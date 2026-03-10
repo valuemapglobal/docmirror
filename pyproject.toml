@@ -38,11 +38,11 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/docmirror/docmirror"
+Homepage = "https://github.com/valuemapglobal/docmirror"
 Documentation = "https://docmirror.readthedocs.io"
-Repository = "https://github.com/docmirror/docmirror"
-Issues = "https://github.com/docmirror/docmirror/issues"
-Changelog = "https://github.com/docmirror/docmirror/blob/main/CHANGELOG.md"
+Repository = "https://github.com/valuemapglobal/docmirror"
+Issues = "https://github.com/valuemapglobal/docmirror/issues"
+Changelog = "https://github.com/valuemapglobal/docmirror/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
 pdf = ["PyMuPDF>=1.23", "pdfplumber>=0.10"]

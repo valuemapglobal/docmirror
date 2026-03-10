@@ -6,7 +6,7 @@ Thank you for your interest in contributing to DocMirror! This guide will help y
 
 ```bash
 # Clone the repository
-git clone https://github.com/docmirror/docmirror.git
+git clone https://github.com/valuemapglobal/docmirror.git
 cd docmirror
 
 # Create a virtual environment
@@ -85,7 +85,7 @@ docmirror/
 
 ## Reporting Issues
 
-- Use [GitHub Issues](https://github.com/docmirror/docmirror/issues)
+- Use [GitHub Issues](https://github.com/valuemapglobal/docmirror/issues)
 - Include: Python version, OS, DocMirror version, minimal reproduction steps
 - For document parsing issues, include a sample file if possible (redact sensitive data)
 
