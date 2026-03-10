@@ -1,7 +1,21 @@
 """
 PDF Adapter — PDF → PerceptionResult
+=====================================
 
-主Path: Orchestrator → EnhancedResult → PerceptionResultBuilder (一步直达)。
+Converts PDF files into structured output via two paths:
+
+- ``to_base_result()``: Core extraction only (no middleware pipeline).
+  Instantiates ``CoreExtractor`` directly and returns an immutable ``BaseResult``.
+
+- ``perceive()``: Full pipeline (recommended). Uses a shared ``Orchestrator``
+  singleton to run extraction + middleware enhancement, then maps the result
+  to a ``PerceptionResult`` via ``PerceptionResultBuilder``.
+
+- ``parse()``: **Deprecated** legacy interface kept for backward compatibility.
+  Delegates to the same orchestrator but returns a ``ParserOutput`` instead.
+
+The orchestrator singleton is lazily initialized on first use to avoid
+import-time overhead from heavy dependencies (PyMuPDF, pdfplumber).
 """
 
 from __future__ import annotations
@@ -15,10 +29,14 @@ from docmirror.models.domain import BaseResult
 
 logger = logging.getLogger(__name__)
 
-# ── Orchestrator Singleton ──
+# Module-level orchestrator singleton. Lazily created on first call to
+# _get_shared_orchestrator() so that importing this module does not
+# trigger heavy dependency loading (PyMuPDF, layout models, etc.).
 _orchestrator = None
 
+
 def _get_shared_orchestrator():
+    """Return (and lazily create) the shared Orchestrator singleton."""
     global _orchestrator
     if _orchestrator is None:
         from docmirror.framework.orchestrator import Orchestrator
@@ -28,23 +46,38 @@ def _get_shared_orchestrator():
 
 class PDFAdapter(BaseParser):
     """
-    PDF Format adapter。
+    PDF format adapter.
 
-    viaShared Orchestrator SingletonComplete全流程，
-    using PerceptionResultBuilder 一步生成 PerceptionResult。
+    Uses a shared Orchestrator singleton to run the full extraction
+    and enhancement pipeline, then builds a PerceptionResult in one step.
+
+    Args:
+        enhance_mode: Enhancement level for the middleware pipeline.
+            One of "raw" (extraction only), "standard" (default), or "full".
     """
 
     def __init__(self, enhance_mode: str = "standard", **kwargs):
         self._enhance_mode = enhance_mode
 
     async def to_base_result(self, file_path: Path, **kwargs) -> BaseResult:
-        """PDF → BaseResult (仅核心Extract, 不走Middleware)。"""
+        """
+        Extract a PDF into a BaseResult without running the middleware pipeline.
+
+        This is useful when you only need the raw extraction output
+        (text, tables, layout) without any business-specific enhancements.
+        """
         from docmirror.core.extractor import CoreExtractor
         extractor = CoreExtractor()
         return await extractor.extract(file_path)
 
     async def perceive(self, file_path: Path, **context):
-        """PDF → PerceptionResult (完整Pipeline, 一步直达)。"""
+        """
+        Full pipeline: PDF → PerceptionResult (recommended entry point).
+
+        Steps:
+            1. Orchestrator runs CoreExtractor + middleware pipeline → EnhancedResult
+            2. PerceptionResultBuilder maps EnhancedResult → PerceptionResult
+        """
         from docmirror.models.builder import PerceptionResultBuilder
 
         orchestrator = _get_shared_orchestrator()
@@ -60,7 +93,12 @@ class PDFAdapter(BaseParser):
         )
 
     async def parse(self, file_path: Path, **kwargs) -> ParserOutput:
-        """[DEPRECATED] retain旧Interface兼容。"""
+        """
+        [DEPRECATED] Legacy interface — use perceive() instead.
+
+        Runs the same orchestrator pipeline but returns a ParserOutput
+        for backward compatibility with older callers.
+        """
         orchestrator = _get_shared_orchestrator()
         enhanced = await orchestrator.run_pipeline(
             file_path=file_path,
@@ -70,5 +108,3 @@ class PDFAdapter(BaseParser):
         output = enhanced.to_parser_output()
         output._enhanced = enhanced
         return output
-
-

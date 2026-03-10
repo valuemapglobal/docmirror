@@ -1,12 +1,23 @@
 """
-Adapters — Format adapter layer
-========================
+Adapters — Format-specific document converters.
+================================================
 
-each Adapter 负责:
-    1. 将特定FormatFileConvert为 ``BaseResult``
-    2. Optional地直接Returns ``ParserOutput`` (Backward compatible)
+Each adapter is responsible for:
+    1. Converting a specific file format into an immutable ``BaseResult``.
+    2. Optionally returning a ``ParserOutput`` for backward compatibility.
 
-Adapter 不引入any业务逻辑 — 业务增强由 Middleware Pipeline统一Processing。
+Adapters contain NO business logic — all domain-specific enhancement
+is handled by the middleware pipeline downstream.
+
+Supported formats:
+    - PDF      → PDFAdapter
+    - Image    → ImageAdapter (VLM + OCR fallback)
+    - Word     → WordAdapter (.docx via python-docx)
+    - Excel    → ExcelAdapter (.xlsx via openpyxl)
+    - PPT      → PPTAdapter (.pptx via python-pptx)
+    - Email    → EmailAdapter (.eml via stdlib email)
+    - HTML     → WebAdapter (raw text extraction)
+    - JSON/CSV → StructuredAdapter
 """
 
 from .pdf import PDFAdapter
