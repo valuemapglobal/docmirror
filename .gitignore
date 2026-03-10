@@ -1,0 +1,47 @@
+## General
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+*.egg
+dist/
+build/
+.eggs/
+
+## Environment
+.env
+.venv/
+venv/
+env/
+
+## IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+## OS
+.DS_Store
+Thumbs.db
+
+## Model weights & large files
+*.onnx
+*.pt
+*.pth
+*.bin
+*.safetensors
+models_cache/
+
+## Test artifacts
+*.pdf
+!tests/fixtures/*.pdf
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+
+## Distribution
+*.whl
+*.tar.gz

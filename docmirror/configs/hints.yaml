@@ -1,0 +1,82 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# MultiModal 业务规则配置 (hints.yaml)
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+# 将易变的业务规则集中管理，替代 v1 的 200+ Plugin 文件。
+# 修改此文件无需重启服务 (支持热加载)。
+
+# ── 场景定义 ──
+scenes:
+  - name: cmb_bank_statement
+    display_name: 招行流水
+    keywords: ["招商银行", "交易明细"]
+    column_map:
+      "交易日": {standard_name: "交易时间", type: "date"}
+      "摘要": {standard_name: "摘要", type: "string"}
+      "人民币": {standard_name: "交易金额", type: "number"}
+      "结余": {standard_name: "账户余额", type: "number"}
+    validation_rules:
+      - {field: "交易金额", rule: "not_null"}
+      - {field: "交易时间", rule: "date_format"}
+
+  - name: ccb_bank_statement
+    display_name: 建行流水
+    keywords: ["中国建设银行"]
+    column_map:
+      "交易日期": {standard_name: "交易时间", type: "date"}
+      "摘要": {standard_name: "摘要", type: "string"}
+      "交易金额": {standard_name: "交易金额", type: "number"}
+      "账户余额": {standard_name: "账户余额", type: "number"}
+      "对方户名": {standard_name: "对方账号与户名", type: "string"}
+
+  - name: icbc_bank_statement
+    display_name: 工行流水
+    keywords: ["中国工商银行"]
+    column_map:
+      "日期": {standard_name: "交易时间", type: "date"}
+      "摘要": {standard_name: "摘要", type: "string"}
+      "借方发生额": {standard_name: "交易金额", type: "number", sign: "negative"}
+      "贷方发生额": {standard_name: "交易金额", type: "number", sign: "positive"}
+      "余额": {standard_name: "账户余额", type: "number"}
+
+  - name: abc_bank_statement
+    display_name: 农行流水
+    keywords: ["中国农业银行"]
+    column_map:
+      "交易日期": {standard_name: "交易时间", type: "date"}
+      "交易摘要": {standard_name: "摘要", type: "string"}
+      "交易金额（元）": {standard_name: "交易金额", type: "number"}
+      "余额（元）": {standard_name: "账户余额", type: "number"}
+
+  - name: generic_invoice
+    display_name: 通用发票
+    keywords: ["增值税", "发票"]
+    column_map:
+      "品名": {standard_name: "item_name", type: "string"}
+      "数量": {standard_name: "quantity", type: "number"}
+      "单价": {standard_name: "unit_price", type: "number"}
+      "金额": {standard_name: "amount", type: "number"}
+      "税率": {standard_name: "tax_rate", type: "string"}
+
+# ── 通用列名别名扩展 ──
+column_aliases:
+  交易时间:
+    - "记账日"
+    - "值日"
+    - "入账时间"
+  交易金额:
+    - "发生金额"
+    - "交易额(元)"
+  账户余额:
+    - "账面余额"
+    - "卡余额"
+
+# ── 机构级微调 (替代 Plugin) ──
+institution_hints:
+  citic:
+    date_format: "YYYYMMDD"
+    amount_sign_rule: "split"  # 收入/支出分列
+    special_columns: ["Account SeqNo", "Inquiry period"]
+  pab:
+    date_format: "YYYY-MM-DD HH:MM:SS"
+    amount_sign_rule: "standard"

@@ -1,0 +1,145 @@
+# DocMirror institution registry (从 pdf BANK_REGISTRY 迁移)
+# 用于 L2 机构识别：identification_keywords 优先，再按 name 全称匹配（按长度降序）
+
+institutions:
+  # 国有大型商业银行
+  icbc:
+    name: "中国工商银行"
+    english_name: "Industrial and Commercial Bank of China"
+    swift: "ICBKCNBJ"
+    category: "state_owned"
+    aliases: ["工行", "工商银行", "ICBC"]
+  abc:
+    name: "中国农业银行"
+    english_name: "Agricultural Bank of China"
+    swift: "ABOCCNBJ"
+    category: "state_owned"
+    aliases: ["农行", "农业银行", "ABC"]
+  boc:
+    name: "中国银行"
+    english_name: "Bank of China"
+    swift: "BKCHCNBJ"
+    category: "state_owned"
+    aliases: ["中行", "BOC"]
+  ccb:
+    name: "中国建设银行"
+    english_name: "China Construction Bank"
+    swift: "PCBCCNBJ"
+    category: "state_owned"
+    aliases: ["建行", "建设银行", "CCB"]
+  comm:
+    name: "交通银行"
+    english_name: "Bank of Communications"
+    swift: "COMMCNSH"
+    category: "state_owned"
+    aliases: ["交行", "BOCOM"]
+  psbc:
+    name: "中国邮政储蓄银行"
+    english_name: "Postal Savings Bank of China"
+    swift: "PSBCCNBJ"
+    category: "state_owned"
+    aliases: ["邮储银行", "邮储", "邮政银行", "PSBC"]
+
+  # 股份制商业银行
+  citic:
+    name: "中信银行"
+    english_name: "China CITIC Bank"
+    swift: "CIBKCNBJ"
+    category: "joint_stock"
+    identification_keywords: ["Account SeqNo", "Inquiry period", "Reversal flag"]
+  ceb:
+    name: "中国光大银行"
+    english_name: "China Everbright Bank"
+    swift: "EVERCNBJ"
+    category: "joint_stock"
+  cmb:
+    name: "招商银行"
+    english_name: "China Merchants Bank"
+    swift: "CMBCCNBS"
+    category: "joint_stock"
+    aliases: ["招行", "CMB"]
+  spdb:
+    name: "上海浦东发展银行"
+    english_name: "Shanghai Pudong Development Bank"
+    swift: "SPDBCNSH"
+    category: "joint_stock"
+  cmbc:
+    name: "中国民生银行"
+    english_name: "China Minsheng Banking"
+    swift: "MSBCCNBJ"
+    category: "joint_stock"
+  hxb:
+    name: "华夏银行"
+    english_name: "Hua Xia Bank"
+    swift: "HXBKCNBJ"
+    category: "joint_stock"
+    aliases: ["华夏"]
+  pab:
+    name: "平安银行"
+    english_name: "Ping An Bank"
+    swift: "SZDBCNBS"
+    category: "joint_stock"
+  cib:
+    name: "兴业银行"
+    english_name: "Industrial Bank"
+    swift: "FJIBCNBA"
+    category: "joint_stock"
+    aliases: ["兴业", "CIB"]
+  cgb:
+    name: "广发银行"
+    english_name: "China Guangfa Bank"
+    swift: "GDBKCN22"
+    category: "joint_stock"
+  cbhb:
+    name: "渤海银行"
+    english_name: "China Bohai Bank"
+    swift: "CHBHCNBT"
+    category: "joint_stock"
+  czb:
+    name: "浙商银行"
+    english_name: "China Zheshang Bank"
+    swift: "ZJCBCN2N"
+    category: "joint_stock"
+  hfb:
+    name: "恒丰银行"
+    english_name: "Evergrowing Bank"
+    swift: "HFBACNSD"
+    category: "joint_stock"
+
+  # 城市商业银行
+  fjhx:
+    name: "福建海峡银行"
+    english_name: "Fujian Haixia Bank"
+    swift: "FJHXCN55"
+    category: "city_commercial"
+    identification_keywords: ["福建海峡银行"]
+  bob:
+    name: "北京银行"
+    english_name: "Bank of Beijing"
+    swift: "BJCNCNBJ"
+    category: "city_commercial"
+  bot:
+    name: "天津银行"
+    english_name: "Bank of Tianjin"
+    swift: "TCCBCNBT"
+    category: "city_commercial"
+  bos:
+    name: "上海银行"
+    english_name: "Bank of Shanghai"
+    swift: "BOSHCNSH"
+    category: "city_commercial"
+  cqb:
+    name: "重庆银行"
+    english_name: "Bank of Chongqing"
+    swift: "CQCBCN22"
+    category: "city_commercial"
+  jsb:
+    name: "江苏银行"
+    english_name: "Bank of Jiangsu"
+    swift: "BOJSCNBN"
+    category: "city_commercial"
+  hzb:
+    name: "杭州银行"
+    english_name: "Bank of Hangzhou"
+    swift: "HZCBCN2H"
+    category: "city_commercial"
