@@ -263,18 +263,14 @@ class ParserOutput(BaseModel):
             pdf_properties=pdf_props,
         )
 
-        # ── 4. Domain: Domain-specific data abstraction ──
+        # ── 4. Domain: Plugin-based domain data abstraction ──
         domain = None
         cat = (doc_info or {}).get("category", "") or meta.get("_doc_category", "")
-        if cat == "bank_statement":
-            bs = BankStatementData(
-                account_holder=str(meta.get("Account holder", "")),
-                account_number=str(meta.get("Account number", "")),
-                bank_name=str(self.key_entities.get("bank_name", "")),
-                query_period=str(meta.get("Query period", "")),
-                currency=str(meta.get("Currency", "CNY")) or "CNY",
+        if cat:
+            from docmirror.plugins import registry as plugin_registry
+            domain = plugin_registry.build_domain_data(
+                cat, metadata=meta, entities=self.key_entities,
             )
-            domain = DomainData(document_type="bank_statement", bank_statement=bs)
 
         pr = PerceptionResult(
             status=result_status,
