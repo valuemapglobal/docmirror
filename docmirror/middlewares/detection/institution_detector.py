@@ -1,18 +1,23 @@
 """
-L2 Institution identificationMiddleware (Institution Detector)
-=========================================
+L2 Institution Identification Middleware (Institution Detector)
+=============================================================
 
-在 scene=bank_statement 时，从全文/首页文本RecognizeConcrete银行 (institution id)。
-策略：先 identification_keywords 精确Match，再按银行全称（按Name长度降序）Match。
-Configuration来自 configs/institution_registry.yaml。
+When scene=bank_statement, identifies the specific concrete banking institution 
+(institution id) utilizing OCR text boundaries from the first page/headline texts.
+
+Strategy: 
+  - Pass 1: Strict identification_keywords fingerprint match.
+  - Pass 2: Fallback length-sorted full institutional name string match.
+  - Pass 3: Alias matching capabilities (e.g. abbreviations).
+Configuration mapped from `configs/institution_registry.yaml`.
 """
-
 from __future__ import annotations
+
 
 import logging
 import unicodedata
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from ..base import BaseMiddleware
 from ...models.enhanced import EnhancedResult
@@ -21,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 
 def _load_registry() -> Dict[str, Dict[str, Any]]:
-    """Load机构Registry。"""
+    """Load the institution yaml configuration registry."""
     try:
         import yaml
         registry_path = Path(__file__).parent.parent.parent / "configs" / "institution_registry.yaml"
@@ -36,8 +41,10 @@ def _load_registry() -> Dict[str, Dict[str, Any]]:
 
 def _extract_header_area(full_text: str, max_chars: int = 5000) -> str:
     """
-    截取「Table header区域」：在常见交易列关键字before的内容，用于Institution identification。
-    avoid在交易流水条目中误Match对手方银行名。
+    Isolate the "Title/Header Area": the textual payload occurring prior to the 
+    first detection of common transaction column table keywords.
+    Crucial for avoiding false-positive matches reading counterparty bank names 
+    deep inside transaction history rows.
     """
     column_keywords = [
         "Transaction date", "凭证Type", "交易时间", "序号",
@@ -53,21 +60,22 @@ def _extract_header_area(full_text: str, max_chars: int = 5000) -> str:
 
 def detect_institution(full_text: str, registry: Dict[str, Dict[str, Any]]) -> Optional[str]:
     """
-    L2 Institution identification：Returns institution_id 或 None。
-    先按 identification_keywords Match，再按银行全称（按Name长度降序）Match。
+    Execute L2 Institution Identification: Returns matched institution_id or None.
+    Evaluates primarily via unique `identification_keywords`, falling back 
+    to full-name overlap, sorted descending by length to prevent partial short-matches.
     """
     if not full_text or not registry:
         return None
     normalized = unicodedata.normalize("NFKC", full_text)
     header_text = _extract_header_area(normalized)
 
-    # Pass 1: 特征指纹
+    # Pass 1: Characteristic Fingerprints (identification_keywords)
     for inst_id, info in registry.items():
         keywords = info.get("identification_keywords") or []
         if keywords and all(kw in normalized for kw in keywords):
             return inst_id
 
-    # Pass 2: Name全称（按长度降序）
+    # Pass 2: Complete Institutional Names (Sorted descending by length)
     sorted_banks = sorted(
         registry.items(),
         key=lambda kv: len(kv[1].get("name", "")),
@@ -78,7 +86,7 @@ def detect_institution(full_text: str, registry: Dict[str, Dict[str, Any]]) -> O
         if name and name in header_text:
             return inst_id
 
-    # Pass 3: Alias matching (缩写/俗称, 如 "工行"→icbc)
+    # Pass 3: Alias Matching (Alternative names/acronyms, e.g., "工行" \u2192 icbc)
     for inst_id, info in registry.items():
         for alias in info.get("aliases", []):
             if alias and alias in header_text:
@@ -89,8 +97,11 @@ def detect_institution(full_text: str, registry: Dict[str, Dict[str, Any]]) -> O
 
 class InstitutionDetector(BaseMiddleware):
     """
-    L2 Institution identification：在 bank_statement 场景下Output institution。
-    将Result写入 result.enhanced_data["institution"]，供 ColumnMapper 等using。
+    L2 Institution Identification Middleware.
+    
+    Contextually restricts execution to `bank_statement` scenes.
+    Writes matched outputs into `result.enhanced_data["institution"]`, feeding 
+    downstream logic like entity extraction and identity resolution.
     """
 
     def __init__(self, config: Optional[Dict[str, Any]] = None):
@@ -125,7 +136,7 @@ class InstitutionDetector(BaseMiddleware):
                 confidence=0.9,
                 reason="registry match",
             )
-            logger.info(f"[InstitutionDetector] → institution={institution}")
+            logger.info(f"[InstitutionDetector] -> institution={institution}")
         else:
-            logger.debug("[InstitutionDetector] → no institution matched")
+            logger.debug("[InstitutionDetector] -> no institution matched")
         return result

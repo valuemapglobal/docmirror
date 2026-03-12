@@ -176,7 +176,16 @@
 
    END OF TERMS AND CONDITIONS
 
-   Copyright 2026 DocMirror Contributors
+   APPENDIX: How to apply the Apache License to your work.
+
+      To apply the Apache License to your work, attach the following
+      boilerplate notice, with the fields enclosed by brackets "[]"
+      replaced with your own identifying information. (Don't include
+      the brackets!)  The text should be enclosed in the appropriate
+      comment syntax for the file format. Please also get an effective
+      date and update the boilerplate example below.
+
+   Copyright 2024-2026 ValueMap Global
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.

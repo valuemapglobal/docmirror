@@ -22,20 +22,33 @@ Metadata includes:
     - source_format: "pptx"
     - slide_count: total number of slides
 """
-
 from __future__ import annotations
+
 
 import logging
 from pathlib import Path
 
-from docmirror.framework.base import BaseParser, ParserOutput, ParserStatus
+from docmirror.framework.base import BaseParser
 from docmirror.models.domain import BaseResult, Block, PageLayout
 
 logger = logging.getLogger(__name__)
 
 
 class PPTAdapter(BaseParser):
-    """PowerPoint (.pptx) format adapter — each slide becomes a separate page."""
+    """PowerPoint (.pptx/.ppt) format adapter — native parsing prioritizing `python-pptx`.
+
+    Processing strategy:
+        1. **Modern formats (.pptx):** Direct deep extraction via ``python-pptx``
+           preserving slides, shapes, text, and tables natively.
+        2. **Legacy formats (.ppt):** Automatically transcoded to PDF via LibreOffice,
+           then processed through the standard PDF pipeline.
+    """
+
+    async def perceive(self, file_path: Path, **context):
+        """
+        Native primary extraction for modern .pptx.
+        """
+        return await super().perceive(file_path, **context)
 
     async def to_base_result(self, file_path: Path) -> BaseResult:
         """

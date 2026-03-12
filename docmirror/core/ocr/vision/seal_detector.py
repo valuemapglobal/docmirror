@@ -1,17 +1,23 @@
 """
-Seal detection与极Coordinates拉直Extract器
-based on OpenCV (cv2)
+Seal Detection & Polar Coordinate Unwarping
+=============================================
 
-supports两种DetectMode:
-1. 彩色Seal: HSV red空间分割 (适合彩色扫描)
-2. graySeal: 灰度Threshold + 圆度Filter (适合黑白/灰度扫描)
+Based on OpenCV (cv2).
 
-解决极端弯曲Seal(如银行公章)无法被普通 OCR Recognize的问题。
-via cv2.warpPolar 进行极Coordinates变换将其"拉直"为水平文本片段。
+Supports two detection modes:
+    1. **Colour seal**: HSV red-channel segmentation (for colour scans).
+    2. **Greyscale seal**: grey-level thresholding + circularity filtering
+       (for B&W / greyscale scans).
+
+Solves the problem of extremely curved seals (e.g. bank chops) that
+cannot be recognised by standard OCR.  Uses ``cv2.warpPolar`` for
+polar-coordinate transformation to "straighten" the curved text into
+a horizontal image strip.
 """
+from __future__ import annotations
 
 import logging
-from typing import Optional, Tuple, Dict, Any, List
+from typing import Optional, Dict, Any
 import numpy as np
 
 logger = logging.getLogger(__name__)
@@ -25,24 +31,24 @@ except ImportError:
 
 
 class SealDetector:
-    """Seal detection与极Coordinates拉直器 — supports彩色与灰度扫描"""
+    """Seal detector & polar-coordinate straightener — supports both colour
+    and greyscale scans."""
 
     def __init__(self):
-        # red在 HSV 中的两个分布区间
+        # Red occupies two disjoint hue ranges in HSV colour space
         self.lower_red1 = np.array([0, 50, 50])
         self.upper_red1 = np.array([10, 255, 255])
         self.lower_red2 = np.array([160, 50, 50])
         self.upper_red2 = np.array([180, 255, 255])
 
     # ─────────────────────────────────────────────────────────────────────────
-    # 公共 API
+    # Public API
     # ─────────────────────────────────────────────────────────────────────────
     def detect_seal(
         self, image_bgr: np.ndarray
     ) -> Dict[str, Any]:
-        """
-        DetectSeal并ReturnsDetection result (不做极Coordinates展开)。
-        
+        """Detect a seal and return detection metadata (no polar unwarping).
+
         Returns:
             {
                 "has_seal": bool,
@@ -55,16 +61,17 @@ class SealDetector:
         if not _CV2_AVAILABLE:
             return {"has_seal": False, "center": None, "radius": None, "bbox": None, "mode": None}
 
-        # 1. Try color (red) seal detection first
+        # 1. Try colour (red) seal detection first
         result = self._detect_color_seal(image_bgr)
         if result["has_seal"]:
             return result
 
-        # 2. Fallback to grayscale (B&W scan) seal detection
+        # 2. Fallback to greyscale (B&W scan) seal detection
         return self._detect_gray_seal(image_bgr)
 
     def unwarp_circular_seal(self, image_bgr: np.ndarray) -> Optional[np.ndarray]:
-        """从原图中剥离Seal并将其拉直成水平图 (极Coordinates展开)。"""
+        """Extract the seal from the image and flatten it via polar-coordinate
+        transformation into a horizontal text strip."""
         info = self.detect_seal(image_bgr)
         if not info["has_seal"]:
             return None
@@ -99,10 +106,10 @@ class SealDetector:
             return None
 
     # ─────────────────────────────────────────────────────────────────────────
-    # 彩色Seal detection (red HSV)
+    # Colour seal detection (red HSV)
     # ─────────────────────────────────────────────────────────────────────────
     def _detect_color_seal(self, image_bgr: np.ndarray) -> Dict[str, Any]:
-        """HSV red空间分割Detect彩色Seal。"""
+        """Detect a colour seal via HSV red-channel segmentation."""
         empty = {"has_seal": False, "center": None, "radius": None, "bbox": None, "mode": None}
         try:
             hsv = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2HSV)
@@ -132,41 +139,42 @@ class SealDetector:
                 "bbox": (center[0] - r, center[1] - r, center[0] + r, center[1] + r),
                 "mode": "color",
             }
-        except Exception:
+        except Exception as exc:
+            logger.debug(f"operation: suppressed {exc}")
             return empty
 
     # ─────────────────────────────────────────────────────────────────────────
-    # 灰度Seal detection (适合黑白扫描)
+    # Greyscale seal detection (for B&W scans)
     # ─────────────────────────────────────────────────────────────────────────
     def _detect_gray_seal(self, image_bgr: np.ndarray) -> Dict[str, Any]:
-        """
-        灰度圆形Contour detection。
-        
-        算法:
-          1. 将图像转灰度, 高斯模糊去噪
-          2. 自适应Threshold + 形态学操作仅retain中gray区域
-             (排除纯黑文字和白色Background)
-          3. 在Threshold图上查找轮廓, 按圆度 (circularity) Filter
-          4. 选取Area最大且圆度 > 0.5 的轮廓作为Seal
+        """Greyscale circular-contour detection.
+
+        Algorithm:
+          1. Convert to greyscale, apply Gaussian blur for denoising.
+          2. Adaptive threshold + morphological operations to retain only
+             mid-grey regions (excluding pure-black text and white background).
+          3. Find contours in the thresholded image, filter by circularity.
+          4. Select the largest contour with circularity > 0.5 as the seal.
         """
         empty = {"has_seal": False, "center": None, "radius": None, "bbox": None, "mode": None}
         try:
             gray = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2GRAY)
             h, w = gray.shape
 
-            # 只搜索右上角区域 (Sealtypically在右上角)
+            # Search only the top-right quadrant (seals are typically placed there)
             roi_y1, roi_y2 = 0, h // 3
             roi_x1, roi_x2 = w // 2, w
             gray_roi = gray[roi_y1:roi_y2, roi_x1:roi_x2]
 
-            # 高斯模糊降噪
+            # Gaussian blur for noise reduction
             blurred = cv2.GaussianBlur(gray_roi, (5, 5), 0)
 
-            # Extract中gray区域 (排除纯黑文字 <80 和白色Background >200)
-            # Sealtypically是gray (扫描后) ~80-200
+            # Extract mid-grey regions (exclude pure-black text < 80
+            # and white background > 200)
+            # Scanned seals typically fall in the ~80–200 grey range
             mask = cv2.inRange(blurred, 80, 200)
 
-            # 形态学: 闭运算连接断裂弧段, 开运算去小噪点
+            # Morphological close to connect broken arcs, open to remove speckle
             kernel = np.ones((5, 5), np.uint8)
             mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel, iterations=2)
             mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
@@ -175,10 +183,10 @@ class SealDetector:
             if not contours:
                 return empty
 
-            # 寻找圆度最高, Area足够大的轮廓
+            # Find the contour with the highest circularity and sufficient area
             best = None
             best_score = 0
-            min_area = 2000  # 最小AreaThreshold
+            min_area = 2000                # Minimum area threshold
             min_circularity = 0.3
 
             for cnt in contours:
@@ -192,7 +200,7 @@ class SealDetector:
                 if circularity < min_circularity:
                     continue
 
-                # 综合评分: Area × 圆度
+                # Combined score: area × circularity
                 score = area * circularity
                 if score > best_score:
                     best_score = score
@@ -202,7 +210,7 @@ class SealDetector:
                 return empty
 
             (cx, cy), radius = cv2.minEnclosingCircle(best)
-            # 转回全图Coordinates
+            # Convert back to full-image coordinates
             abs_cx = int(cx) + roi_x1
             abs_cy = int(cy) + roi_y1
             r = int(radius)
@@ -228,7 +236,7 @@ class SealDetector:
             return empty
 
 
-# Singleton提供
+# Singleton accessor
 _default_seal_detector: Optional[SealDetector] = None
 
 def get_seal_detector() -> SealDetector:

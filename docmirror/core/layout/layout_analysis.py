@@ -1,46 +1,46 @@
 """
-Layout analysis engine (Layout Analysis Engine)
+Layout Analysis Engine
 =======================================
 
-提供Page级版面Analyze与空间Partitioned能力。
-Self-contained，不Dependency MultiModal 包External的any v1 代码。
+Provides page-level layout analysis and spatial partitioning capabilities.
+Self-contained, does not depend on any v1 code external to the MultiModal package.
 
-=== Module结构 (v2 重构后) ===
+=== Module Structure (post v2 refactor) ===
 
-  本File仅retain:
-    - Module 1:  版面Analyze  — ALPageLayout / analyze_page_layout / analyze_document_layout
-    - Module 1b: 空间Partitioned  — Zone / segment_page_into_zones / _classify_zone
+  This file only retains:
+    - Module 1: Layout Analysis — ALPageLayout / analyze_page_layout / analyze_document_layout
+    - Module 1b: Spatial Partitioning — Zone / segment_page_into_zones / _classify_zone
 
-  已Split至独立Module:
-    - text_utils.py:         CJK Tool / normalize_text / parse_amount / headers_match
-    - vocabulary.py:         VOCAB_BY_CATEGORY / KNOWN_HEADER_WORDS / 行Classifier
-    - table_postprocess.py:  post_process_table 全家族
-    - watermark.py:          preprocess_pdf / filter_watermark_page / _dedup_overlapping_chars
-    - table_extraction.py:   extract_tables_layered (6+1 Layer) 全链路
-    - ocr_fallback.py:       analyze_scanned_page (Scanned document OCR)
+  Split into independent modules:
+    - text_utils.py: CJK Tools / normalize_text / parse_amount / headers_match
+    - vocabulary.py: VOCAB_BY_CATEGORY / KNOWN_HEADER_WORDS / Row Classifier
+    - table_postprocess.py: post_process_table family
+    - watermark.py: preprocess_document / filter_watermark_page / _dedup_overlapping_chars
+    - table_extraction.py: extract_tables_layered (6+1 Layer) full pipeline
+    - ocr_fallback.py: analyze_scanned_page (Scanned document OCR)
 
-=== Backward compatible ===
+=== Backward Compatibility ===
 
-  all历史Public符号均via re-export 保持Backward compatible。
-  Callers do not need to modify any import statements。
+  All historical public symbols are maintained backward compatible via re-export.
+  Callers do not need to modify any import statements.
 """
-
 from __future__ import annotations
+
 
 import logging
 import re
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Dict, List, Tuple
 
 logger = logging.getLogger(__name__)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Backward compatible re-exports  — Lazy Loading (按需Import，avoidTrigger 11+ Module链)
+# Backward compatible re-exports — Lazy Loading (Load on demand, avoids triggering 11+ module chain)
 # ═══════════════════════════════════════════════════════════════════════════════
 
-# Mapping table: symbol_name → (module_path, is_package_level)
+# Mapping table: symbol_name -> (module_path, is_package_level)
 _LAZY_MAP = {}
 
 def _register_lazy(module: str, symbols: list):
@@ -67,7 +67,7 @@ _register_lazy("..table.postprocess", [
 ])
 # watermark & preprocessing
 _register_lazy("..utils.watermark", [
-    "preprocess_pdf", "is_watermark_char", "filter_watermark_page",
+    "preprocess_document", "is_watermark_char", "filter_watermark_page",
     "_dedup_overlapping_chars",
 ])
 # table extraction
@@ -96,12 +96,12 @@ def __getattr__(name):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Module 1: 版面Analyze器
+# Module 1: Layout Analyzer
 # ═══════════════════════════════════════════════════════════════════════════════
 
 @dataclass
 class ContentRegion:
-    """Page上的一个内容区域。"""
+    """A content region on the page."""
     type: str  # "text" | "table" | "image"
     bbox: Tuple[float, float, float, float]
     page: int
@@ -115,7 +115,7 @@ class ContentRegion:
 
 @dataclass
 class ALPageLayout:
-    """单页版面AnalyzeResult。"""
+    """Single page layout analysis result."""
     page_index: int
     width: float
     height: float
@@ -132,8 +132,8 @@ class ALPageLayout:
 
 def _detect_borderless_table(text_dict: dict, page_height: float) -> bool:
     """
-    启发式Detect无线Table。
-    如果 ≥3 行都有 ≥2 个独立 x 段 → 判定为无线Table。
+    Heuristic detection of borderless tables.
+    If >= 3 rows have >= 2 independent x segments -> determined as a borderless table.
     """
     spans = []
     for block in text_dict.get("blocks", []):
@@ -182,7 +182,7 @@ def _detect_borderless_table(text_dict: dict, page_height: float) -> bool:
 
 
 def analyze_page_layout(page, page_idx: int) -> ALPageLayout:
-    """Analyze单页版面结构 (~30ms/页)。"""
+    """Analyze single page layout structure (~30ms/page)."""
     rect = page.rect
     layout = ALPageLayout(page_index=page_idx, width=rect.width, height=rect.height)
 
@@ -212,18 +212,34 @@ def analyze_page_layout(page, page_idx: int) -> ALPageLayout:
         ))
     layout.image_count = len(image_blocks)
 
+    # ── Fast table detection: line-count heuristic (~1ms vs ~2000ms) ──
+    # The actual table extraction happens later in extract_tables_layered().
+    # Here we only need a boolean has_table for routing decisions.
     try:
-        tables = page.find_tables()
-        for tbl in tables.tables:
-            layout.regions.append(ContentRegion(
-                type="table", bbox=tbl.bbox, page=page_idx,
-                text_preview=f"table_{len(tbl.cells)}cells",
-            ))
-        layout.table_count = len(tables.tables)
-        layout.has_table = layout.table_count > 0
-    except Exception:
-        pass
+        drawings = page.get_drawings()
+        v_lines = 0
+        h_lines = 0
+        for d in drawings:
+            for item in d.get("items", []):
+                if item[0] == "l":  # line item
+                    p1, p2 = item[1], item[2]
+                    dx = abs(p1.x - p2.x)
+                    dy = abs(p1.y - p2.y)
+                    if dx < 1 and dy > 5:
+                        v_lines += 1
+                    elif dy < 1 and dx > 5:
+                        h_lines += 1
+            if item[0] == "re":  # rectangle item → implies borders
+                v_lines += 2
+                h_lines += 2
+        # Bordered table: has both vertical and horizontal lines
+        if v_lines >= 2 and h_lines >= 2:
+            layout.has_table = True
+            layout.table_count = 1  # approximate; exact count not needed for routing
+    except Exception as exc:
+        logger.debug(f"fast table detection: suppressed {exc}")
 
+    # Fallback: borderless table detection (existing heuristic)
     if not layout.has_table:
         if _detect_borderless_table(text_dict, rect.height):
             layout.has_table = True
@@ -276,7 +292,7 @@ def analyze_page_layout(page, page_idx: int) -> ALPageLayout:
 
 
 def analyze_document_layout(fitz_doc) -> List[ALPageLayout]:
-    """Analyze整个Document的版面结构。"""
+    """Analyze the layout structure of the entire document."""
     layouts = []
     for page_idx in range(len(fitz_doc)):
         layouts.append(analyze_page_layout(fitz_doc[page_idx], page_idx))
@@ -285,7 +301,7 @@ def analyze_document_layout(fitz_doc) -> List[ALPageLayout]:
         layouts[0].is_continuation = False
 
     logger.info(
-        f"[v2] {len(layouts)} pages: "
+        f"{len(layouts)} pages: "
         + " | ".join(
             f"P{l.page_index+1}({'cont' if l.is_continuation else 'new'}:"
             f"T{l.table_count}/I{l.image_count}/Txt{l.text_region_count})"
@@ -296,11 +312,11 @@ def analyze_document_layout(fitz_doc) -> List[ALPageLayout]:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Module 1b: 空间Partitioned
+# Module 1b: Spatial Partitioning
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def _reconstruct_rows_from_chars(chars, col_gap: float = 8.0):
-    """Fallback: 从 chars 直接重建Table行。"""
+    """Fallback: Reconstruct table rows directly from chars."""
     if not chars:
         return []
     y_groups = defaultdict(list)
@@ -337,40 +353,166 @@ def _reconstruct_rows_from_chars(chars, col_gap: float = 8.0):
 
 @dataclass
 class Zone:
-    """Page上的一个大区域 (3~5 个/页)。"""
+    """A large zone on the page (3~5 zones/page)."""
     type: str  # "title" | "summary" | "data_table" | "footer" | "formula" | "unknown"
     bbox: Tuple[float, float, float, float]
     page: int = 0
     chars: list = field(default_factory=list)
     rects: list = field(default_factory=list)
     text: str = ""
-    confidence: float = 1.0  # 模型DetectConfidence, 规则MethodDefault1.0
+    confidence: float = 1.0  # Model Detection Confidence, rule method default 1.0
+
+
+def _isolate_formula_components(chars: List[dict], page_w: float, page_h: float) -> Tuple[List[dict], List[Zone]]:
+    """
+    Isolates formula regions using morphological clustering of character bounding boxes.
+    By finding 'seed' math symbols and dilating them to absorb adjacent subscripts/text,
+    we can accurately segment inline and block formulas without VLM.
+    
+    Returns: (remaining_chars, formula_zones)
+    """
+    if not chars or page_w <= 0 or page_h <= 0:
+        return chars, []
+        
+    try:
+        import cv2
+        import numpy as np
+    except ImportError:
+        return chars, []
+        
+    MATH_UNICODE = set("∑∫∏√∞∂∇±×÷≈≡≠≤≥⊂⊃⊆⊇∈∉∪∩")
+    
+    math_seeds = []
+    
+    for i, c in enumerate(chars):
+        h = c.get("bottom", 0) - c.get("top", 0)
+        w = c.get("x1", 0) - c.get("x0", 0)
+        text = c.get("text", "").strip()
+        
+        is_math = False
+        if h > 0 and w > 0:
+            aspect = h / w
+            if aspect > 2.5 or aspect < 0.2:  # extremely tall or wide (integral, fraction bar)
+                is_math = True
+            elif text and text[0] in MATH_UNICODE:
+                is_math = True
+                
+        if is_math:
+            math_seeds.append(i)
+            
+    if not math_seeds:
+        return chars, []
+        
+    # Create low-res canvas for morphology (scale=2 is enough for bounding boxes)
+    scale = 2.0
+    canvas_h, canvas_w = int(page_h * scale), int(page_w * scale)
+    if canvas_h <= 0 or canvas_w <= 0:
+        return chars, []
+        
+    canvas = np.zeros((canvas_h, canvas_w), dtype=np.uint8)
+    
+    # Draw seeds with generous dilation to catch subscripts/neighbors
+    for idx in math_seeds:
+        c = chars[idx]
+        x0, y0 = int(c["x0"] * scale), int(c["top"] * scale)
+        x1, y1 = int(c["x1"] * scale), int(c["bottom"] * scale)
+        
+        # Expand seed by 15pt horizontally, 8pt vertically
+        mx, my = int(15 * scale), int(8 * scale)
+        cv2.rectangle(canvas, (max(0, x0 - mx), max(0, y0 - my)), 
+                      (min(canvas_w, x1 + mx), min(canvas_h, y1 + my)), 255, -1)
+                      
+    # Draw standard chars to build connected components
+    for c in chars:
+        x0, y0 = int(c["x0"] * scale), int(c["top"] * scale)
+        x1, y1 = int(c["x1"] * scale), int(c["bottom"] * scale)
+        cv2.rectangle(canvas, (x0, y0), (x1, y1), 255, -1)
+        
+    # Morphological Close to connect fragmented formula parts
+    kernel = np.ones((int(5 * scale), int(15 * scale)), np.uint8)
+    canvas = cv2.morphologyEx(canvas, cv2.MORPH_CLOSE, kernel)
+    
+    num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(canvas, connectivity=8)
+    
+    formula_zones = []
+    used_char_indices = set()
+    
+    for i in range(1, num_labels):
+        _, _, w, h, area = stats[i]
+        
+        # Skip absurd components (entire page) or tiny noise
+        if w > canvas_w * 0.9 or h > canvas_h * 0.5 or area < 20:
+            continue
+            
+        comp_mask = (labels == i)
+        comp_char_indices = []
+        comp_math_count = 0
+        
+        for idx, c in enumerate(chars):
+            if idx in used_char_indices: continue
+            cx = int((c["x0"] + c["x1"]) / 2 * scale)
+            cy = int((c["top"] + c["bottom"]) / 2 * scale)
+            
+            if 0 <= cy < canvas_h and 0 <= cx < canvas_w and comp_mask[cy, cx]:
+                comp_char_indices.append(idx)
+                if idx in math_seeds:
+                    comp_math_count += 1
+                    
+        # If CC contains mathematical seed and isn't a massive text block (< 150 chars)
+        if comp_char_indices and comp_math_count > 0 and len(comp_char_indices) < 150:
+            comp_chars = [chars[idx] for idx in comp_char_indices]
+            used_char_indices.update(comp_char_indices)
+            
+            fx0 = min(c["x0"] for c in comp_chars)
+            fy0 = min(c["top"] for c in comp_chars)
+            fx1 = max(c["x1"] for c in comp_chars)
+            fy1 = max(c["bottom"] for c in comp_chars)
+            ftext = "".join(c["text"] for c in sorted(comp_chars, key=lambda c: (c["top"], c["x0"])))
+            
+            formula_zones.append(Zone(
+                type="formula",
+                bbox=(fx0, fy0, fx1, fy1),
+                chars=comp_chars,
+                text=ftext.strip(),
+                confidence=0.9
+            ))
+            
+    remaining_chars = [c for i, c in enumerate(chars) if i not in used_char_indices]
+    return remaining_chars, formula_zones
 
 
 def segment_page_into_zones(
     page_plum, page_idx: int, gap_threshold: float = 15.0,
 ) -> List[Zone]:
-    """空间Partitioned: 模拟人眼把Page切成 3~5 个大区域。"""
+    """Spatial partitioning: Simulates human eye to split page into 3~5 large zones."""
     chars = page_plum.chars
     rects = page_plum.rects or []
     page_h = page_plum.height
+    page_w = page_plum.width
 
     if not chars:
         return []
 
-    # ── Optimize4: 动态 gap_threshold ──
-    # 用字符中位Height × 1.5 替代固定 15pt, 自适应不同Font size
+    # ── Morphological Formula Extraction ──
+    # Extract formula zones first so they don't corrupt text parsing
+    chars, formula_zones = _isolate_formula_components(chars, page_w, page_h)
+
+    if not chars:
+        return formula_zones
+
+    # ── Optimize 4: Dynamic gap_threshold ──
+    # Use median character height x 1.5 instead of fixed 15pt, adapts to different font sizes
     char_heights = [c["bottom"] - c["top"] for c in chars if c.get("bottom", 0) > c.get("top", 0)]
     if char_heights:
         sorted_h = sorted(char_heights)
         median_h = sorted_h[len(sorted_h) // 2]
         gap_threshold = max(12.0, median_h * 1.5)
-        logger.debug(f"[v2] zone split: median_char_h={median_h:.1f}, gap_threshold={gap_threshold:.1f}")
+        logger.debug(f"zone split: median_char_h={median_h:.1f}, gap_threshold={gap_threshold:.1f}")
 
     row_ys = sorted(set(round(c["top"] / 3) * 3 for c in chars))
 
-    # ── H3 增强: based onFont大小变化DetectParagraph边界 ──
-    # 收集每行的中位Font大小
+    # ── H3 Enhancement: Detect paragraph boundaries based on font size changes ──
+    # Collect median font size for each row
     row_font_sizes: Dict[int, float] = {}
     for y_key in row_ys:
         row_chars = [c for c in chars if round(c["top"] / 3) * 3 == y_key]
@@ -384,11 +526,11 @@ def segment_page_into_zones(
         y_gap = row_ys[i] - row_ys[i - 1]
         is_gap = y_gap > gap_threshold
 
-        # H3: Font大小变化也视为Paragraph分隔
+        # H3: Font size changes are also considered paragraph separators
         if not is_gap and row_ys[i] in row_font_sizes and row_ys[i - 1] in row_font_sizes:
             fs_curr = row_font_sizes[row_ys[i]]
             fs_prev = row_font_sizes[row_ys[i - 1]]
-            if abs(fs_curr - fs_prev) > 2.0:  # Font size差 > 2pt
+            if abs(fs_curr - fs_prev) > 2.0:  # Font size difference > 2pt
                 is_gap = True
 
         if is_gap:
@@ -432,8 +574,10 @@ def segment_page_into_zones(
 
         zone.type = _classify_zone(zone, page_h)
         zones.append(zone)
+        
+    zones.extend(formula_zones)
 
-    # Merge相邻 data_table zones
+    # Merge adjacent data_table zones
     merged_zones = []
     for z in zones:
         if (merged_zones
@@ -454,7 +598,7 @@ def segment_page_into_zones(
 
     from .graph_router import GraphRouter
 
-    # 语义优先的Reading order（借鉴 OCR2 因果流）：抛弃死板 y-band
+    # Semantic priority reading order (borrowing OCR2 causal flow): Abandon rigid y-band
     router = GraphRouter(page_width=page_plum.width, page_height=page_plum.height)
     causal_zones = router.build_flow(merged_zones)
 
@@ -462,9 +606,9 @@ def segment_page_into_zones(
 
 
 def _classify_zone(zone: Zone, page_h: float) -> str:
-    """判定 Zone Type。"""
-    # 懒LoadModule级符号: __getattr__ 仅对ModuleExternal生效,
-    # 本ModuleInternal需via globals() 或显式 import 才能取得延迟Register的名字。
+    """Determine Zone Type."""
+    # Lazy load module-level symbols: __getattr__ only works externally,
+    # Internal module needs to use globals() or explicit import to get the lazy registered names.
     _PIPE_CHARS = globals().get("PIPE_CHARS")
     if _PIPE_CHARS is None:
         _PIPE_CHARS = __getattr__("PIPE_CHARS")
@@ -479,19 +623,19 @@ def _classify_zone(zone: Zone, page_h: float) -> str:
     if y_ratio > 0.85 and char_count < 30 and "页" in text:
         return "footer"
 
-    # ── Pipe网格Detect: ASCII 画线Table (mainframe) ──
+    # ── Pipe grid detection: ASCII drawn line table (mainframe) ──
     pipe_count = sum(1 for c in zone.chars if c.get("text") in _PIPE_CHARS)
     if pipe_count >= 10:
         return "data_table"
 
-    # ── Data内容Detect: 含Date+Amount的 zone 优先判为 data_table ──
-    # prevent续页Data行因 y_ratio 小 / char_count 少被误判为 title
+    # ── Data content detection: Zones with Date+Amount are prioritized as data_table ──
+    # Prevent continuation data rows from being misjudged as title due to small y_ratio / char_count
     _has_date = bool(re.search(r'\d{8}|\d{4}[-/.]\d{1,2}[-/.]\d{1,2}', text))
     _has_amount = bool(re.search(r'(?:RMB|USD|CNY)\s*[\d,.]+|\d+\.\d{2}', text))
     if _has_date and _has_amount:
         return "data_table"
 
-    # ── 词 tableHeader detection: 含 ≥3 个已知列名的 zone 是Table header → data_table ──
+    # ── Header vocabulary detection: Zones containing >=3 known column names are Table headers -> data_table ──
     _vocab_hits = sum(1 for w in _KNOWN_HEADER_WORDS if w in text)
     if _vocab_hits >= 3:
         return "data_table"

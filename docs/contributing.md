@@ -34,7 +34,7 @@ pytest tests/ -v
    ```bash
    ruff check docmirror/        # Lint
    ruff format docmirror/       # Format
-   pytest tests/ -v             # Test
+   pytest tests/ -v             # Test (110 cases)
    ```
 
 4. **Commit** with [Conventional Commits](https://www.conventionalcommits.org/):
@@ -60,16 +60,36 @@ pytest tests/ -v
 ```
 docmirror/
 ├── adapters/       # Format-specific adapters (PDF, Image, Office, ...)
-├── configs/        # Settings, YAML configs, registries
-├── core/           # Core engines (extraction, layout, OCR, table, security)
-├── framework/      # Dispatcher, orchestrator, base classes
-├── middlewares/    # Pipeline middlewares (detection, extraction, alignment, validation)
-└── models/         # Data models (domain, enhanced, perception_result)
+│   ├── pdf/        # PDF adapter with multi-strategy extraction
+│   ├── image/      # Image adapter with OCR
+│   ├── office/     # Word, Excel, PowerPoint adapters
+│   ├── web/        # HTML and Email adapters
+│   └── data/       # Structured data (JSON, XML, CSV)
+├── configs/        # Settings, pipeline registry, domain registry
+├── core/           # Core engines
+│   ├── extraction/ # Extraction, pre-analysis, quality routing
+│   ├── layout/     # Layout analysis (DocLayout-YOLO, graph router)
+│   ├── ocr/        # RapidOCR, formula recognition, seal detection
+│   ├── table/      # Multi-strategy table extraction
+│   ├── security/   # Forgery detection
+│   └── output/     # Markdown export, visualization
+├── framework/      # Dispatcher, orchestrator, cache, base classes
+├── middlewares/    # Pipeline middlewares
+│   ├── detection/  # Scene, institution, language detection
+│   ├── extraction/ # Entity extraction
+│   ├── alignment/  # Header alignment, amount splitting
+│   └── validation/ # Trust scoring, mutation analysis
+├── models/         # Data models
+│   ├── entities/   # PerceptionResult, EnhancedResult, domain models
+│   ├── construction/ # Builder pattern for result assembly
+│   └── tracking/   # Mutation tracking
+├── plugins/        # Domain plugins (bank_statement, ...)
+└── server/         # FastAPI server
 ```
 
 ## Adding a New Adapter
 
-1. Create `docmirror/adapters/your_format.py`
+1. Create `docmirror/adapters/your_format/your_format.py`
 2. Subclass `BaseParser` from `docmirror.framework.base`
 3. Implement `to_base_result(file_path) -> BaseResult`
 4. Register in the dispatcher's `_get_parser()` method
@@ -79,7 +99,7 @@ docmirror/
 
 1. Create `docmirror/middlewares/your_category/your_middleware.py`
 2. Subclass `BaseMiddleware` from `docmirror.middlewares.base`
-3. Implement `process(result) -> result`
+3. Implement `process(result: EnhancedResult) -> EnhancedResult`
 4. Register in `docmirror/configs/pipeline_registry.py`
 5. Add tests
 

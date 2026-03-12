@@ -25,15 +25,15 @@ Both formats produce a single-page BaseResult with:
     does not create structured blocks. A future enhancement could
     detect list-of-dicts patterns and convert them to table Blocks.
 """
-
 from __future__ import annotations
+
 
 import csv
 import json
 import logging
 from pathlib import Path
 
-from docmirror.framework.base import BaseParser, ParserOutput, ParserStatus
+from docmirror.framework.base import BaseParser
 from docmirror.models.domain import BaseResult, Block, PageLayout
 
 logger = logging.getLogger(__name__)

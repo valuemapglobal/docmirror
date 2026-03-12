@@ -25,16 +25,16 @@ Metadata includes:
     - source_format: "email"
     - attachment_count: number of detected attachments
 """
-
 from __future__ import annotations
+
 
 import email as email_lib
 from email import policy
 import logging
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict
 
-from docmirror.framework.base import BaseParser, ParserOutput, ParserStatus
+from docmirror.framework.base import BaseParser
 from docmirror.models.domain import BaseResult, Block, PageLayout
 
 logger = logging.getLogger(__name__)
@@ -78,14 +78,14 @@ class EmailAdapter(BaseParser):
                 elif part.get_content_type() == "text/plain":
                     try:
                         text_parts.append(part.get_content())
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        logger.debug(f"operation: suppressed {exc}")
         else:
             # Non-multipart: read content directly
             try:
                 text_parts.append(msg.get_content())
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug(f"operation: suppressed {exc}")
 
         full_text = "\n\n".join(text_parts)
 

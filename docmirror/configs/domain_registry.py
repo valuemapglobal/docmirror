@@ -24,17 +24,108 @@ Usage::
     identity = resolve_identity("bank_statement", extracted_entities)
     # {'document_type': 'bank_statement', 'institution': 'HSBC', ...}
 """
+from __future__ import annotations
 
+import logging
+from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
+import yaml
 
-# Document type → list of identity field definitions.
+logger = logging.getLogger(__name__)
+
+_CONFIGS_DIR = Path(__file__).parent
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Multilingual Key Synonyms — loaded from key_synonyms.yaml
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _load_key_synonyms() -> Dict[str, str]:
+    """
+    Load and flatten the key_synonyms.yaml config into a single lookup dict.
+
+    The YAML structure is ``domain → locale → {raw_key: canonical_key}``.
+    This function flattens all levels into one dict for O(1) lookup at runtime.
+    If the YAML file is missing or malformed, returns an empty dict and logs
+    a warning (graceful degradation — English-key documents still work).
+    """
+    yaml_path = _CONFIGS_DIR / "key_synonyms.yaml"
+    if not yaml_path.exists():
+        logger.warning("key_synonyms.yaml not found at %s, key normalization disabled", yaml_path)
+        return {}
+
+    try:
+        with open(yaml_path, "r", encoding="utf-8") as f:
+            raw = yaml.safe_load(f)
+    except Exception as e:
+        logger.warning("Failed to load key_synonyms.yaml: %s", e)
+        return {}
+
+    if not isinstance(raw, dict):
+        return {}
+
+    flat: Dict[str, str] = {}
+    for domain, locales in raw.items():
+        if not isinstance(locales, dict):
+            continue
+        for locale, mappings in locales.items():
+            if not isinstance(mappings, dict):
+                continue
+            flat.update(mappings)
+
+    logger.debug("Loaded %d key synonyms from key_synonyms.yaml", len(flat))
+    return flat
+
+
+# Module-level singleton — loaded once on first import
+KEY_SYNONYMS: Dict[str, str] = _load_key_synonyms()
+
+
+def normalize_entity_keys(entities: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Normalize locale-specific entity keys to canonical English equivalents.
+
+    Applies ``KEY_SYNONYMS`` (loaded from ``key_synonyms.yaml``) to translate
+    raw extracted keys (e.g. Chinese ``"账号"``) into canonical English keys
+    (e.g. ``"Account number"``).
+
+    Rules:
+        - If the canonical key already exists in the dict, the original
+          value is preserved (extraction-level data takes priority).
+        - Unknown keys pass through unchanged.
+        - The original dict is not mutated; a new dict is returned.
+
+    Args:
+        entities: Raw entity dict from document extraction.
+
+    Returns:
+        New dict with normalized keys.
+    """
+    normalized: Dict[str, Any] = {}
+
+    for key, value in entities.items():
+        canonical = KEY_SYNONYMS.get(key, key)
+        # Don't overwrite if the canonical key was already set
+        if canonical not in normalized:
+            normalized[canonical] = value
+        elif key not in KEY_SYNONYMS:
+            # Original (non-synonym) key takes priority over synonym-derived
+            normalized[key] = value
+
+    return normalized
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Document type → Identity Field Definitions
+# ══════════════════════════════════════════════════════════════════════════════
+
 # Each tuple: (display_name, candidate_key_1, candidate_key_2, ...)
 # The resolver tries candidate keys in order and uses the first non-empty match.
 DOMAIN_IDENTITY: Dict[str, List[Tuple[str, ...]]] = {
     "bank_statement": [
         ("institution", "bank_name", "Bank name", "Bank branch"),
-        ("account_holder", "Account name", "Account name", "Account name", "Account holder", "Card holder", "Customer name", "Customer name"),
+        ("account_holder", "Account name", "Account holder", "Card holder", "Customer name"),
         ("account_number", "Account number", "Card number", "Account", "Customer account number"),
         ("query_period", "Query period", "Period", "From/to date"),
         ("currency", "Currency"),
@@ -73,10 +164,9 @@ def resolve_identity(domain: str, entities: Dict[str, Any]) -> Dict[str, str]:
     """
     Extract standardized identity fields from raw entities by document type.
 
-    For each identity field defined in the domain's DOMAIN_IDENTITY entry,
-    iterates through the candidate keys and picks the first one that has
-    a non-empty value in the entities dict. Falls back to the wildcard
-    ``"*"`` domain if the specific domain is not registered.
+    Internally normalizes entity keys via ``normalize_entity_keys()`` before
+    matching, so locale-specific keys (e.g. Chinese) are resolved
+    transparently.
 
     Args:
         domain:   Document type string (e.g., "bank_statement", "invoice").
@@ -87,6 +177,9 @@ def resolve_identity(domain: str, entities: Dict[str, Any]) -> Dict[str, str]:
         ``"document_type"`` as the first key. Missing fields are set
         to empty strings.
     """
+    # Normalize locale-specific keys to canonical English
+    normalized = normalize_entity_keys(entities)
+
     fields = DOMAIN_IDENTITY.get(domain, DOMAIN_IDENTITY.get("*", []))
     identity: Dict[str, str] = {"document_type": domain}
 
@@ -95,7 +188,7 @@ def resolve_identity(domain: str, entities: Dict[str, Any]) -> Dict[str, str]:
         candidates = field_def[1:]
         # Try each candidate key in order; use the first non-empty value
         for key in candidates:
-            val = entities.get(key, "")
+            val = normalized.get(key, "")
             if val:
                 identity[display_name] = str(val)
                 break

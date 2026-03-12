@@ -42,6 +42,15 @@ htmlcov/
 .coverage.*
 coverage.xml
 
+## Parse output
+output/
+
 ## Distribution
 *.whl
 *.tar.gz
+
+## Cache
+.mypy_cache/
+
+## Test fixtures (real documents)
+tests/fixtures/银行流水/

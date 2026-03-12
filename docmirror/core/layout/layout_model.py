@@ -1,29 +1,29 @@
 """
-布局Detect模型Encapsulation (Layout Detection Model)
-==========================================
+Layout Detection Model
+======================
 
-Encapsulation RapidLayout (ONNX) 模型，用于模型级布局Detect。
-当模型不可用时，自动Falling back to rulesMethod。
+Wrapper around RapidLayout (ONNX) for model-based page layout detection.
+Falls back gracefully when the model or its dependencies are unavailable.
 
-来源: https://github.com/RapidAI/RapidLayout
-内置模型: DocLayout-YOLO, PP-Layout-CDLA, PP-DocLayoutV3 等 12 种
+Source: https://github.com/RapidAI/RapidLayout
+Built-in models: DocLayout-YOLO, PP-Layout-CDLA, PP-DocLayoutV3, and 12 others.
 
 Usage::
 
-    detector = LayoutDetector()           # Default DOCLAYOUT_DOCSTRUCTBENCH
-    detector = LayoutDetector("cdla")     # 中文Document版面
+    detector = LayoutDetector()           # Default: DOCLAYOUT_DOCSTRUCTBENCH
+    detector = LayoutDetector("cdla")     # Chinese document layout
     regions = detector.detect(page_image)
 
-need to:
-    - rapid-layout (pip install rapid-layout)
-    - onnxruntime (已有, RapidOCR Dependency)
+Requirements:
+    - rapid-layout  (pip install rapid-layout)
+    - onnxruntime   (already present as a RapidOCR dependency)
 """
-
 from __future__ import annotations
+
 
 import logging
 from dataclasses import dataclass
-from typing import List, Optional, Tuple
+from typing import List, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -33,20 +33,22 @@ try:
 except ImportError:
     HAS_RAPID_LAYOUT = False
 
-# RapidLayout class_name → MultiModal Zone Type
+# ---------------------------------------------------------------------------
+# RapidLayout class_name → DocMirror zone type mapping
+# ---------------------------------------------------------------------------
 _CATEGORY_MAP = {
-    # DocLayout-YOLO (DOCLAYOUT_DOCSTRUCTBENCH) 10 类
+    # DocLayout-YOLO (DOCLAYOUT_DOCSTRUCTBENCH) — 10 classes
     "title": "title",
     "plain text": "text",
     "abandon": "abandon",
-    "figure": "data_table",           # figure 同样作为独立区域
+    "figure": "data_table",           # figures are treated as standalone regions too
     "figure_caption": "text",
     "table": "data_table",
     "table_caption": "text",
     "table_footnote": "text",
     "isolate_formula": "formula",
     "formula_caption": "text",
-    # PP-Layout-CDLA 额外类别
+    # PP-Layout-CDLA — additional classes
     "text": "text",
     "header": "title",
     "footer": "footer",
@@ -54,7 +56,7 @@ _CATEGORY_MAP = {
     "equation": "formula",
 }
 
-# 模型Type别名Map (字符串 → ModelType)
+# Model type alias map (user-friendly string → ModelType enum name)
 _MODEL_ALIASES = {
     "doclayout": "DOCLAYOUT_DOCSTRUCTBENCH",
     "doclayout_docstructbench": "DOCLAYOUT_DOCSTRUCTBENCH",
@@ -74,32 +76,40 @@ _MODEL_ALIASES = {
 
 @dataclass
 class DetectedRegion:
-    """模型Detect到的区域。"""
-    category: str           # Map后的 MultiModal Zone Type
-    bbox: Tuple[float, float, float, float]   # (x0, y0, x1, y1)
-    confidence: float       # Confidence 0-1
-    raw_category_id: str    # 原始模型类别名
+    """A region detected by the layout model.
+
+    Attributes:
+        category:        Mapped DocMirror zone type (e.g. "text", "data_table").
+        bbox:            Bounding box as (x0, y0, x1, y1).
+        confidence:      Detection confidence score in [0, 1].
+        raw_category_id: Original class name reported by the model.
+    """
+    category: str
+    bbox: Tuple[float, float, float, float]
+    confidence: float
+    raw_category_id: str
 
 
 class LayoutDetector:
-    """RapidLayout 布局Detect器。
+    """RapidLayout-based page layout detector.
 
-    懒Load模型，首次 detect() 时Initialize。
-    supports 12 种内置模型，via model_type 选择。
+    The underlying ONNX model is loaded lazily on the first ``detect()``
+    call.  Supports 12 built-in models selectable via *model_type*.
     """
 
     def __init__(self, model_type: str = "doclayout_docstructbench"):
         """
         Args:
-            model_type: 模型TypeName，supports简写别名。
-                常用值: "doclayout", "cdla", "layoutv3", "paper", "general6"
+            model_type: Model type name.  Accepts short aliases such as
+                ``"doclayout"``, ``"cdla"``, ``"layoutv3"``, ``"paper"``,
+                or ``"general6"``.
         """
         self._model_type_str = model_type
         self._engine = None
         self._available = HAS_RAPID_LAYOUT
 
     def _ensure_engine(self) -> bool:
-        """懒LoadEngine。"""
+        """Lazily load the ONNX engine.  Returns ``True`` if ready."""
         if not self._available:
             return False
         if self._engine is not None:
@@ -121,14 +131,16 @@ class LayoutDetector:
         page_image,
         confidence_threshold: float = 0.5,
     ) -> List[DetectedRegion]:
-        """DetectPage布局区域。
+        """Detect layout regions in a page image.
 
         Args:
-            page_image: Page图像 (numpy ndarray, HxWx3 RGB/BGR, 或Path)。
-            confidence_threshold: ConfidenceThreshold。
+            page_image: Page image as a numpy ndarray (H×W×3, RGB/BGR)
+                        or a file path.
+            confidence_threshold: Minimum confidence to keep a detection.
 
         Returns:
-            DetectedRegion List，按 y CoordinatesSort。
+            List of ``DetectedRegion`` objects sorted by y-coordinate
+            (top-to-bottom reading order).
         """
         if not self._ensure_engine():
             return []
@@ -149,12 +161,13 @@ class LayoutDetector:
 
             category = _CATEGORY_MAP.get(cls_name.lower(), "text")
 
+            # Skip regions classified as "abandon" (decorative / irrelevant)
             if category == "abandon":
                 continue
 
             bbox = (float(box[0]), float(box[1]), float(box[2]), float(box[3]))
 
-            # FilterArea过小的Detection result
+            # Filter out detections with negligibly small area
             area = (bbox[2] - bbox[0]) * (bbox[3] - bbox[1])
             if area < 100:
                 continue
@@ -166,7 +179,7 @@ class LayoutDetector:
                 raw_category_id=cls_name,
             ))
 
-        # 按 y CoordinatesSort (Reading order)
+        # Sort by y-coordinate for natural reading order
         regions.sort(key=lambda r: r.bbox[1])
 
         logger.debug(f"[LayoutDetector] Detected {len(regions)} regions (threshold={confidence_threshold})")
@@ -174,5 +187,5 @@ class LayoutDetector:
 
     @property
     def is_available(self) -> bool:
-        """模型Whether可用。"""
+        """Whether the layout detection model is available."""
         return self._available

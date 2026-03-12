@@ -1,0 +1,95 @@
+# ══════════════════════════════════════════════════════════════════════════════
+# Key Synonyms — Multilingual Entity Key Normalization
+# ══════════════════════════════════════════════════════════════════════════════
+#
+# Maps locale-specific raw key names (as extracted from documents) to their
+# canonical English equivalents used by DOMAIN_IDENTITY in domain_registry.py.
+#
+# This file is the single source of truth for key normalization. To support
+# a new language or document variant, simply add entries under the appropriate
+# locale section — no Python code changes needed.
+#
+# Rules:
+#   - Keys are raw strings exactly as they appear in extracted KV blocks.
+#   - Values MUST match a candidate key in DOMAIN_IDENTITY (domain_registry.py).
+#   - Organized by domain → locale for readability.
+#   - At runtime, all entries are flattened into a single lookup table.
+
+# ── Bank Statement ────────────────────────────────────────────────────────────
+bank_statement:
+  zh:
+    # Account number
+    账号: "Account number"
+    卡号: "Account number"
+    账户号: "Account number"
+    账户号码: "Account number"
+    客户账号: "Account number"
+    # Account holder
+    账户名: "Account name"
+    账户名称: "Account name"
+    户名: "Account name"
+    客户名称: "Customer name"
+    持卡人: "Card holder"
+    # Currency
+    币种: "Currency"
+    币别: "Currency"
+    # Query period
+    交易时间: "Query period"
+    查询期间: "Query period"
+    交易期间: "Query period"
+    账单周期: "Query period"
+    起止日期: "Query period"
+    # Print date
+    打印日期: "Print date"
+    打印时间: "Print date"
+    # Bank name
+    银行名称: "Bank name"
+    开户行: "Bank name"
+    开户银行: "Bank name"
+  ja:
+    口座番号: "Account number"
+    口座名義: "Account name"
+    通貨: "Currency"
+    取引期間: "Query period"
+    印刷日: "Print date"
+    銀行名: "Bank name"
+
+# ── Invoice ───────────────────────────────────────────────────────────────────
+invoice:
+  zh:
+    销售方: "Supplier"
+    销方: "Supplier"
+    购买方: "Buyer"
+    购方: "Buyer"
+    发票号码: "Invoice number"
+    发票代码: "Invoice number"
+    金额: "Amount"
+    价税合计: "Total with tax"
+    税额: "Tax amount"
+    税率: "Tax rate"
+    开票日期: "Invoice date"
+  ja:
+    販売者: "Supplier"
+    購入者: "Buyer"
+    請求書番号: "Invoice number"
+    金額: "Amount"
+    税額: "Tax amount"
+    発行日: "Invoice date"
+
+# ── Contract ──────────────────────────────────────────────────────────────────
+contract:
+  zh:
+    甲方: "Party A"
+    乙方: "Party B"
+    合同编号: "Contract number"
+    合同号: "Contract number"
+    签订日期: "Signing date"
+    合同金额: "Contract amount"
+
+# ── Receipt ───────────────────────────────────────────────────────────────────
+receipt:
+  zh:
+    商户名称: "Merchant name"
+    商户: "Merchant"
+    交易金额: "Transaction amount"
+    交易日期: "Transaction date"

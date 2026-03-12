@@ -9,7 +9,7 @@ variables using the ``DOCMIRROR_`` prefix. The ``from_env()`` classmethod
 reads the current environment and returns a configured instance.
 
 Configuration groups:
-    - **Enhancement**: Default pipeline mode and LLM integration toggle.
+    - **Enhancement**: Default pipeline mode.
     - **Performance**: Page limits, OCR resolution, and language detection.
     - **Validation**: Pass/fail thresholds for the quality validator.
     - **Model paths**: Optional paths to AI model weights (layout, reading
@@ -17,12 +17,87 @@ Configuration groups:
       are used instead.
     - **Pipeline strategy**: How to handle middleware failures (skip vs abort).
 """
-
 from __future__ import annotations
+
 
 import os
 from dataclasses import dataclass, field
 from typing import Dict, Any, Optional
+
+
+@dataclass
+class OCRHyperParams:
+    """
+    Physically justified OCR preprocessing hyperparameters.
+
+    Every value here has a documented rationale. Changing any value
+    should require updating the justification — enforcing Deutsch's
+    'hard to vary' principle.
+    """
+
+    # ── Adaptive Upscale ──
+    # Rationale: RapidOCR's detection model (DBNet) is trained on 640×640 inputs.
+    # Images below 500px on their shortest side produce feature maps too coarse
+    # for the 3×3 convolution kernels to separate adjacent characters.
+    upscale_threshold_low: int = 500    # Below this → 4× upscale
+    upscale_threshold_mid: int = 1000   # Below this → 2× upscale
+    upscale_factor_low: float = 4.0     # Matches DBNet's receptive field requirement
+    upscale_factor_mid: float = 2.0
+
+    # ── Gamma Correction ──
+    # Rationale: Mean brightness < 80/255 (31%) indicates a severely underexposed
+    # scan. Gamma=0.6 maps the [0,80] input range onto [0,148], restoring
+    # discriminability in the dark region where OCR character edges live.
+    dark_image_brightness_threshold: int = 80
+    dark_image_gamma: float = 0.6
+
+    # ── Histogram Stretch ──
+    # Rationale: Standard deviation < 25 in an 8-bit image means the entire
+    # dynamic range is compressed into ~10% of the [0,255] spectrum. Below
+    # this, CLAHE alone cannot restore sufficient edge contrast.
+    low_contrast_std_threshold: float = 25.0
+    histogram_percentile_lo: float = 1.0   # Clip darkest 1% — removes sensor noise
+    histogram_percentile_hi: float = 99.0  # Clip brightest 1% — removes highlights
+
+    # ── Red Seal Removal (HSV bounds) ──
+    # Rationale: Red hue wraps around 0° in HSV. These ranges (0–10° and 160–180°)
+    # cover the full red lobe. S≥70, V≥50 excludes desaturated pinks and dark shadows.
+    red_hue_range_1: tuple = (0, 10)
+    red_hue_range_2: tuple = (160, 180)
+    red_saturation_min: int = 70
+    red_value_min: int = 50
+
+    # ── Row Clustering ──
+    # Rationale: 40% vertical overlap of character height is the empirical minimum
+    # for CJK characters (which are square) to be considered "same line". Below
+    # 40%, subscripts and superscripts get incorrectly merged.
+    row_overlap_ratio: float = 0.4
+
+    # ── Line Fragment Merging ──
+    # Rationale: Two words with >50% vertical overlap AND horizontal gap <1.5×
+    # average char height belong to the same line. 1.5× accommodates CJK
+    # inter-character spacing (which is wider than Latin).
+    line_merge_v_overlap_ratio: float = 0.5
+    line_merge_h_gap_multiplier: float = 1.5
+
+    # ── NMS Fusion ──
+    # Rationale: 60% intersection-over-min-area means the smaller box is
+    # substantially enclosed by the larger one — they represent the same text.
+    nms_overlap_threshold: float = 0.6
+
+    # ── Minimum Words for Valid OCR ──
+    # Rationale: A page with fewer than 10 recognized words at the initial DPI
+    # is likely a low-quality scan that needs higher resolution. 3 words is the
+    # absolute minimum to produce any meaningful output (e.g., a stamp).
+    min_words_initial_pass: int = 10
+    min_words_final: int = 3
+
+    # ── Multi-Scale DPI Passes ──
+    dpi_passes: tuple = (150, 200, 300)
+
+    # ── Dynamic Color Slicing ──
+    kmeans_clusters: int = 3       # Background, Text, Overlay — 3 is sufficient for documents
+    hue_tolerance: int = 15        # ±15° in HSV hue space covers a single color family
 
 
 @dataclass
@@ -37,12 +112,6 @@ class DocMirrorSettings:
 
     # ── Enhancement settings ──
     default_enhance_mode: str = "standard"  # "raw" | "standard" | "full"
-
-    # ── LLM integration ──
-    enable_llm: bool = False        # Whether to use LLM-powered validation/repair
-    llm_model: str = "qwen-vl-max"  # LLM model name (passed to VLM adapter)
-    llm_max_tokens: int = 4096      # Maximum tokens per LLM request
-    llm_temperature: float = 0.0    # LLM temperature (0.0 for deterministic output)
 
     # ── Performance limits ──
     max_pages: int = 200       # Maximum pages to process per document
@@ -68,6 +137,14 @@ class DocMirrorSettings:
     # ── Model inference parameters ──
     model_render_dpi: int = 200  # DPI for rendering pages before DocLayout-YOLO inference
 
+    # ── OCR Hyperparameters (physically justified) ──
+    ocr_params: OCRHyperParams = field(default_factory=OCRHyperParams)
+
+    # ── Constructor Theory: Impossible Transformation Guards ──
+    min_file_size: int = 512          # Below 512 bytes, no document can contain meaningful content
+    max_file_size: int = 500_000_000  # 500MB hard limit — prevents OOM
+    min_image_dimension: int = 50     # 50px — below this, OCR receptive fields cannot function
+
     @classmethod
     def from_env(cls) -> DocMirrorSettings:
         """
@@ -78,8 +155,6 @@ class DocMirrorSettings:
 
         Supported env vars:
             DOCMIRROR_ENHANCE_MODE       → default_enhance_mode
-            DOCMIRROR_ENABLE_LLM         → enable_llm (true/false)
-            DOCMIRROR_LLM_MODEL          → llm_model
             DOCMIRROR_MAX_PAGES          → max_pages
             DOCMIRROR_VALIDATOR_THRESHOLD → validator_pass_threshold
             DOCMIRROR_LOG_LEVEL          → log_level
@@ -87,8 +162,6 @@ class DocMirrorSettings:
         """
         return cls(
             default_enhance_mode=os.getenv("DOCMIRROR_ENHANCE_MODE", "standard"),
-            enable_llm=os.getenv("DOCMIRROR_ENABLE_LLM", "false").lower() == "true",
-            llm_model=os.getenv("DOCMIRROR_LLM_MODEL", "qwen-vl-max"),
             max_pages=int(os.getenv("DOCMIRROR_MAX_PAGES", "200")),
             validator_pass_threshold=float(os.getenv("DOCMIRROR_VALIDATOR_THRESHOLD", "0.7")),
             log_level=os.getenv("DOCMIRROR_LOG_LEVEL", "INFO"),
@@ -104,10 +177,8 @@ class DocMirrorSettings:
         """
         return {
             "enhance_mode": self.default_enhance_mode,
-            "SceneDetector": {"enable_llm": self.enable_llm},
-            "ColumnMapper": {},
+            "SceneDetector": {},
             "Validator": {"pass_threshold": self.validator_pass_threshold},
-            "Repairer": {"enable_llm": self.enable_llm},
         }
 
 

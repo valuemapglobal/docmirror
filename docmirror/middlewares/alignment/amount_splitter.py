@@ -1,20 +1,24 @@
 """
-借贷分Column detection (Amount Split Detection)
-=======================================
+Debit/Credit Split Column Detection (Amount Split Detector)
+===========================================================
 
-从 ``column_mapper.py`` Extract: DetectTable中收入/支出分列Mode。
+Extracted from ``column_mapper.py``: Detects income/expense split-column 
+patterns in tables.
 
-supports三种Mode:
-  1. 显式分列: Table header含收入/支出关键字
-  2. 隐式分列: Amount column旁有空Table header列 (如浦发银行 'Transaction amount'+Empty column)
-  3. 粘连分列: 粘连列名中嵌入借贷关键字
+Supports 3 modes:
+  1. Explicit Split: Table headers explicitly contain income/expense keywords.
+  2. Implicit Split: Amount column adjacent to an empty header column 
+     (e.g., Shanghai Pudong Development Bank 'Transaction amount' + Empty column).
+  3. Merged Split: Concatenated column names containing embedded debit/credit keywords.
 
-F-6 增强:
-  - Data行Validate: 检查借贷列Whetheralso有值 (>30% 冲突 → 非分列)
-  - 借贷标志Column detection: 有「借/贷」标志列时不做 amount split
+F-6 Enhancements:
+  - Data Row Validation: Checks if debit/credit columns both simultaneously contain
+    values (>30% conflict ratio \u2192 rejected, implies they are not mutually exclusive splits).
+  - Debit/Credit Flag Detection: If a dedicated "Debit/Credit Flag" column exists,
+    amount splitting is aggressively skipped.
 """
-
 from __future__ import annotations
+
 
 import logging
 import re
@@ -22,7 +26,7 @@ from typing import Dict, List, Optional, Set, Tuple
 
 logger = logging.getLogger(__name__)
 
-# F-6: Data validation — Amount正则
+# F-6: Data validation \u2014 Generic number regex
 _RE_HAS_NUMBER = re.compile(r"\d")
 
 
@@ -32,13 +36,14 @@ def _validate_split_by_data(
     exp_idx: Optional[int],
     max_sample: int = 20,
 ) -> bool:
-    """F-6: 采样Data行Validate分列Whether合理。
+    """F-6: Samples data rows to validate if column splitting is logical.
 
-    如果 >30% 的Data行在 income 和 expense 列also有值，
-    说明这not真正的借贷分列 (but rather两个独立的Amount column)。
+    If >30% of data rows have numeric values in BOTH the supposed income
+    and expense columns simultaneously, it indicates this is not a true
+    debit/credit split (but rather two independent amount columns).
     """
     if inc_idx is None or exp_idx is None or not data_rows:
-        return True  # 无法Validate，Default信任Table header
+        return True  # Unable to validate, default to trusting the headers
 
     sample = data_rows[:max_sample]
     both_count = 0
@@ -58,7 +63,7 @@ def _validate_split_by_data(
                 both_count += 1
 
     if valid_count < 3:
-        return True  # Data太少，Default信任
+        return True  # Data sample too small, default to trusting headers
 
     conflict_ratio = both_count / valid_count
     if conflict_ratio > 0.3:
@@ -78,32 +83,32 @@ def detect_split_amount(
     amount_like_keywords: Set[str],
     data_rows: Optional[List[List[str]]] = None,
 ) -> Tuple[bool, Optional[int], Optional[int]]:
-    """DetectWhether存在收入/支出分列。
+    """Detects whether an income/expense split column layout exists.
 
     Args:
-        headers: 原始Table headerList。
-        mapping: 列MapResult {raw_header: standard_name or None}。
-        income_keywords: 收入关键字集合。
-        expense_keywords: 支出关键字集合。
-        amount_like_keywords: Amount类关键字集合。
-        data_rows: (F-6) Optional的Data行，用于Validate分列Whether合理。
+        headers: Original list of table headers.
+        mapping: Column mapping result {raw_header: standard_name or None}.
+        income_keywords: Set of keywords identifying an income column.
+        expense_keywords: Set of keywords identifying an expense column.
+        amount_like_keywords: Set of generic amount-related keywords.
+        data_rows: (F-6) Optional data rows for validating split logic viability.
 
     Returns:
-        (has_split, income_idx, expense_idx)
+        A tuple: (has_split_amount, income_col_idx, expense_col_idx)
     """
-    # F-6: Detect借贷标志列 — 有标志列时不做 amount split
+    # F-6: Detect Debit/Credit Flag Column \u2014 skip split if flag column exists
     _DEBIT_CREDIT_FLAGS = {"借贷标志", "借贷", "借/贷", "收支", "支/收",
-                           "借贷Status", "收支标志", "DC标志"}
+                           "借贷Status", "收支标志", "DC标志", "Debit/Credit Flag"}
     header_set = {h.strip() for h in headers if h}
     if header_set & _DEBIT_CREDIT_FLAGS:
-        logger.info("[AmountSplit] F-6: skipped — debit/credit flag column found")
+        logger.info("[AmountSplit] F-6: skipped \u2014 debit/credit flag column found")
         return False, None, None
 
     has_income = bool(header_set & income_keywords)
     has_expense = bool(header_set & expense_keywords)
 
     if has_income and has_expense:
-        # Mode1: 显式分列
+        # Mode 1: Explicit split (Headers clearly indicate Income and Expense)
         inc_idx = exp_idx = None
         for i, h in enumerate(headers):
             h_clean = h.strip()
@@ -111,18 +116,19 @@ def detect_split_amount(
                 inc_idx = i
             elif h_clean in expense_keywords and exp_idx is None:
                 exp_idx = i
-        # F-6: Data validation
+        # F-6: Data validation phase
         if data_rows and not _validate_split_by_data(data_rows, inc_idx, exp_idx):
             return False, None, None
         return True, inc_idx, exp_idx
 
-    # Mode2: Amount column + 相邻空Table header列 → 隐式借贷分列
+    # Mode 2: Amount column + Adjacent empty header column \u2192 Implicit split
     for i, h in enumerate(headers):
         h_clean = h.strip()
         if h_clean in amount_like_keywords and i + 1 < len(headers):
             next_h = headers[i + 1].strip()
             if not next_h:
-                # F-6: Data validation
+                # F-6: Data validation phase
+                # Assume column `i` is expense and empty column `i+1` is income
                 if data_rows and not _validate_split_by_data(data_rows, i + 1, i):
                     continue
                 logger.info(
@@ -131,7 +137,7 @@ def detect_split_amount(
                 )
                 return True, i + 1, i
 
-    # Mode3: 粘连列名中嵌入借贷关键字
+    # Mode 3: Merged split \u2014 concatenations of column names embedding debit/credit keywords
     merged_inc_idx = merged_exp_idx = None
     for i, h in enumerate(headers):
         h_clean = h.strip()
@@ -154,7 +160,7 @@ def detect_split_amount(
 
     if (merged_inc_idx is not None and merged_exp_idx is not None
             and merged_inc_idx != merged_exp_idx):
-        # F-6: Data validation
+        # F-6: Data validation phase
         if data_rows and not _validate_split_by_data(data_rows, merged_inc_idx, merged_exp_idx):
             return False, None, None
         logger.info(

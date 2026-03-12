@@ -1,24 +1,25 @@
 """
-Orchestrate layer (Orchestrator)
-======================
+Orchestration Layer
+====================
 
-系统的"大脑" — 负责全流程Orchestrate:
-    1. call CoreExtractor 生成 BaseResult
-    2. based on enhance_mode 动态构建MiddlewarePipeline
-    3. ExecutePipeline，收集Result
-    4. 桥接Output为 v1 兼容的 ParserOutput
+The "Brain" of the MultiModal system — responsible for orchestrating the entire
+extract-and-enhance pipeline:
+    1. Invokes ``CoreExtractor`` to generate a baseline ``BaseResult``.
+    2. Dynamically builds a ``MiddlewarePipeline`` based on ``enhance_mode``.
+    3. Executes the pipeline, sequentially enriching and validating the result.
+    4. Bridges the final output into an API-compatible data structure.
 
-三种增强Mode:
-    - ``raw``:      仅Extract，不增强
-    - ``standard``: SceneDetector + EntityExtractor + InstitutionDetector + ColumnMapper + Validator
-    - ``full``:     Standard + Repairer
+Three Enhancement Modes:
+    - ``raw``:      Base extraction only, no enrichment.
+    - ``standard``: SceneDetector + EntityExtractor + InstitutionDetector + Validator.
 
-ExceptionDegradation strategy:
-    - MiddlewareFailed时Default skip 继续Execute
-    - 保证始终Returns有效Result (即使 status="partial")
+Exception Downgrade Strategy:
+    - If a middleware fails, by default the pipeline skips it and continues executing.
+    - Guarantees the return of a valid payload even under catastrophic internal
+      halts (returning ``status="partial"``).
 """
-
 from __future__ import annotations
+
 
 import logging
 import time
@@ -30,47 +31,35 @@ from ..middlewares.base import BaseMiddleware, MiddlewarePipeline
 from ..middlewares.scene_detector import SceneDetector
 from ..middlewares.institution_detector import InstitutionDetector
 from ..middlewares.entity_extractor import EntityExtractor
-from ..middlewares.column_mapper import ColumnMapper
 from ..middlewares.validator import Validator
-from ..middlewares.repairer import Repairer
+
 from ..middlewares.language_detector import LanguageDetector
 from ..middlewares.generic_entity_extractor import GenericEntityExtractor
 from ..models.enhanced import EnhancedResult
-from ..models.domain import BaseResult
 from ..configs.settings import DocMirrorSettings
 
 logger = logging.getLogger(__name__)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# MiddlewareRegistry — Open/Closed Principle
+# Middleware Registry — Conforms to Open/Closed Principle
 # ═══════════════════════════════════════════════════════════════════════════════
 
 MIDDLEWARE_REGISTRY: Dict[str, Type[BaseMiddleware]] = {
     "SceneDetector": SceneDetector,
     "EntityExtractor": EntityExtractor,
     "InstitutionDetector": InstitutionDetector,
-    "ColumnMapper": ColumnMapper,
     "Validator": Validator,
-    "Repairer": Repairer,
-    # ── 跨Format通用Middleware ──
+    # ── Cross-format generic middlewares ──
     "LanguageDetector": LanguageDetector,
     "GenericEntityExtractor": GenericEntityExtractor,
 }
 
-# PipelineConfiguration: enhance_mode → MiddlewareList
-PIPELINE_CONFIGS: Dict[str, List[str]] = {
-    "raw": [],
-    "standard": ["SceneDetector", "EntityExtractor", "InstitutionDetector", "ColumnMapper", "Validator"],
-    "full": ["SceneDetector", "EntityExtractor", "InstitutionDetector", "ColumnMapper", "Validator", "Repairer"],
-}
 
-# need to hints 注入的MiddlewareName
-_HINTS_CONSUMERS = {"ColumnMapper"}
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# hints.yaml Cache (mtime-based)
+# hints.yaml File Cache (based on mtime checks)
 # ═══════════════════════════════════════════════════════════════════════════════
 
 _hints_cache: Optional[Dict[str, Any]] = None
@@ -78,7 +67,7 @@ _hints_mtime: float = 0.0
 
 
 def _load_hints_cached() -> Dict[str, Any]:
-    """Load hints.yaml Configuration (mtime Cache)。"""
+    """Load configuration from `hints.yaml` (utilizing mtime-based caching)."""
     global _hints_cache, _hints_mtime
     try:
         import yaml
@@ -97,7 +86,7 @@ def _load_hints_cached() -> Dict[str, Any]:
 
 class Orchestrator:
     """
-    MultiModal Orchestrator — 全流程管理。
+    MultiModal Orchestrator — Manages the full extraction lifecycle.
 
     Usage::
 
@@ -107,7 +96,7 @@ class Orchestrator:
             enhance_mode="full",
         )
 
-        # 获取 v1 兼容Output
+        # Retrieve a backwards-compatible output envelope
         parser_output = result.to_parser_output()
     """
 
@@ -133,26 +122,28 @@ class Orchestrator:
         **kwargs,
     ) -> EnhancedResult:
         """
-        Execute完整ParsePipeline。
+        Execute the complete document processing pipeline.
 
         Args:
-            file_path:    PDF file path。
-            enhance_mode: 增强Mode (raw/standard/full)。
+            file_path:    Valid path to the target document.
+            enhance_mode: Depth of enhancements applied (raw/standard/full).
+            file_type:    Injected document type (pdf, image, word).
 
         Returns:
-            EnhancedResult: contains BaseResult + 增强Data + Mutations。
+            EnhancedResult: Aggregated payload containing the underlying
+                            BaseResult + injected domain data + applied mutations.
         """
         t0 = time.time()
 
         logger.info(
-            f"[DocMirror] Orchestrator ▶ "
+            f"[DocMirror] Orchestrator \u25b6 "
             f"file={Path(file_path).name} | mode={enhance_mode}"
         )
 
-        # ═══ Step 1: 核心Extract → BaseResult ═══
+        # \u2550\u2550\u2550 Step 1: Core Physical Extraction \u2192 Returns BaseResult \u2550\u2550\u2550
         base_result = await self.extractor.extract(file_path)
 
-        # 检查ExtractResult有效性
+        # Validate extraction baseline viability
         if not base_result.pages and not base_result.full_text:
             error_msg = base_result.metadata.get("error", "Empty extraction result")
             logger.warning(f"[DocMirror] Extraction failed: {error_msg}")
@@ -162,39 +153,39 @@ class Orchestrator:
             result.enhanced_data["enhance_mode"] = enhance_mode
             return result
 
-        # ═══ Step 2: Initialize EnhancedResult ═══
+        # \u2550\u2550\u2550 Step 2: Initialize Enrichment Lifecycle Wrapper \u2550\u2550\u2550
         result = EnhancedResult.from_base_result(base_result)
         result.enhanced_data["enhance_mode"] = enhance_mode
 
-        # ═══ Step 2.5: 策略自适应 (based on PreAnalyzer) ═══
+        # \u2550\u2550\u2550 Step 2.5: Adaptive Strategy Downgrades (driven by PreAnalyzer) \u2550\u2550\u2550
         pre_analysis = base_result.metadata.get("pre_analysis", {})
         recommended = pre_analysis.get("recommended_strategy", "standard")
         strategy_params = pre_analysis.get("strategy_params", {})
         result.enhanced_data["pre_analysis"] = pre_analysis
 
-        # fast 策略: Downgrade增强Mode
+        # `fast` Strategy overrides: forcibly downgrade target execution mode
         effective_mode = enhance_mode
         if recommended == "fast" and enhance_mode == "full":
             effective_mode = "standard"
-            logger.info("[DocMirror] PreAnalyzer: fast strategy → downgrade full→standard")
-        # LLM Enable: 由 strategy_params 驱动
+            logger.info("[DocMirror] PreAnalyzer: 'fast' strategy engaged \u2192 downgraded full\u2192standard")
+            
+        # Optional LLM Escalation: conditionally inject LLM flags dynamically
         if strategy_params.get("enable_llm", False):
             self.config.setdefault("SceneDetector", {})["enable_llm"] = True
-            self.config.setdefault("Repairer", {})["enable_llm"] = True
-            logger.info("[DocMirror] PreAnalyzer: deep strategy → enable LLM middlewares")
+            logger.info("[DocMirror] PreAnalyzer: 'deep' strategy engaged \u2192 LLM execution unblocked")
 
-        # ═══ Step 3: 构建MiddlewarePipeline ═══
+        # \u2550\u2550\u2550 Step 3: Middleware Pipeline Compilation & Execution \u2550\u2550\u2550
         if effective_mode == "raw":
-            logger.info("[DocMirror] Raw mode — skipping middleware pipeline")
+            logger.info("[DocMirror] Raw mode selected \u2014 skipping middleware pipeline entirely")
         else:
             middlewares = self._build_middlewares(effective_mode, file_type)
             result = self.pipeline.execute(middlewares, result)
 
-        # ═══ Step 4: 设置最终Status ═══
+        # \u2550\u2550\u2550 Step 4: Trace Instrumentation & Status Seal \u2550\u2550\u2550
         elapsed = (time.time() - t0) * 1000
         result.processing_time = elapsed
 
-        # ═══ Step 4.5: Mutation Analyze (认知反馈闭环) ═══
+        # \u2550\u2550\u2550 Step 4.5: Analytical Mutation Auditing (Self-Correcting Loop Feedback) \u2550\u2550\u2550
         if result.mutations:
             try:
                 from .middlewares.mutation_analyzer import MutationAnalyzer
@@ -202,16 +193,16 @@ class Orchestrator:
                 analysis = analyzer.analyze(result.mutations)
                 result.enhanced_data["mutation_analysis"] = analysis.to_dict()
             except Exception as e:
-                logger.debug(f"[DocMirror] MutationAnalyzer error: {e}")
+                logger.debug(f"[DocMirror] MutationAnalyzer error bypass: {e}")
 
-        # ensure table block 有内容
+        # Safety Fallback: Ensure structurally bound blocks were identified
         if not base_result.table_blocks:
             if result.status == "success":
                 result.status = "partial"
-                result.add_error("No tables found in document")
+                result.add_error("No tables found in document layout")
 
         logger.info(
-            f"[DocMirror] Orchestrator ◀ status={result.status} | "
+            f"[DocMirror] Orchestrator \u25c0 status={result.status} | "
             f"scene={result.scene} | "
             f"mutations={result.mutation_count} | "
             f"elapsed={elapsed:.0f}ms"
@@ -223,34 +214,25 @@ class Orchestrator:
         self, enhance_mode: str, file_type: str = "pdf",
     ) -> List[BaseMiddleware]:
         """
-        based onFormat + 增强Mode构建MiddlewareList。
+        Builds an active List of Middleware instances mapping to the target 
+        format and execution mode criteria.
 
-        based onRegistryMode，新增Middleware只需:
-          1. 在 MIDDLEWARE_REGISTRY 中Register
-          2. 在 configs/pipeline_registry.py 中add到对应Format+ModeList
+        Extensibility Contract:
+        To append a new Middleware into the pipeline simply:
+          1. Register its Class mapping within `MIDDLEWARE_REGISTRY`.
+          2. Splice its identifier explicitly into `configs/pipeline_registry.py` definitions.
         """
         from ..configs.pipeline_registry import get_pipeline_config
         middleware_names = get_pipeline_config(file_type, enhance_mode)
         middlewares = []
 
-        hints = None  # 惰性Load
-
         for name in middleware_names:
             cls = MIDDLEWARE_REGISTRY.get(name)
             if cls is None:
-                logger.warning(f"[DocMirror] Unknown middleware: {name}")
+                logger.warning(f"[DocMirror] Unresolved middleware configuration request: {name}")
                 continue
 
             mw_config = self.config.get(name, {})
-
-            # 特殊Processing: need to hints 注入的Middleware
-            if name in _HINTS_CONSUMERS:
-                if hints is None:
-                    hints = _load_hints_cached()
-                if hints:
-                    mw_config["column_aliases"] = hints.get("column_aliases", {})
-                    mw_config["hints"] = hints
-
             middlewares.append(cls(config=mw_config))
 
         return middlewares

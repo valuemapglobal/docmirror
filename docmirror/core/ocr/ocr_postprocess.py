@@ -1,21 +1,24 @@
 """
-OCR Post-processing纠正Engine (OCR Post-Processing Correction Engine)
-==========================================================
+OCR Post-Processing Correction Engine
+======================================
 
-通用、泛化的 OCR 文本纠正Module。
-- Amount formatFix (标点混淆: 冒号/分号/空格 → 小数点)
-- Date formatFix (波浪号/空格 → 连字符)
-- 数字清洗 (常见 OCR 误Recognize修正)
-- 领域词典纠正 (字形混淆修正, 可Extension)
+General-purpose, domain-agnostic OCR text correction module.
+
+Correction layers:
+    - Amount format fixing (punctuation confusion: colon / semicolon /
+      space → decimal point).
+    - Date format fixing (tilde / space → hyphen).
+    - Digit clean-up (common OCR misrecognition corrections).
+    - Domain dictionary correction (glyph confusion, extensible).
 
 Design principles:
-    1. 纯Function, 无Status, 无副作用
-    2. 通用泛化 — 不绑定特定银行/行业
-    3. 分 layer修正 — 先修Format, 再修内容
-    4. 安全优先 — 只修高Confidence的Error
+    1. Pure functions — no state, no side-effects.
+    2. Domain-agnostic — not bound to any specific bank or industry.
+    3. Layered correction — fix format first, then content.
+    4. Safety first — only correct high-confidence errors.
 """
-
 from __future__ import annotations
+
 
 import logging
 import re
@@ -26,10 +29,10 @@ logger = logging.getLogger(__name__)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Layer 1: 字符级清洗 (最安全, 无歧义)
+# Layer 1: Character-level normalisation (safest — no ambiguity)
 # ═══════════════════════════════════════════════════════════════════════════════
 
-# 全角 → 半角Map (OCR 常见)
+# Full-width → half-width mapping (common OCR artefact)
 _FULLWIDTH_MAP = str.maketrans(
     "０１２３４５６７８９"
     "ＡＢＣＤＥＦＧＨＩＪＫＬＭＮＯＰＱＲＳＴＵＶＷＸＹＺ"
@@ -43,112 +46,112 @@ _FULLWIDTH_MAP = str.maketrans(
 
 
 def normalize_chars(text: str) -> str:
-    """字符级Standard化: 全角→半角, NFKC, 控制字符Clean。"""
-    # Unicode NFKC Standard化
+    """Character-level normalisation: full-width → half-width, NFKC, control character clean-up."""
+    # Unicode NFKC normalisation
     text = unicodedata.normalize("NFKC", text)
-    # 全角数字/字母 → 半角
+    # Full-width digits/letters → half-width
     text = text.translate(_FULLWIDTH_MAP)
-    # 零宽字符/控制字符
+    # Zero-width / control characters
     text = re.sub(r"[\u200b-\u200f\u2028-\u202f\ufeff]", "", text)
-    # 多余WhitespaceMerge
+    # Collapse multiple whitespace characters
     text = re.sub(r"[ \t]+", " ", text)
     return text.strip()
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Layer 2: Amount formatFix
+# Layer 2: Amount format fixing
 # ═══════════════════════════════════════════════════════════════════════════════
 
-# 编译正则 (一次性)
+# Pre-compiled regex patterns (one-time compilation)
 _AMOUNT_PATTERNS: List[Tuple[re.Pattern, str, str]] = [
-    # "-230: 43" → "-230.43" (冒号+空格 → 小数点)
+    # "-230: 43" → "-230.43" (colon + space → decimal point)
     (re.compile(r"([+-]?\d[\d,]*): (\d{2})\b"), r"\1.\2", "colon_space→dot"),
-    # "132.995:40" → "132,995.40" (冒号 → 小数点, Fix千分位)
+    # "132.995:40" → "132,995.40" (colon → decimal, fix thousands separator)
     (re.compile(r"(\d{1,3})\.(\d{3}):(\d{2})\b"), r"\1,\2.\3", "dot_colon→comma_dot"),
-    # "-15;324.55" → "-15,324.55" (分号 → 逗号千分位)
+    # "-15;324.55" → "-15,324.55" (semicolon → thousands comma)
     (re.compile(r"([+-]?\d{1,3});(\d{3}[.\d]*)"), r"\1,\2", "semicolon→comma"),
-    # "15,458-75" → "15,458.75" (减号 in decimal → 小数点)
+    # "15,458-75" → "15,458.75" (hyphen in decimal position → decimal point)
     (re.compile(r"(\d{3})-(\d{2})\b"), r"\1.\2", "hyphen→decimal"),
-    # "-3. 290. 46" → "-3,290.46" (点+空格 → 千分位)
+    # "-3. 290. 46" → "-3,290.46" (spaced dots → thousands separator)
     (re.compile(r"(\d)\. (\d{3})\. (\d{2})\b"), r"\1,\2.\3", "spaced_dots→amount"),
-    # "-3. 290. 46" 的变体: "4. 088. 31"
+    # Variant of spaced dots: "4. 088. 31"
     (re.compile(r"(\d)\. (\d{3})\. (\d{2})"), r"\1,\2.\3", "spaced_dots_v2"),
-    # ".4,088.31" → "4,088.31" (前置点号)
+    # ".4,088.31" → "4,088.31" (spurious leading dot)
     (re.compile(r"^\.(\d{1,3},\d{3}\.\d{2})"), r"\1", "leading_dot"),
     # "+4;400.00" → "+4,400.00"
     (re.compile(r"([+-]?\d{1,3});(\d{3}\.\d{2})"), r"\1,\2", "semicolon_amount"),
-    # Amount中多余空格: "1, 234. 56" → "1,234.56"
+    # Spurious space in amount: "1, 234. 56" → "1,234.56"
     (re.compile(r"(\d), (\d{3})"), r"\1,\2", "comma_space"),
     (re.compile(r"(\d)\. (\d{2})\b"), r"\1.\2", "dot_space_decimal"),
 ]
 
 
 def fix_amount_format(text: str) -> str:
-    """Fix OCR Amount中的标点混淆。"""
+    """Fix punctuation confusion in OCR-recognised amounts."""
     for pattern, replacement, _name in _AMOUNT_PATTERNS:
         text = pattern.sub(replacement, text)
     return text
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Layer 3: Date formatFix
+# Layer 3: Date format fixing
 # ═══════════════════════════════════════════════════════════════════════════════
 
 _DATE_PATTERNS: List[Tuple[re.Pattern, str]] = [
-    # "2024~08-05" → "2024-08-05" (波浪号→连字符)
+    # "2024~08-05" → "2024-08-05" (tilde → hyphen)
     (re.compile(r"(\d{4})[~～](\d{2})[-~～]?(\d{2})"), r"\1-\2-\3"),
-    # "2024 -08-05" → "2024-08-05" (空格+连字符)
+    # "2024 -08-05" → "2024-08-05" (space + dash variants)
     (re.compile(r"(\d{4})\s*[-–—]\s*(\d{2})\s*[-–—]\s*(\d{2})"), r"\1-\2-\3"),
-    # "2024.08.05" → "2024-08-05" (点号Date)
+    # "2024.08.05" → "2024-08-05" (dot-separated date)
     (re.compile(r"(\d{4})\.(\d{2})\.(\d{2})"), r"\1-\2-\3"),
-    # "2024/08/05" 保持不变 (合法Format)
+    # "2024/08/05" is kept as-is (valid format)
 ]
 
 
 def fix_date_format(text: str) -> str:
-    """Fix OCR Date中的FormatError。"""
+    """Fix FormatError in OCR Date."""
     for pattern, replacement in _DATE_PATTERNS:
         text = pattern.sub(replacement, text)
     return text
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Layer 4: 领域词典纠正 (泛化版)
+# Layer 4: Domain dictionary correction (generic version)
 # ═══════════════════════════════════════════════════════════════════════════════
 
-# 通用高频 OCR 字形混淆词典
-# key: Error形式, value: 正确形式
-# Design principles: 只收录 OCR 中高频出现且无歧义的纠正
+# Generic high-frequency OCR glyph-confusion dictionary
+# key: incorrect form, value: correct form
+# Design: only includes high-frequency unambiguous corrections
 _GENERIC_CORRECTIONS: Dict[str, str] = {
-    # ── AccountType (银行通用) ──
+    # ── Account types (banking, generic) ──
     "活川": "活期", "活圳": "活期", "活助": "活期", "活斯": "活期",
     "活州": "活期", "活朋": "活期",
     "定册": "定期", "定朋": "定期",
 
-    # ── 支付渠道 (通用) ──
+    # ── Payment channels (generic) ──
     "快提支付": "快捷支付", "块捷支付": "快捷支付",
     "快措支付": "快捷支付", "快据支付": "快捷支付",
 
-    # ── 交易Type (通用) ──
+    # ── Transaction types (generic) ──
     "转帐": "转账", "转帖": "转账",
     "汇入汇": "汇入", "他行汇人": "他行汇入",
     "跨行转人": "跨行转入", "跨行转人账": "跨行转入",
-    "网上银行": "网上银行",  # retain (已正确)
+    "网上银行": "网上银行",  # keep (already correct)
 
-    # ── 货币/通用 ──
+    # ── Currency / general ──
     "人民帀": "人民币", "人民巾": "人民币",
     "借记卞": "借记卡", "借记下": "借记卡",
 
-    # ── 常见动词混淆 ──
+    # ── Common verb confusions ──
     "消赀": "消费", "消贵": "消费",
     "还歉": "还款",
 }
 
-# 支付公司Name纠正 (通用Mode: X友 → X友)
+# Payment company name correction (Generic format)
 _COMPANY_PATTERNS: List[Tuple[re.Pattern, str]] = [
-    # "富发支付" → "富友支付" (发↔友 混淆)
+    # "富发支付" -> "富友支付" (character confusion)
     (re.compile(r"富发支付"), "富友支付"),
-    # "高友支付" → "富友支付" (富↔高 混淆)
+    # "高友支付" -> "富友支付" (character confusion)
     (re.compile(r"高友支付"), "富友支付"),
     # "通联支忖" → "通联支付"
     (re.compile(r"支忖"), "支付"),
@@ -157,13 +160,13 @@ _COMPANY_PATTERNS: List[Tuple[re.Pattern, str]] = [
 
 
 def fix_domain_terms(text: str) -> str:
-    """Fix OCR 领域术语的字形混淆。"""
-    # 词典replace
+    """Fix OCR glyph confusion in domain-specific terms."""
+    # Dictionary replacement
     for wrong, correct in _GENERIC_CORRECTIONS.items():
         if wrong in text:
             text = text.replace(wrong, correct)
 
-    # 正则Modereplace
+    # Regex pattern replacement
     for pattern, replacement in _COMPANY_PATTERNS:
         text = pattern.sub(replacement, text)
 
@@ -171,42 +174,130 @@ def fix_domain_terms(text: str) -> str:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Layer 5: 数字清洗 (Fix纯数字串中的 OCR Error)
+# Layer 5: Digit noise clean-up (fix pure digit strings)
 # ═══════════════════════════════════════════════════════════════════════════════
 
 _DIGIT_CLEANUP: List[Tuple[re.Pattern, str]] = [
-    # "00000," → "00000" (尾部逗号)
+    # "00000," → "00000" (trailing comma)
     (re.compile(r"(\d{5}),\s*$"), r"\1"),
-    # "00:00002+" → 无法Fix, 标记为Low confidence (不做replace)
+    # "00:00002+" → cannot be fixed, mark as low confidence (no replacement)
 ]
 
 
 def fix_digit_noise(text: str) -> str:
-    """Clean数字串中的 OCR 噪声。"""
+    """Clean OCR noise in pure digit strings."""
     for pattern, replacement in _DIGIT_CLEANUP:
         text = pattern.sub(replacement, text)
     return text
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 统一Entry point: 全流程Post-processing
+# Layer 6: Levenshtein dictionary correction for standard keys
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Standard, high-value document keys (Property, Business License, etc.)
+_STANDARD_KEYS = [
+    "不动产单元号", "权利类型", "权利性质", "用途", "面积", "使用期限",
+    "权利其他状况", "附记", "坐落", "权利人", "共有情况", "法定代表人",
+    "注册资本", "成立日期", "营业期限", "经营范围", "统一社会信用代码",
+    "宗地面积", "房屋结构", "建筑面积"
+]
+
+def _levenshtein_distance(s1: str, s2: str) -> int:
+    if len(s1) < len(s2):
+        return _levenshtein_distance(s2, s1)
+    if len(s2) == 0:
+        return len(s1)
+    previous_row = range(len(s2) + 1)
+    for i, c1 in enumerate(s1):
+        current_row = [i + 1]
+        for j, c2 in enumerate(s2):
+            insertions = previous_row[j + 1] + 1
+            deletions = current_row[j] + 1
+            substitutions = previous_row[j] + (c1 != c2)
+            current_row.append(min(insertions, deletions, substitutions))
+        previous_row = current_row
+    return previous_row[-1]
+
+def fix_domain_keys(text: str) -> str:
+    """Fuzzy match and correct standard document keys using Levenshtein distance."""
+    # We only correct if the text is short enough to realistically be a key (or key+value)
+    # If the text is very long (like a full paragraph of business scope), skip it.
+    if len(text) > 25:
+        return text
+    
+    # Try to find if this string contains a misspelled standard key
+    for standard_key in _STANDARD_KEYS:
+        key_len = len(standard_key)
+        # If the text is exactly the key length (or very close), just compare directly
+        if abs(len(text) - key_len) <= 1:
+            if _levenshtein_distance(text, standard_key) <= 1:
+                return standard_key
+        
+        # If the text contains the key as a prefix (like "执利类型：xxx")
+        # Check the first N characters
+        if len(text) > key_len:
+            prefix = text[:key_len]
+            if _levenshtein_distance(prefix, standard_key) <= 1:
+                return standard_key + text[key_len:]
+                
+    return text
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Layer 7: Alphanumeric Substitution (Heuristic Context Constraints)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Fix typical character/digit confusions based on surrounding context.
+# E.g., '0' inside a word should be 'O', 'O' inside a number should be '0'.
+_ALPHANUM_PATTERNS: List[Tuple[re.Pattern, str, str]] = [
+    # 0 vs O/o
+    # 'O' or 'o' surrounded by digits becomes '0'
+    (re.compile(r'(?<=\d)[Oo](?=\d)'), '0', 'O_in_digits'),
+    # 'O' or 'o' after a currency symbol or trailing a number: "￥10O" -> "￥100", "50o" -> "500"
+    (re.compile(r'(?<=\d)[Oo](?P<end>[.,\s]|$)'), r'0\g<end>', 'O_at_end_of_digits'),
+    # '0' surrounded by letters becomes 'O'
+    (re.compile(r'(?<=[a-zA-Z])0(?=[a-zA-Z])'), 'O', '0_in_letters'),
+    
+    # 1 vs I/l
+    # 'l' or 'I' surrounded by digits becomes '1'
+    (re.compile(r'(?<=\d)[Il](?=\d)'), '1', 'I_in_digits'),
+    # '1' surrounded by letters becomes 'l'
+    (re.compile(r'(?<=[a-z])1(?=[a-z])'), 'l', '1_in_letters'),
+    (re.compile(r'(?<=[A-Z])1(?=[A-Z])'), 'I', '1_in_upper_letters'),
+    
+    # 5 vs S
+    # 'S' or 's' surrounded by numbers
+    (re.compile(r'(?<=\d)[Ss](?=\d)'), '5', 'S_in_digits'),
+    # '5' surrounded by letters
+    (re.compile(r'(?<=[a-zA-Z])5(?=[a-zA-Z])'), 'S', '5_in_letters'),
+    
+    # Currency bounds: 'S' right before digits (often from $ or 5)
+    (re.compile(r'^S(?=\d{2,})'), '5', 'S_at_start_of_digits'),
+]
+
+def fix_alphanumeric_confusion(text: str) -> str:
+    """Fix common OCR confusions (0/O, 1/l/I, 5/S) using surrounding context constraints."""
+    for pattern, replacement, _ in _ALPHANUM_PATTERNS:
+        text = pattern.sub(replacement, text)
+    return text
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Unified entry point: full-pipeline post-processing
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def postprocess_ocr_text(text: str) -> str:
-    """OCR 文本全流程Post-processing。
+    """OCR text full pipeline Post-processing.
 
-    分 layerExecute:
-        L1: 字符级清洗 (全角→半角, NFKC)
-        L2: Amount formatFix
-        L3: Date formatFix
-        L4: 领域词典纠正
-        L5: 数字噪声Clean
-
-    Args:
-        text: OCR 原始文本。
-
-    Returns:
-        纠正后的文本。
+    Layered execution:
+        L1: Character-level cleaning (Full-width to Half-width, NFKC)
+        L2: Amount format fix
+        L3: Date format fix
+        L4: Domain dictionary correction
+        L5: Digit noise clean
+        L6: Fuzzy key correction
+        L7: Alphanumeric heuristic constraint
     """
     if not text or not text.strip():
         return text
@@ -215,7 +306,9 @@ def postprocess_ocr_text(text: str) -> str:
     text = fix_amount_format(text)    # L2
     text = fix_date_format(text)      # L3
     text = fix_domain_terms(text)     # L4
+    text = fix_alphanumeric_confusion(text) # L7
     text = fix_digit_noise(text)      # L5
+    text = fix_domain_keys(text)      # L6
 
     return text
 
@@ -223,13 +316,13 @@ def postprocess_ocr_text(text: str) -> str:
 def postprocess_table(
     table: List[List[str]],
 ) -> List[List[str]]:
-    """对Table中each单元格应用 OCR Post-processing。
+    """Apply OCR post-processing to every cell in a table.
 
     Args:
-        table: TableData (二维字符串List)。
+        table: Table data (2-D list of strings).
 
     Returns:
-        纠正后的Table。
+        Corrected table.
     """
     return [
         [postprocess_ocr_text(cell) if isinstance(cell, str) else cell for cell in row]
@@ -240,26 +333,26 @@ def postprocess_table(
 def postprocess_ocr_result(
     result: Optional[dict],
 ) -> Optional[dict]:
-    """对 analyze_scanned_page() 的完整ReturnsResult应用Post-processing。
+    """Apply post-processing to the full result from ``analyze_scanned_page()``.
 
     Args:
-        result: {'table': [[...]], 'header_text': str, 'footer_text': str}
+        result: ``{'table': [[...]], 'header_text': str, 'footer_text': str}``
 
     Returns:
-        纠正后的Result (原地修改)。
+        Corrected result (modified in-place).
     """
     if not result:
         return result
 
-    # 纠正Table
+    # Correct table cells
     if "table" in result and result["table"]:
         result["table"] = postprocess_table(result["table"])
 
-    # 纠正多Table
+    # Correct multiple tables
     if "tables" in result and result["tables"]:
         result["tables"] = [postprocess_table(t) for t in result["tables"]]
 
-    # 纠正 header/footer
+    # Correct header / footer text
     if "header_text" in result:
         result["header_text"] = postprocess_ocr_text(result["header_text"])
     if "footer_text" in result:

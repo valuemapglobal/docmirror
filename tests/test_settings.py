@@ -14,7 +14,6 @@ class TestDocMirrorSettings:
         """Default settings should have sensible values."""
         settings = DocMirrorSettings()
         assert settings.default_enhance_mode == "standard"
-        assert settings.enable_llm is False
         assert settings.max_pages == 200
         assert settings.ocr_dpi == 150
         assert settings.fail_strategy == "skip"
@@ -23,17 +22,14 @@ class TestDocMirrorSettings:
         """from_env should use defaults when env vars not set."""
         settings = DocMirrorSettings.from_env()
         assert settings.default_enhance_mode == "standard"
-        assert settings.enable_llm is False
 
     def test_from_env_override(self, monkeypatch):
         """from_env should respect DOCMIRROR_ env vars."""
         monkeypatch.setenv("DOCMIRROR_ENHANCE_MODE", "full")
-        monkeypatch.setenv("DOCMIRROR_ENABLE_LLM", "true")
         monkeypatch.setenv("DOCMIRROR_MAX_PAGES", "50")
 
         settings = DocMirrorSettings.from_env()
         assert settings.default_enhance_mode == "full"
-        assert settings.enable_llm is True
         assert settings.max_pages == 50
 
     def test_to_dict(self):

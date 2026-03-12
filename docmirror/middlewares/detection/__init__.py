@@ -1,4 +1,4 @@
-"""Detection middlewares – scene, language, institution."""
+"""Detection middlewares \u2013 scene, language, institution."""
 
 from .scene_detector import SceneDetector
 from .language_detector import LanguageDetector

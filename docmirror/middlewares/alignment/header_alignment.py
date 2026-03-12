@@ -1,43 +1,44 @@
 """
-Table header-DataAlignmentValidate (Header-Data Alignment Verification)
-======================================================
+Header-Data Alignment Verification
+====================================
 
-从 ``column_mapper.py`` Extract: based on内容Type推断的列AlignmentVerify和修正。
+Handles content-type-based inference 
+and structural alignment verification.
 
-核心功能:
-  - ``infer_column_type()``: 对Data列做Type分布采样 (date/amount/seq/text)
-  - ``verify_header_data_alignment()``: Detect并修正Table header与Data的系统性偏移
+Core Capabilities:
+  - ``infer_column_type()``: Samples data columns to infer expected datatype distributions (date/amount/seq/text).
+  - ``verify_header_data_alignment()``: Detects and automatically corrects systematic alignment offsets occurring between headers and data rows.
 """
-
 from __future__ import annotations
+
 
 import logging
 import re
 from collections import Counter
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List
 
 logger = logging.getLogger(__name__)
 
-# Date正则 (宽松，override YYYYMMDD / YYYY-MM-DD / YYYY.MM.DD / YYYY/MM/DD 等)
+# Date Regex Patterns (Lenient, capturing YYYYMMDD / YYYY-MM-DD / YYYY.MM.DD / YYYY/MM/DD etc.)
 _RE_COL_DATE = re.compile(
     r'^\d{8}(\s*\d{1,2}:\d{2}(:\d{2})?)?$|'
     r'^\d{4}[-/.年]\d{1,2}[-/.月]\d{1,2}日?'
     r'(\s*\d{1,2}:\d{2}(:\d{2})?)?$|'
     r'^\d{2}[-/]\d{2}[-/]\d{4}$'
 )
-# Amount正则 (含逗号分隔)
+# Numeric Amount Regex (Supports comma-separated inputs)
 _RE_COL_AMOUNT = re.compile(r'^[+-]?\d[\d,]*\.\d{1,4}$')
-# 序号正则 (纯整数, 1~8 位)
+# Sequence/Index Number Regex (Pure integers, 1~8 digits)
 _RE_COL_SEQ = re.compile(r'^\d{1,8}$')
 
 
 def infer_column_type(
     data_rows: List[List[str]], col_idx: int, sample_size: int = 30,
 ) -> Dict[str, float]:
-    """推断单列的DataType分布。
+    """Infers the dominant data type distribution of a target column.
 
     Returns:
-        {"date": 0.9, "amount": 0.05, "seq": 0.0, "text": 0.05}
+        Probability map, e.g., {"date": 0.9, "amount": 0.05, "seq": 0.0, "text": 0.05}
     """
     counts = {"date": 0, "amount": 0, "seq": 0, "text": 0}
     total = 0
@@ -68,25 +69,26 @@ def verify_header_data_alignment(
     data_rows: List[List[str]],
     header_type_expectations: Dict[str, str],
     mutation_recorder=None,
-    middleware_name: str = "ColumnMapper",
+    middleware_name: str = "HeaderAlignment",
 ) -> List[str]:
-    """ValidateTable header与Data列WhetherAlignment，Detect并修正系统性偏移。
+    """Validates alignment between headers and corresponding data columns, 
+    detecting and repairing systematic offsets.
 
     Args:
-        headers: 原始Table headerList。
-        data_rows: Data行。
-        header_type_expectations: Table header名 → 期望Type ("date"/"amount"/"seq")。
-        mutation_recorder: Optional的 EnhancedResult 用于记录 mutation。
-        middleware_name: mutation 记录的Middleware名。
+        headers: Original list of table headers.
+        data_rows: Extraction data rows matrix.
+        header_type_expectations: Mapping of Header Name \u2192 Expected Datatype ("date"/"amount"/"seq").
+        mutation_recorder: Optional `EnhancedResult` dependency for mutation tracking logging.
+        middleware_name: Name of the invoking middleware for telemetry.
 
     Returns:
-        修正后的Table headerList (或原样Returns)。
+        A corrected list of table headers, or the original payload if unchanged.
     """
     n_cols = len(headers)
     if len(data_rows) < 5 or n_cols < 3:
         return headers
 
-    # ── Step 1: 收集锚点列 ──
+    # \u2500\u2500\u2500 Step 1: Collect structural anchor columns \u2500\u2500\u2500
     anchors: List[Dict] = []
     for i, h in enumerate(headers):
         h_clean = h.strip()
@@ -108,7 +110,7 @@ def verify_header_data_alignment(
     if len(anchors) < 2:
         return headers
 
-    # ── Step 2: 对each锚点列，检查WhetherAlignment ──
+    # \u2500\u2500\u2500 Step 2: Validate column-level alignment against anchors \u2500\u2500\u2500
     offsets: List[Dict] = []
     for anchor in anchors:
         hi = anchor["header_idx"]
@@ -116,12 +118,14 @@ def verify_header_data_alignment(
         current_profile = infer_column_type(data_rows, hi)
         current_match = current_profile.get(et, 0.0)
 
+        # Early exit matching threshold
         if current_match >= 0.5:
             offsets.append({"anchor": anchor, "offset": 0, "confidence": current_match})
             continue
 
         best_offset = 0
         best_match = current_match
+        # Sweep surrounding columns (±2 window) resolving potential OCR shift artifacts
         for delta in [1, -1, 2, -2]:
             check_idx = hi + delta
             if 0 <= check_idx < n_cols:
@@ -131,12 +135,13 @@ def verify_header_data_alignment(
                     best_match = match
                     best_offset = delta
 
+        # Register shifted positive hits
         if best_match >= 0.5 and best_offset != 0:
             offsets.append({"anchor": anchor, "offset": best_offset, "confidence": best_match})
         else:
             offsets.append({"anchor": anchor, "offset": 0, "confidence": current_match})
 
-    # ── Step 3: Detect系统性偏移 ──
+    # \u2500\u2500\u2500 Step 3: Global systemic pattern evaluation \u2500\u2500\u2500
     non_zero = [o for o in offsets if o["offset"] != 0]
     if len(non_zero) < 2:
         return headers
@@ -147,10 +152,11 @@ def verify_header_data_alignment(
         return headers
 
     zero_count = sum(1 for o in offsets if o["offset"] == 0)
+    # Require systematic skew to overpower static (valid) alignment observations
     if zero_count > dominant_count:
         return headers
 
-    # ── Step 4: 修正Table header ──
+    # \u2500\u2500\u2500 Step 4: Execute Alignment Correction \u2500\u2500\u2500
     logger.info(
         f"[{middleware_name}] alignment fix: detected systematic offset={dominant_offset}, "
         f"anchors={[(o['anchor']['header_name'], o['offset']) for o in offsets]}"
@@ -158,6 +164,7 @@ def verify_header_data_alignment(
 
     new_headers = list(headers)
     if dominant_offset > 0:
+        # Padded insertion shifting headers rightward natively
         for _ in range(abs(dominant_offset)):
             first_shift_idx = min(
                 o["anchor"]["header_idx"] for o in non_zero
@@ -166,6 +173,7 @@ def verify_header_data_alignment(
             new_headers.insert(first_shift_idx, "")
         new_headers = new_headers[:n_cols]
     elif dominant_offset < 0:
+        # Deletion strategy shifting headers incrementally structural leftward
         for _ in range(abs(dominant_offset)):
             first_shift_idx = min(
                 o["anchor"]["header_idx"] for o in non_zero
@@ -191,5 +199,5 @@ def verify_header_data_alignment(
             reason=f"systematic offset={dominant_offset}, {dominant_count} anchors confirmed",
         )
 
-    logger.info(f"[{middleware_name}] alignment fix applied: {headers[:6]} → {new_headers[:6]}")
+    logger.info(f"[{middleware_name}] alignment fix applied: {headers[:6]} \u2192 {new_headers[:6]}")
     return new_headers

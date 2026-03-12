@@ -6,7 +6,6 @@
       members:
         - DomainPlugin
         - PluginRegistry
-        - ColumnHint
 
 ::: docmirror.configs.settings.DocMirrorSettings
     options:

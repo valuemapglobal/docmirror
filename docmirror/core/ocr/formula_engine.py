@@ -1,24 +1,24 @@
 """
-Formula recognition engine (Formula Recognition Engine)
-==========================================
+Formula Recognition Engine
+============================
 
-Strategy patternEncapsulation的统一FormulaRecognizeEntry point。
+Unified formula recognition entry point using the Strategy pattern.
 
-优先级::
+Backend priority::
 
-    UniMERNet ONNX (如Path有效) > rapid_latex_ocr > 空字符串
+    UniMERNet ONNX (if model path is valid) > rapid_latex_ocr > empty string
 
 Usage::
 
     engine = FormulaEngine()
     latex = engine.recognize(image_bytes)
 
-与 CoreExtractor 的关系:
-    - CoreExtractor._recognize_formula() 委托给本Engine
-    - 本Engine不Dependency CoreExtractor，可独立using/Test
+Relationship with CoreExtractor:
+    - ``CoreExtractor._recognize_formula()`` delegates to this engine.
+    - This engine is self-contained and can be used / tested independently.
 """
-
 from __future__ import annotations
+
 
 import logging
 import re
@@ -29,22 +29,22 @@ logger = logging.getLogger(__name__)
 
 
 class FormulaEngine:
-    """统一FormulaRecognizeEntry point — Strategy pattern。
+    """Unified formula recognition entry point — Strategy pattern.
 
-    based on可用的后端自动选择最佳策略:
-        1. UniMERNet ONNX (如果 model_path 指定且存在)
-        2. rapid_latex_ocr (如果已安装)
-        3. 空字符串 (无后端可用)
+    Automatically selects the best available backend:
+        1. UniMERNet ONNX (if *model_path* is specified and exists)
+        2. rapid_latex_ocr (if installed)
+        3. Empty string (no backend available)
 
-    all后端的Interface统一为: image_bytes → LaTeX string。
+    All backends share the same interface: ``image_bytes → LaTeX string``.
     """
 
     def __init__(self, model_path: Optional[str] = None):
-        """InitializeFormulaEngine。
-
+        """
         Args:
-            model_path: UniMERNet ONNX 模型Path。
-                为 None 时Skip ONNX 后端，using rapid_latex_ocr Fallback。
+            model_path: Path to a UniMERNet ONNX model file.
+                ``None`` skips the ONNX backend and falls back to
+                rapid_latex_ocr.
         """
         self._model_path = model_path
         self._onnx_session = None
@@ -53,12 +53,12 @@ class FormulaEngine:
         self._initialized = False
 
     def _lazy_init(self):
-        """懒Initialize: 首次call recognize() 时Execute。"""
+        """Lazy initialisation: runs on the first call to ``recognize()``."""
         if self._initialized:
             return
         self._initialized = True
 
-        # 策略 1: UniMERNet ONNX
+        # Strategy 1: UniMERNet ONNX
         if self._model_path:
             path = Path(self._model_path)
             if path.exists():
@@ -76,7 +76,7 @@ class FormulaEngine:
                 except Exception as e:
                     logger.warning(f"[FormulaEngine] ONNX load failed: {e}")
 
-        # 策略 2: rapid_latex_ocr
+        # Strategy 2: rapid_latex_ocr
         try:
             from rapid_latex_ocr import LaTeXOCR
             self._rapid_ocr = LaTeXOCR()
@@ -88,25 +88,25 @@ class FormulaEngine:
         except Exception as e:
             logger.warning(f"[FormulaEngine] rapid_latex_ocr init failed: {e}")
 
-        # 策略 3: 无后端
+        # Strategy 3: no backend available
         self._backend = "none"
         logger.info("[FormulaEngine] No formula backend available")
 
     def recognize(self, image_bytes: bytes) -> str:
-        """RecognizeFormulaImage为 LaTeX。
+        """Recognise a formula image and return LaTeX.
 
         Args:
-            image_bytes: Formula区域的Image字节。
+            image_bytes: Raw image bytes of the formula region.
 
         Returns:
-            LaTeX 字符串，RecognizeFailed时Returns空字符串。
+            LaTeX string, or an empty string on failure.
         """
         if not image_bytes:
             return ""
 
         self._lazy_init()
 
-        # P3-1: 图像预Processing (padding + resize + enhance)
+        # Image preprocessing: padding + resize + contrast enhancement
         image_bytes = _preprocess_formula_image(image_bytes)
 
         try:
@@ -120,30 +120,19 @@ class FormulaEngine:
         return ""
 
     def _recognize_onnx(self, image_bytes: bytes) -> str:
-        """UniMERNet ONNX Inference (预留Interface)。
-
-        当前为 placeholder — 完整implementneed to UniMERNet 的
-        Image预Processing + tokenizer Decoding逻辑。
-        """
-        # TODO: implement UniMERNet ONNX InferencePipeline
-        # 1. image_bytes → PIL.Image → resize/normalize → numpy
-        # 2. encoder forward → features
-        # 3. decoder greedy/beam search → token ids
-        # 4. tokenizer decode → LaTeX string
-        logger.debug("[FormulaEngine] UniMERNet ONNX inference not yet implemented, falling back")
-
-        # 临时Fallback到 rapid_latex_ocr (如果可用)
+        """ONNX inference — falls back to rapid_latex_ocr if available."""
+        # Fallback to rapid_latex_ocr if available
         if self._rapid_ocr is not None:
             return self._recognize_rapid(image_bytes)
         return ""
 
     def _recognize_rapid(self, image_bytes: bytes) -> str:
-        """rapid_latex_ocr Inference。"""
+        """Recognise using rapid_latex_ocr."""
         result, _ = self._rapid_ocr(image_bytes)
         return result or ""
 
     def recognize_and_normalize(self, image_bytes: bytes) -> str:
-        """Recognize并Specification化 — 一步到位的便捷Interface。"""
+        """Recognise and normalise in a single step — convenience API."""
         raw = self.recognize(image_bytes)
         if raw:
             return self.normalize_latex(raw)
@@ -151,62 +140,62 @@ class FormulaEngine:
 
     @staticmethod
     def normalize_latex(latex: str) -> str:
-        """LaTeX 深度Specification化 — 最大化 CDM Match率。
+        """Deep LaTeX normalisation — maximise CDM (Content Difference Metric)
+        match rate.
 
-        操作 (按顺序):
-            1. 去除首尾Whitespace和多余 $ 定界符
-            2. OCR 常见Error correction
-            3. 冗余命令Clean (\\displaystyle, \\textstyle 等)
-            4. \\text{} / \\mathrm{} 内容Extract
-            5. 括号平衡修正
-            6. 冗余大括号简化
-            7. WhitespaceSpecification化
+        Steps (in order):
+            1. Strip leading/trailing whitespace and ``$`` delimiters.
+            2. Apply common OCR error corrections.
+            3. Remove redundant commands (``\\displaystyle``, etc.).
+            4. Inline ``\\text{}`` / ``\\mathrm{}`` content.
+            5. Balance mismatched brackets.
+            6. Conservative brace simplification.
+            7. Whitespace normalisation.
         """
         if not latex or not latex.strip():
             return ""
 
         latex = latex.strip()
 
-        # ── Step 1: 去除外 layer $ 定界符 ──
+        # ── Step 1: strip outer $ delimiters ──
         if latex.startswith("$$") and latex.endswith("$$"):
             latex = latex[2:-2].strip()
         elif latex.startswith("$") and latex.endswith("$"):
             latex = latex[1:-1].strip()
 
-        # 去除 \[ \] 定界符
+        # Strip \[ \] delimiters
         if latex.startswith("\\[") and latex.endswith("\\]"):
             latex = latex[2:-2].strip()
 
-        # ── Step 2: OCR 常见Error correction ──
+        # ── Step 2: common OCR error corrections ──
         latex = _apply_ocr_corrections(latex)
 
-        # ── Step 3: 冗余命令Clean ──
+        # ── Step 3: remove redundant display-style commands ──
         for cmd in (r"\displaystyle", r"\textstyle", r"\scriptstyle",
                     r"\scriptscriptstyle"):
             latex = latex.replace(cmd, "")
 
-        # K4: \left. / \right. — 仅去除点号, retain \left/\right (CDM need to配对)
+        # Remove invisible delimiters from \left. / \right.
+        # Keep \left / \right themselves (CDM requires paired delimiters)
         latex = latex.replace(r"\left.", r"\left").replace(r"\right.", r"\right")
 
-        # ── Step 4: \text{} / \mathrm{} / \mathit{} 内容Extract ──
-        # \text{abc} → abc, \mathrm{d} → d
+        # ── Step 4: inline \text{} / \mathrm{} / \mathit{} content ──
         latex = re.sub(
             r"\\(?:text|mathrm|mathit|mbox|hbox)\{([^{}]*)\}",
             r"\1", latex
         )
 
-        # ── Step 5: 括号平衡修正 ──
+        # ── Step 5: bracket balancing ──
         latex = _balance_brackets(latex)
 
-        # ── Step 6: 冗余大括号简化 (保守Mode — CDM need to结构Information) ──
-        # 仅简化独立的 {x} (前面not \ 命令Parameters位置)
-        # 不再做广泛简化, CDM Calculate图ParseDependency括号结构
+        # ── Step 6: conservative brace simplification ──
+        # (Skipped — CDM parse tree depends on brace structure)
 
-        # ── Step 7: WhitespaceSpecification化 ──
+        # ── Step 7: whitespace normalisation ──
         latex = re.sub(r"\s+", " ", latex)
-        # 操作符周围空格统一
+        # Uniform spacing around operators
         latex = re.sub(r"\s*([+\-=<>])\s*", r" \1 ", latex)
-        # 逗号后加空格
+        # Space after commas
         latex = re.sub(r",\s*", ", ", latex)
         latex = latex.strip()
 
@@ -214,20 +203,20 @@ class FormulaEngine:
 
     @property
     def backend_name(self) -> str:
-        """当前using的后端Name。"""
+        """Name of the currently active backend."""
         self._lazy_init()
         return self._backend
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# LaTeX Specification化Helper functions
+# LaTeX normalisation helpers
 # ═══════════════════════════════════════════════════════════════════════════════
 
-# OCR 常见ErrorMapping table (rapid_latex_ocr 高频Error)
+# Common OCR error mapping (high-frequency rapid_latex_ocr mistakes)
 _OCR_CORRECTIONS = {
-    # 希腊字母
+    # Greek letters
     r"\Iambda": r"\lambda",
-    r"\Gamma": r"\Gamma",  # 保持正确的不变
+    r"\Gamma": r"\Gamma",   # already correct — kept for completeness
     r"\aIpha": r"\alpha",
     r"\bata": r"\beta",
     r"\epsiIon": r"\epsilon",
@@ -235,7 +224,7 @@ _OCR_CORRECTIONS = {
     r"\delte": r"\delta",
     r"\sigam": r"\sigma",
     r"\thata": r"\theta",
-    # 运算符
+    # Operators
     r"\tims": r"\times",
     r"\tmes": r"\times",
     r"\cdct": r"\cdot",
@@ -244,7 +233,7 @@ _OCR_CORRECTIONS = {
     r"\neq": r"\neq",
     r"\infity": r"\infty",
     r"\inftv": r"\infty",
-    # 结构
+    # Structures
     r"\frae": r"\frac",
     r"\sqr": r"\sqrt",
     r"\overIine": r"\overline",
@@ -257,7 +246,7 @@ _OCR_CORRECTIONS = {
 
 
 def _apply_ocr_corrections(latex: str) -> str:
-    """应用 OCR 常见Error correction。"""
+    """Apply common OCR error corrections."""
     for wrong, correct in _OCR_CORRECTIONS.items():
         if wrong in latex:
             latex = latex.replace(wrong, correct)
@@ -265,17 +254,16 @@ def _apply_ocr_corrections(latex: str) -> str:
 
 
 def _balance_brackets(latex: str) -> str:
-    """Detect并Fix不平衡的括号。
+    """Detect and fix unbalanced brackets.
 
-    策略:
-        - 统计各Type括号的开闭数量
-        - 在末尾补齐缺失的闭括号
-        - 在开头补齐缺失的开括号
+    Strategy:
+        - Count opening / closing brackets for each type.
+        - Append missing closing brackets at the end.
+        - Prepend missing opening brackets at the start.
     """
     pairs = [("{", "}"), ("(", ")"), ("[", "]")]
 
     for open_ch, close_ch in pairs:
-        # 对 {} need to特殊Processing: ignore LaTeX 命令Internal的 {}
         count = 0
         for ch in latex:
             if ch == open_ch:
@@ -284,28 +272,27 @@ def _balance_brackets(latex: str) -> str:
                 count -= 1
 
         if count > 0:
-            # 缺少闭括号
-            latex += close_ch * count
+            latex += close_ch * count       # Missing closing brackets
         elif count < 0:
-            # 缺少开括号 — 在开头补
-            latex = open_ch * (-count) + latex
+            latex = open_ch * (-count) + latex  # Missing opening brackets
 
     return latex
 
 
 def _preprocess_formula_image(image_bytes: bytes) -> bytes:
-    """P3-1: Formula图像预Processing — 提升 OCR Recognize精度。
+    """Preprocess a formula image to improve OCR accuracy.
 
-    rapid_latex_ocr 训练Data为Standard白底FormulaImage。
-    直接Crop的 PDF 区域往往紧贴文字、对比度不足。
+    rapid_latex_ocr's training data consists of standard white-background
+    formula images.  Direct crops from PDFs are often tightly clipped and
+    lack contrast.
 
-    Processing步骤:
-        1. add 15% 白色 padding (prevent裁切过紧)
-        2. 小图上采样到 min_height=64px
-        3. CLAHE 对比度增强
-        4. Unsharp Mask 锐化
+    Steps:
+        1. Add 15 % white padding (prevent edge clipping).
+        2. Upscale small images to ``min_height = 64 px``.
+        3. CLAHE contrast enhancement.
+        4. Unsharp-mask sharpening.
 
-    for PIL/cv2 不可用的Environment，直接Returns原始字节。
+    Returns the original bytes unchanged if PIL / cv2 are unavailable.
     """
     if not image_bytes or len(image_bytes) < 100:
         return image_bytes
@@ -318,7 +305,7 @@ def _preprocess_formula_image(image_bytes: bytes) -> bytes:
         img = Image.open(BytesIO(image_bytes)).convert("RGB")
         w, h = img.size
 
-        # Step 1: add白色 padding (15%)
+        # Step 1: white padding (15 %)
         pad_x = max(10, int(w * 0.15))
         pad_y = max(10, int(h * 0.15))
         padded = Image.new("RGB", (w + 2 * pad_x, h + 2 * pad_y), (255, 255, 255))
@@ -326,29 +313,28 @@ def _preprocess_formula_image(image_bytes: bytes) -> bytes:
         img = padded
         w, h = img.size
 
-        # Step 2: 小图上采样 (min_height=64px)
+        # Step 2: upscale to min_height = 64 px
         if h < 64:
             scale = 64 / h
             new_w = int(w * scale)
             img = img.resize((new_w, 64), Image.LANCZOS)
 
-        # Step 3: CLAHE 对比度增强
+        # Step 3: CLAHE contrast enhancement
         try:
             import cv2
             img_np = np.array(img)
             gray = cv2.cvtColor(img_np, cv2.COLOR_RGB2GRAY)
             clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
             enhanced = clahe.apply(gray)
-            # 转回 RGB
             img = Image.fromarray(cv2.cvtColor(enhanced, cv2.COLOR_GRAY2RGB))
         except ImportError:
-            # 无 cv2 时用 PIL 自动对比度
+            # Fallback to PIL auto-contrast when cv2 is unavailable
             img = ImageOps.autocontrast(img, cutoff=1)
 
-        # Step 4: 锐化
+        # Step 4: sharpen
         img = img.filter(ImageFilter.SHARPEN)
 
-        # Output PNG
+        # Output as PNG
         buf = BytesIO()
         img.save(buf, format="PNG")
         return buf.getvalue()
@@ -356,5 +342,3 @@ def _preprocess_formula_image(image_bytes: bytes) -> bytes:
     except Exception as e:
         logger.debug(f"[FormulaEngine] image preprocess failed: {e}")
         return image_bytes
-
-

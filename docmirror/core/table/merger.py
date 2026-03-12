@@ -1,17 +1,20 @@
 """
-table_merger — 跨页TableMerge
-=============================
+table_merger — Cross-page table merging
+========================================
 
-从 ``CoreExtractor._merge_cross_page_tables`` Extract的独立Module。
-负责Detect内容连续的跨页Table并将它们Merge为单一 Block。
+Independent module extracted from ``CoreExtractor._merge_cross_page_tables``.
+Responsible for detecting content-continuous cross-page tables and merging
+them into a single Block.
 
-Merge策略:
-  1. 下一页Table首行是Table header (且与上一页Table headerMatch) → Skip重复Table header直接MergeData
-  2. 首行notTable header (续 table页) → ``_strip_preamble`` 剥离汇总行/重复Table header行后Merge
-  3. 完全异 table (Table header不Match) → 当作独立Table
+Merge strategy:
+  1. Next page's first row is a header (matching the previous page's header)
+     → skip the duplicate header and merge data rows directly.
+  2. First row is not a header (continuation page) → ``_strip_preamble``
+     strips summary rows / duplicate headers before merging.
+  3. Completely different table (header mismatch) → treat as an independent table.
 """
-
 from __future__ import annotations
+
 
 import logging
 from typing import Dict, List
@@ -25,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 
 def _median_col_count(rows: list) -> int:
-    """P3-6: CalculateTable行的中位列数。"""
+    """P3-6: Compute the median column count of a table's rows."""
     if not rows:
         return 0
     counts = sorted(len(r) for r in rows if isinstance(r, (list, tuple)))
@@ -35,13 +38,13 @@ def _median_col_count(rows: list) -> int:
 
 
 def merge_cross_page_tables(pages: List[PageLayout]) -> List[PageLayout]:
-    """跨页TableMerge — Block 级别。
+    """Cross-page table merging — operates at the Block level.
 
     Args:
-        pages: allPage的 PageLayout List。
+        pages: List of PageLayout objects for all pages.
 
     Returns:
-        Merge后的 PageLayout List。
+        PageLayout list with cross-page tables merged.
     """
     if len(pages) <= 1:
         return pages
@@ -79,13 +82,13 @@ def merge_cross_page_tables(pages: List[PageLayout]) -> List[PageLayout]:
         first_row = curr_rows[0] if curr_rows else []
         is_header = _is_header_row(first_row)
 
-        # P3-6: 列数Verify — prevent不同Table误Merge
+        # P3-6: column count validation — prevent merging different tables
         prev_col_count = _median_col_count(prev_rows)
         curr_col_count = _median_col_count(curr_rows)
         col_count_mismatch = abs(prev_col_count - curr_col_count) > 1
 
         if col_count_mismatch:
-            # 列数Ratio判断: ratio < 0.5 视为Extraction failed (Skip, 不打断链)
+            # Column count ratio check: ratio < 0.5 = extraction failure (skip, don't break chain)
             max_cc = max(prev_col_count, curr_col_count, 1)
             min_cc = min(prev_col_count, curr_col_count)
             ratio = min_cc / max_cc
@@ -95,8 +98,8 @@ def merge_cross_page_tables(pages: List[PageLayout]) -> List[PageLayout]:
                     f"{entry['page_number']} ({curr_col_count} cols vs "
                     f"expected {prev_col_count})"
                 )
-                continue  # Skip, 不打断Merge链
-            # 列数相近但不同 → 视为独立Table
+                continue  # Skip, don't break the merge chain
+            # Similar but different column counts → treat as independent table
             merged_table_data.append({
                 "rows": list(curr_rows),
                 "pages": [entry["page_number"]],
@@ -114,7 +117,7 @@ def merge_cross_page_tables(pages: List[PageLayout]) -> List[PageLayout]:
                     "block": block,
                 })
         elif not is_header and prev_rows:
-            # 续 table: 剥离本页开头的汇总行/重复Table header行, 再Merge
+            # Continuation page: strip summary / duplicate header rows, then merge
             confirmed_hdr = prev_rows[0] if prev_rows else []
             stripped = _strip_preamble(list(curr_rows), confirmed_hdr)
             stripped = [r for r in stripped if any((c or "").strip() for c in r)]
@@ -128,7 +131,7 @@ def merge_cross_page_tables(pages: List[PageLayout]) -> List[PageLayout]:
                 "block": block,
             })
 
-    # F-7: Merge后行数审计
+    # F-7: post-merge row count audit
     for mdata in merged_table_data:
         if len(mdata["pages"]) > 1:
             merged_rows = len(mdata["rows"])

@@ -4,8 +4,7 @@
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `DOCMIRROR_ENHANCE_MODE` | `standard` | Pipeline mode: `raw`, `standard`, `full` |
-| `DOCMIRROR_ENABLE_LLM` | `false` | Enable LLM-powered validation |
+| `DOCMIRROR_ENHANCE_MODE` | `standard` | Pipeline mode: `raw`, `standard` |
 | `DOCMIRROR_MAX_PAGES` | `200` | Maximum pages to process |
 | `DOCMIRROR_OCR_DPI` | `150` | OCR rendering resolution |
 | `DOCMIRROR_FAIL_STRATEGY` | `skip` | Error handling: `skip`, `raise`, `fallback` |
@@ -18,8 +17,7 @@
 from docmirror.configs.settings import DocMirrorSettings
 
 settings = DocMirrorSettings(
-    default_enhance_mode="full",
-    enable_llm=True,
+    default_enhance_mode="standard",
     max_pages=100,
     ocr_dpi=200,
 )
@@ -29,6 +27,28 @@ settings = DocMirrorSettings(
 
 | Mode | Middlewares | Use Case |
 |------|-----------|----------|
-| `raw` | Scene detection only | Fast preview, format conversion |
-| `standard` | Detection + Entity + Column mapping + Repair | Production parsing |
-| `full` | Standard + LLM validation | High-accuracy, audit-grade |
+| `raw` | None | Fast preview, format conversion |
+| `standard` | SceneDetector + EntityExtractor + InstitutionDetector + Validator | Production parsing with full entity extraction and trust scoring |
+
+## Pipeline Configuration
+
+The middleware pipeline is configured per-format in `docmirror/configs/pipeline_registry.py`:
+
+| Format | `raw` | `standard` |
+|--------|-------|-----------|
+| PDF | — | SceneDetector → EntityExtractor → InstitutionDetector → Validator |
+| Image | — | LanguageDetector → GenericEntityExtractor |
+| Word | — | LanguageDetector → GenericEntityExtractor |
+| Excel | — | GenericEntityExtractor |
+| Other | — | LanguageDetector |
+
+## CLI Options
+
+```bash
+python3 -m docmirror <file>                    # Parse a document
+python3 -m docmirror --skip-cache <file>       # Force re-parse (skip Redis)
+python3 -m docmirror --format json <file>      # Output format
+python3 -m docmirror --no-save <file>          # Don't save to disk
+python3 -m docmirror --output-dir ./out <file> # Custom output directory
+python3 -m docmirror --authors                 # Show contributors
+```

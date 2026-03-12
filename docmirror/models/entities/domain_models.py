@@ -1,39 +1,54 @@
 """
-Domain Models — 领域特定Data模型
+Domain Models — Domain-specific Data Targets
+=============================================
 
-按DocumentType (DocumentType) define结构化Field,
-由 Parser 在RecognizeDocumentType后选择性填充。
+Defines structured Pydantic models for domain-specific document types.
+Each model captures the key fields relevant to a particular business
+document category (bank statement, invoice, contract, etc.).
+
+The ``DomainData`` container wraps all domain models with a discriminator
+field (``document_type``) so that exactly one sub-model is populated per
+parsed document.
+
+Supported domains:
+    - BankStatementData   — bank statements and transaction records
+    - InvoiceData         — tax invoices and commercial invoices
+    - TaxReportData       — tax compliance reports
+    - BusinessLicenseData — company registration certificates
+    - ContractData        — legal contracts and agreements
+    - FinancialReportData — financial statements
+    - IDCardData          — personal identification documents
 """
-
 from __future__ import annotations
 
-from enum import Enum
-from typing import Any, Dict, List, Optional
+
+
+from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
 
-# ═══════════════════════════════════════════════════════════════════════════
-# Bank statement
-# ═══════════════════════════════════════════════════════════════════════════
+# \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+# Bank Statement
+# \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 
 class TransactionRow(BaseModel):
-    """单笔交易"""
+    """Single Transaction Details"""
     date: str = ""
     description: str = ""
     amount: float = 0.0
     balance: Optional[float] = None
     counterparty: str = ""
-    transaction_type: str = ""         # "消费" | "转账" | "代付" ...
+    transaction_type: str = ""  # Consumption | Transfer | Repayment etc.
     currency: str = "CNY"
 
 
 class BankStatementData(BaseModel):
-    """Bank statement领域Data"""
-    account_holder: str = ""           # Account holder
-    account_number: str = ""           # Account number
-    bank_name: str = ""                # Bank name
-    query_period: str = ""             # "20240620 - 20250620"
+    """Bank statement contextual entity"""
+    account_holder: str = ""
+    account_number: str = ""
+    bank_name: str = ""
+    query_period: str = ""  # "20240620 - 20250620"
     currency: str = "CNY"
     opening_balance: Optional[float] = None
     closing_balance: Optional[float] = None
@@ -43,12 +58,12 @@ class BankStatementData(BaseModel):
     transactions: List[TransactionRow] = Field(default_factory=list)
 
 
-# ═══════════════════════════════════════════════════════════════════════════
+# \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 # Invoice
-# ═══════════════════════════════════════════════════════════════════════════
+# \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 
 class InvoiceItem(BaseModel):
-    """Invoice明细行"""
+    """Detailed Invoice Items"""
     name: str = ""
     quantity: Optional[float] = None
     unit_price: Optional[float] = None
@@ -58,11 +73,11 @@ class InvoiceItem(BaseModel):
 
 
 class InvoiceData(BaseModel):
-    """Invoice领域Data"""
+    """Invoice contextual entity mapping internally."""
     invoice_code: str = ""
     invoice_number: str = ""
     invoice_date: str = ""
-    invoice_type: str = ""             # "增值税专用Invoice" | "增值税普通Invoice"
+    invoice_type: str = ""  # Ordinary invoice vs Special VAT
     buyer_name: str = ""
     buyer_tax_id: str = ""
     seller_name: str = ""
@@ -73,12 +88,12 @@ class InvoiceData(BaseModel):
     items: List[InvoiceItem] = Field(default_factory=list)
 
 
-# ═══════════════════════════════════════════════════════════════════════════
-# 税务报告
-# ═══════════════════════════════════════════════════════════════════════════
+# \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+# Tax Report
+# \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 
 class TaxReportData(BaseModel):
-    """税务报告领域Data"""
+    """Tax report contextual fields."""
     taxpayer_name: str = ""
     taxpayer_id: str = ""
     tax_period: str = ""
@@ -90,12 +105,12 @@ class TaxReportData(BaseModel):
     tax_due: Optional[float] = None
 
 
-# ═══════════════════════════════════════════════════════════════════════════
-# Business license
-# ═══════════════════════════════════════════════════════════════════════════
+# \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+# Business License
+# \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 
 class BusinessLicenseData(BaseModel):
-    """Business license领域Data"""
+    """Business license entity schema natively"""
     company_name: str = ""
     unified_social_credit_code: str = ""
     legal_representative: str = ""
@@ -107,12 +122,12 @@ class BusinessLicenseData(BaseModel):
     company_type: str = ""
 
 
-# ═══════════════════════════════════════════════════════════════════════════
+# \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 # Contract
-# ═══════════════════════════════════════════════════════════════════════════
+# \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 
 class ContractData(BaseModel):
-    """Contract领域Data"""
+    """Legal contract entity schema."""
     contract_title: str = ""
     contract_number: str = ""
     party_a: str = ""
@@ -125,15 +140,15 @@ class ContractData(BaseModel):
     contract_subject: str = ""
 
 
-# ═══════════════════════════════════════════════════════════════════════════
-# 财务报告
-# ═══════════════════════════════════════════════════════════════════════════
+# \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+# Financial Report
+# \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 
 class FinancialReportData(BaseModel):
-    """财务报告领域Data"""
+    """Financial reporting schema."""
     company_name: str = ""
     report_period: str = ""
-    report_type: str = ""              # "年报" | "季报" | "月报"
+    report_type: str = ""  # Annual/Quarter/Month
     total_revenue: Optional[float] = None
     operating_cost: Optional[float] = None
     gross_profit: Optional[float] = None
@@ -143,12 +158,12 @@ class FinancialReportData(BaseModel):
     owner_equity: Optional[float] = None
 
 
-# ═══════════════════════════════════════════════════════════════════════════
-# ID card
-# ═══════════════════════════════════════════════════════════════════════════
+# \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+# ID Card
+# \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 
 class IDCardData(BaseModel):
-    """ID card领域Data"""
+    """Personal Identification Schema."""
     name: str = ""
     gender: str = ""
     ethnicity: str = ""
@@ -159,16 +174,16 @@ class IDCardData(BaseModel):
     valid_period: str = ""
 
 
-# ═══════════════════════════════════════════════════════════════════════════
-# DomainData 容器
-# ═══════════════════════════════════════════════════════════════════════════
+# \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+# DomainData Container
+# \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 
 class DomainData(BaseModel):
     """
-    领域特定Data容器。
+    Domain-specific data wrapper context.
 
-    based on ``document_type`` 填充对应子Field。
-    同一时刻typicallyonly一个子Field非 None。
+    Populated by selectively mapping into a corresponding nested schema.
+    Typically only one corresponding subfield remains exclusively valid.
     """
     document_type: str = "other"
 
@@ -182,7 +197,7 @@ class DomainData(BaseModel):
 
     @property
     def active_model(self) -> Optional[BaseModel]:
-        """Returns当前已填充的领域模型 (若有)"""
+        """Returns the actively configured explicitly defined domain."""
         for field_name in [
             "bank_statement", "invoice", "tax_report",
             "business_license", "contract", "financial_report", "id_card",

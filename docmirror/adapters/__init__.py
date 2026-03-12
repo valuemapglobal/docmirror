@@ -20,14 +20,14 @@ Supported formats:
     - JSON/CSV → StructuredAdapter
 """
 
-from .pdf import PDFAdapter
-from .image import ImageAdapter
-from .email import EmailAdapter
-from .excel import ExcelAdapter
-from .word import WordAdapter
-from .ppt import PPTAdapter
-from .structured import StructuredAdapter
-from .web import WebAdapter
+from .pdf.pdf import PDFAdapter
+from .image.image import ImageAdapter
+from .web.email import EmailAdapter
+from .office.excel import ExcelAdapter
+from .office.word import WordAdapter
+from .office.ppt import PPTAdapter
+from .data.structured import StructuredAdapter
+from .web.web import WebAdapter
 
 __all__ = [
     "PDFAdapter",

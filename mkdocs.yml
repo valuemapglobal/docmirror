@@ -1,5 +1,5 @@
 site_name: DocMirror
-site_url: https://docmirror.readthedocs.io
+site_url: https://valuemapglobal.github.io/docmirror
 site_description: Universal document parsing engine — extract structured data from any document format
 site_author: ValueMap Global
 
@@ -45,6 +45,8 @@ nav:
     - Overview: plugins/overview.md
     - Creating Plugins: plugins/creating-plugins.md
   - API Reference: api/index.md
+  - PLG Strategies (Growth): plg-strategies.md
+  - Integrations: integrations.md
   - Contributing: contributing.md
   - Changelog: changelog.md
 

@@ -1,6 +1,6 @@
 # 📄 DocMirror
 
-**Universal document parsing engine** — extract structured data from any document format.
+**Universal document parsing engine** — extract structured data from any document format with a single API.
 
 <div class="grid cards" markdown>
 
@@ -9,7 +9,7 @@
 - :material-file-word: **Office** — Word, Excel, PowerPoint
 - :material-email: **Email** — EML/MSG with attachments
 - :material-table: **Tables** — Multi-strategy extraction
-- :material-shield-check: **Security** — Forgery detection
+- :material-shield-check: **Security** — Forgery detection & trust scoring
 
 </div>
 
@@ -25,8 +25,10 @@ from docmirror import perceive_document
 result = await perceive_document("invoice.pdf")
 
 # Structured output
+print(result.scene)                 # "bank_statement", "invoice", etc.
 print(result.content.text)          # Full text (Markdown)
 print(result.content.entities)      # Key-value entities
+
 for block in result.content.blocks: # Content blocks
     print(block.type, block.table or block.text)
 ```
@@ -38,8 +40,10 @@ for block in result.content.blocks: # Content blocks
 | Format support | 8+ formats | PDF only |
 | Table extraction | 4-tier progressive | Single strategy |
 | Layout analysis | AI + rules | None |
+| Trust scoring | Mirror fidelity validation | None |
 | Plugin system | Extensible domains | Hardcoded |
 | OCR engine | RapidOCR (ONNX) | Tesseract |
+| Caching | Redis with full state persistence | None |
 
 ## Next Steps
 

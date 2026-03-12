@@ -1,15 +1,16 @@
 """
-Middleware base class与PipelineExecutor (Middleware Base & Pipeline)
-====================================================
+Middleware Base Class and Pipeline Executor
+===========================================
 
 Design principles:
-    - eachMiddleware是独立的、可Composition的 Python 类
-    - 统一 ``process(EnhancedResult) -> EnhancedResult`` Interface
-    - PipelineExecutor提供 per-middleware Exception隔离和Degradation strategy
-    - allData变换via Mutation 记录，不直接修改 BaseResult
+    - Each Middleware is an independent, composable Python class.
+    - Unified ``process(EnhancedResult) -> EnhancedResult`` interface.
+    - PipelineExecutor provides per-middleware exception isolation.
+    - All data transformations are recorded via Mutations, without
+      directly modifying the BaseResult.
 """
-
 from __future__ import annotations
+
 
 import logging
 import time
@@ -24,14 +25,26 @@ logger = logging.getLogger(__name__)
 
 class BaseMiddleware(ABC):
     """
-    MiddlewareAbstractBase class。
+    Abstract Base Class for Middlewares.
 
-    allMiddleware必须implement ``process()`` Method。
-    约定:
-        - 接收 EnhancedResult，Returns修改后的 EnhancedResult
-        - via result.record_mutation() 记录all变换
-        - Failed时应 add_error() 而非抛出Exception
+    All Middlewares must implement the ``process()`` method.
+
+    Causal Dependency Protocol (Deutsch V5: 'hard to vary' ordering):
+        - ``DEPENDS_ON``: List of middleware class names that MUST run before this one.
+        - ``PROVIDES``:   List of data keys this middleware contributes to the result.
+        These declarations make the pipeline execution order *causally justified*
+        rather than an arbitrary convention. The Orchestrator can topologically
+        sort middlewares based on these declarations.
+
+    Conventions:
+        - Receives an EnhancedResult, returns the modified EnhancedResult.
+        - Records all transformations via result.record_mutation().
+        - Upon failure, should use add_error() rather than raising exceptions.
     """
+
+    # ── Causal Dependency Declarations ──
+    DEPENDS_ON: List[str] = []   # Middleware names that must run before this one
+    PROVIDES: List[str] = []     # Data keys this middleware contributes
 
     def __init__(self, config: Optional[Dict[str, Any]] = None):
         self.config = config or {}
@@ -42,12 +55,13 @@ class BaseMiddleware(ABC):
         return self._name
 
     def should_skip(self, result: EnhancedResult) -> bool:
-        """条件Skip: Returns True 时整个Middleware不Execute。
+        """
+        Conditional Skip: If True is returned, the Middleware is skipped.
 
-        Subclass可覆写此Methodimplement条件Skip逻辑。
-        Defaultimplement: 检查 config 中的 ``skip_scenes`` List。
+        Subclasses can override this method to implement conditional logic.
+        Default implementation: Checks the ``skip_scenes`` list in config.
 
-        示例::
+        Example::
 
             class BankSpecificMiddleware(BaseMiddleware):
                 def should_skip(self, result):
@@ -60,7 +74,7 @@ class BaseMiddleware(ABC):
 
     @abstractmethod
     def process(self, result: EnhancedResult) -> EnhancedResult:
-        """Processing EnhancedResult 并Returns增强后的Result。"""
+        """Processes the EnhancedResult and returns the augmented Result."""
         raise NotImplementedError
 
     def __repr__(self) -> str:
@@ -69,19 +83,19 @@ class BaseMiddleware(ABC):
 
 class MiddlewarePipeline:
     """
-    MiddlewarePipelineExecutor。
+    Middleware Pipeline Executor.
 
     Responsibilities:
-        1. 顺序ExecuteMiddlewareList
-        2. Per-middleware try/except Exception隔离
-        3. based on策略决定 [SkipFailedMiddleware] 或 [终止Pipeline]
-        4. 记录eachMiddleware的耗时
+        1. Sequentially executes the provided list of Middlewares.
+        2. Implements per-middleware try/except exception isolation.
+        3. Decides whether to [Skip] or [Abort] based on the strategy.
+        4. Records the execution time of each Middleware.
 
     Usage::
 
         pipeline = MiddlewarePipeline()
         result = pipeline.execute(
-            middlewares=[SceneDetector(), ColumnMapper(), Validator()],
+            middlewares=[SceneDetector(), EntityExtractor(), Validator()],
             result=initial_result,
         )
     """
@@ -98,26 +112,37 @@ class MiddlewarePipeline:
         result: EnhancedResult,
     ) -> EnhancedResult:
         """
-        顺序ExecuteMiddlewarePipeline。
+        Sequentially executes the Middleware Pipeline.
 
         Args:
-            middlewares: 有序MiddlewareList。
-            result: 初始 EnhancedResult。
+            middlewares: Ordered list of Middlewares.
+            result: Initial EnhancedResult.
 
         Returns:
-            Processing后的 EnhancedResult。
+            The processed EnhancedResult.
         """
         logger.info(
-            f"[DocMirror] Pipeline ▶ {len(middlewares)} middlewares: "
+            f"[DocMirror] Pipeline \u25b6 {len(middlewares)} middlewares: "
             f"{[m.name for m in middlewares]}"
         )
+
+        # ── Validate causal ordering (Deutsch V5) ──
+        seen: set = set()
+        for mw in middlewares:
+            for dep in mw.DEPENDS_ON:
+                if dep not in seen:
+                    logger.warning(
+                        f"[DocMirror] ⚠ Causal violation: {mw.name} depends on "
+                        f"{dep}, but {dep} has not run yet in this pipeline."
+                    )
+            seen.add(mw.name)
 
         step_timings: Dict[str, float] = {}
 
         for mw in middlewares:
-            # ── 条件Skip检查 ──
+            # \u2500\u2500\u2500 Conditional Skip Check \u2500\u2500\u2500
             if mw.should_skip(result):
-                logger.info(f"[DocMirror] {mw.name} ⏭ skipped (should_skip=True)")
+                logger.info(f"[DocMirror] {mw.name} \u23ed skipped")
                 step_timings[mw.name] = 0.0
                 continue
 
@@ -127,9 +152,12 @@ class MiddlewarePipeline:
                 result = mw.process(result)
                 elapsed = (time.time() - t0) * 1000
                 step_timings[mw.name] = round(elapsed, 1)
+                num_mutations = sum(
+                    1 for m in result.mutations if m.middleware_name == mw.name
+                )
                 logger.info(
-                    f"[DocMirror] {mw.name} ◀ {elapsed:.0f}ms | "
-                    f"mutations=+{sum(1 for m in result.mutations if m.middleware_name == mw.name)}"
+                    f"[DocMirror] {mw.name} \u25c0 {elapsed:.0f}ms | "
+                    f"mutations=+{num_mutations}"
                 )
 
             except Exception as e:
@@ -142,18 +170,22 @@ class MiddlewarePipeline:
                 result.add_error(str(mw_error))
 
                 if self.fail_strategy == "abort":
-                    logger.warning(f"[DocMirror] Pipeline aborted at {mw.name}")
+                    logger.warning(
+                        f"[DocMirror] Pipeline aborted at {mw.name}"
+                    )
                     result.status = "failed"
                     break
                 else:
-                    logger.info(f"[DocMirror] Skipping {mw.name}, continuing pipeline")
+                    logger.info(
+                        f"[DocMirror] Skipping {mw.name}, continuing"
+                    )
 
-        # 记录总耗时
+        # Record total execution timings
         result.enhanced_data["step_timings"] = step_timings
 
         total_mutations = result.mutation_count
         logger.info(
-            f"[DocMirror] Pipeline ◀ status={result.status} | "
+            f"[DocMirror] Pipeline \u25c0 status={result.status} | "
             f"total_mutations={total_mutations}"
         )
 

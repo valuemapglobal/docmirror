@@ -1,43 +1,44 @@
 """
-Mutation 变换记录 (Data Lineage Tracker)
+Mutation (Data Lineage Tracker)
 ========================================
 
-每一次Middleware对Data的操作都via Mutation 记录，
-implement 100% 操作可追溯，满足金融级审计要求。
+Every operation performed by a Middleware on the Data is recorded via a
+Mutation, implementing 100% operation traceability to meet audit requirements.
 
-usingMode::
+Usage::
 
     mutation = Mutation.create(
-        middleware_name="ColumnMapper",
+        middleware_name="EntityExtractor",
         target_block_id="blk_a1",
-        field_changed="column_name",
-        old_value="交易日",
-        new_value="transaction_date",
+        field_changed="account_holder",
+        old_value="",
+        new_value="John Doe",
         confidence=0.95,
     )
 """
-
 from __future__ import annotations
+
+
 
 import dataclasses
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any
 
 
 @dataclasses.dataclass
 class Mutation:
     """
-    单次Data变换记录。
+    Single data transformation record.
 
     Attributes:
-        middleware_name: Execute变换的MiddlewareName。
-        target_block_id: 被变换的 Block ID。
-        field_changed:   被变换的Field名。
-        old_value:       变换前的值。
-        new_value:       变换后的值。
-        confidence:      变换的Confidence (0.0 ~ 1.0)。
-        timestamp:       变换发生的时间。
-        reason:          变换原因 (Optional，用于Debug)。
+        middleware_name: The name of the Middleware executing the change.
+        target_block_id: The ID of the transformed Block.
+        field_changed:   The name of the transformed field.
+        old_value:       The value before the transformation.
+        new_value:       The value after the transformation.
+        confidence:      The confidence of the transformation (0.0 ~ 1.0).
+        timestamp:       The time the transformation occurred.
+        reason:          The reason for the transformation (for debugging).
     """
     middleware_name: str
     target_block_id: str
@@ -61,7 +62,7 @@ class Mutation:
         confidence: float = 1.0,
         reason: str = "",
     ) -> Mutation:
-        """FactoryMethod — 自动填充时间戳。"""
+        """Factory Method \u2014 Automatically populates the timestamp."""
         return cls(
             middleware_name=middleware_name,
             target_block_id=target_block_id,
@@ -73,7 +74,7 @@ class Mutation:
         )
 
     def to_dict(self) -> dict:
-        """Serialization为 dict — 用于Log和持久化。"""
+        """Serialization to dict \u2014 Used for logging and persistence."""
         return {
             "middleware": self.middleware_name,
             "block_id": self.target_block_id,

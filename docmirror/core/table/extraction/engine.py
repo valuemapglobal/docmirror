@@ -1,41 +1,26 @@
-"""Auto-split from table_extraction.py"""
+"""Layered table extraction engine — main entry point.
 
+Split from ``table_extraction.py``.
+"""
 from __future__ import annotations
 
+
 import concurrent.futures
-import contextvars
 import logging
-import math
 import re
 import time
 from collections import Counter, defaultdict
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
-from ...utils.text_utils import _is_cjk_char, _smart_join, normalize_table
-from ...utils.vocabulary import (
-    KNOWN_HEADER_WORDS,
-    PIPE_CHARS,
-    HLINE_CHARS,
-    _ALL_BORDER_CHARS,
-    _is_header_row,
-    _is_header_cell,
-    _normalize_for_vocab,
-    _score_header_by_vocabulary,
-    _RE_IS_DATE,
-    _RE_IS_AMOUNT,
-)
+from ...utils.text_utils import _is_cjk_char, _smart_join
+from ...utils.vocabulary import _ALL_BORDER_CHARS, _is_header_row, _is_header_cell, _normalize_for_vocab, _score_header_by_vocabulary, _RE_IS_DATE, _RE_IS_AMOUNT
 
 logger = logging.getLogger(__name__)
 
 
 from .pipe_strategy import _extract_by_pipe_delimited
 from .pdfplumber_strategy import _recover_header_from_zone
-from .classifier import (
-    TABLE_SETTINGS, TABLE_SETTINGS_LINES,
-    _quick_classify, _compute_table_confidence, _tables_look_valid, _cell_is_stuffed,
-    _layer_timings_var, get_last_layer_timings,
-)
+from .classifier import TABLE_SETTINGS, TABLE_SETTINGS_LINES, _quick_classify, _compute_table_confidence, _tables_look_valid, _cell_is_stuffed, _layer_timings_var
 from .char_strategy import (
     _extract_by_hline_columns, _extract_by_rect_columns,
     detect_columns_by_header_anchors, detect_columns_by_whitespace_projection,
@@ -47,49 +32,51 @@ def extract_tables_layered(
     page_plum,
     table_zone_bbox: Optional[Tuple[float, float, float, float]] = None,
 ) -> Tuple[List[List[List[str]]], str, float]:
-    """
-    分 layer递进式TableExtract (多 layer递进)。
+    """Progressively layered table extraction.
 
-    Optimize:
-      - 预Classifier (_quick_classify): based on快速特征Skip不太may命中的 layer
-      - 各 layer耗时打点: Result存入Module级 _last_layer_timings
-      - Layer 2 并行Execute: 4 种 char-level Method用 ThreadPoolExecutor 并发
-      - Confidence评估: Returns 0-1 浮点数, 综合 vocab_score / row_count / col_consistency
+    Optimisation highlights:
+      - Pre-classification (``_quick_classify``): skip unlikely layers based
+        on quick page features.
+      - Per-layer timing: results stored in ``_layer_timings_var``.
+      - Layer 2 parallel execution: 4 char-level methods run concurrently
+        via ``ThreadPoolExecutor``.
+      - Confidence scoring: returns a 0–1 float combining vocab_score,
+        row_count, and col_consistency.
 
     Args:
-        page_plum: pdfplumber page Object
-        table_zone_bbox: Optional (x0, y0, x1, y1) — Table区域的边界框。
-                         all Layer 都在Crop后的Page上工作,
-                         avoidExtract到 zone 外的元Data table或Title文字。
+        page_plum: pdfplumber page object.
+        table_zone_bbox: Optional ``(x0, y0, x1, y1)`` bounding box of the
+            table zone.  All layers operate on the cropped page to avoid
+            extracting metadata tables or title text outside the zone.
 
     Returns:
-        (tables, layer_label, confidence): 3 元组
+        ``(tables, layer_label, confidence)`` 3-tuple.
     """
     timings: Dict[str, float] = {}
     t_total = time.time()
 
     def _t(label: str, t0: float):
-        """记录某 layer耗时 (ms)。"""
+        """Record per-layer elapsed time (ms)."""
         timings[label] = round((time.time() - t0) * 1000, 2)
 
     def _return(tables, layer):
-        """统一ReturnsEntry point: CalculateConfidence + 记录总耗时。"""
+        """Unified return: compute confidence and record total time."""
         timings["total"] = round((time.time() - t_total) * 1000, 2)
         _layer_timings_var.set(dict(timings))
         conf = _compute_table_confidence(tables, layer)
         logger.debug(
-            f"[v2] extract_tables_layered -> layer={layer} conf={conf:.3f} "
+            f"extract_tables_layered -> layer={layer} conf={conf:.3f} "
             f"timings={timings}"
         )
         return tables, layer, conf
 
-    # ── Crop到Table区域 (all Layer 都在Crop后的Page上工作) ──
+    # ── Crop to table zone (all layers work on the cropped page) ──
     work_page = page_plum
     if table_zone_bbox:
         try:
             x0, y0, x1, y1 = table_zone_bbox
 
-            # 向上探测Table header: data_table zone 正abovemay有被分到 summary zone 的Table header行
+            # Upward header probe: header row may sit above the data_table zone
             probe_top = max(0, y0 - 40)
             if probe_top < y0:
                 try:
@@ -98,7 +85,7 @@ def extract_tables_layered(
                         keep_blank_chars=True, x_tolerance=2
                     )
                     if probe_words:
-                        # 按 y 分组为行, 从下往上找第一个Table header行
+                        # Group by y into rows, search bottom-up for the first table header row
                         from collections import defaultdict
                         _probe_rows = defaultdict(list)
                         for w in probe_words:
@@ -114,7 +101,7 @@ def extract_tables_layered(
                             ]
                             if len(texts) < 3:
                                 continue
-                            # 排除 KV 元Data行 (如 "Customer name:丁节")
+                            # Exclude KV metadata rows (e.g. "Customer name: ...")
                             kv_count = sum(
                                 1 for t in texts
                                 if ":" in t or "：" in t
@@ -130,7 +117,7 @@ def extract_tables_layered(
                                     w["top"] for w in _probe_rows[yk]
                                 ) - 2
 
-                                # ── Optimize2: 多行Header detection ──
+                                # ── Optimisation 2: multi-row header detection ──
                                 if idx_yk + 1 < len(sorted_yks):
                                     prev_yk = sorted_yks[idx_yk + 1]
                                     prev_texts = [
@@ -149,52 +136,53 @@ def extract_tables_layered(
                                                 w["top"] for w in _probe_rows[prev_yk]
                                             ) - 2
                                             logger.debug(
-                                                f"[v2] header probe: multi-row header detected, "
+                                                f"header probe: multi-row header detected, "
                                                 f"expanded to {header_y:.0f}"
                                             )
 
                                 y0 = max(0, header_y)
                                 logger.debug(
-                                    f"[v2] header probe: "
+                                    f"header probe: "
                                     f"expanded zone top "
                                     f"from {table_zone_bbox[1]:.0f}"
                                     f" to {y0:.0f}"
                                 )
                                 break
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.debug(f"operation: suppressed {exc}")
 
             crop_x0 = 0
             crop_x1 = page_plum.width
             work_page = page_plum.crop((crop_x0, y0, crop_x1, y1))
             logger.debug(
-                f"[v2] cropped to table zone: x={crop_x0:.0f}-{crop_x1:.0f}, y={y0:.0f}-{y1:.0f}"
+                f"cropped to table zone: x={crop_x0:.0f}-{crop_x1:.0f}, y={y0:.0f}-{y1:.0f}"
             )
         except Exception as e:
-            logger.debug(f"[v2] crop failed: {e}")
+            logger.debug(f"crop failed: {e}")
 
-    # ── 预分类: based on快速特征决定起始 Layer ──
+    # ── Pre-classification: determine starting layer from quick features ──
     t0 = time.time()
     classify_hint = _quick_classify(work_page)
     _t("pre_classify", t0)
-    logger.debug(f"[v2] pre-classify hint: {classify_hint}")
+    logger.debug(f"pre-classify hint: {classify_hint}")
 
-    # ── Detect纵线Border: 有Border的TableSkip stuffed cell Detect ──
+    # ── Detect vertical border lines: bordered tables skip stuffed-cell check ──
     _lines = work_page.lines or []
     _v_line_count = sum(1 for l in _lines if abs(l.get("x0", 0) - l.get("x1", 0)) < 1)
     has_borders = _v_line_count >= 2
 
-    # ── 分段纵线行边界Extract ──
-    # 当纵线按行分段 (同一 x 多条短线段) 且水平线不足时,
-    # 从纵线端点Extract隐含的行边界 y Coordinates。
+    # ── Segmented vertical lines → implicit row boundaries ──
+    # When vertical lines are segmented per row (same x, many short lines)
+    # and horizontal lines are insufficient, extract implicit row boundary
+    # y-coordinates from vertical-line endpoints.
     _h_line_count = sum(1 for l in _lines if abs(l.get("top", 0) - l.get("bottom", 0)) < 1)
     _segmented_h_lines = None
     if _v_line_count >= 10 and _h_line_count < 10:
         from collections import Counter
-        # 统计each x 位置有多少条 v_line
+        # Count how many vertical lines share each x-position
         _v_x_counts = Counter(round(l["x0"], 0) for l in _lines
                               if abs(l.get("x0", 0) - l.get("x1", 0)) < 1)
-        # 如果最常见的 x 有 > 3 条线段, 说明纵线按行分段
+        # If the most common x has > 3 segments, vertical lines are row-segmented
         _max_segs = _v_x_counts.most_common(1)[0][1] if _v_x_counts else 0
         if _max_segs > 3:
             _y_set = set()
@@ -202,26 +190,26 @@ def extract_tables_layered(
                 if abs(l.get("x0", 0) - l.get("x1", 0)) < 1:
                     _y_set.add(round(l["top"], 1))
                     _y_set.add(round(l["bottom"], 1))
-            # 加上已有的 h_line y 值
+            # Also include existing horizontal line y-values
             for l in _lines:
                 if abs(l.get("top", 0) - l.get("bottom", 0)) < 1:
                     _y_set.add(round(l["top"], 1))
             _segmented_h_lines = sorted(_y_set)
             logger.debug(
-                f"[v2] segmented v_lines → {len(_segmented_h_lines)} "
+                f"segmented v_lines → {len(_segmented_h_lines)} "
                 f"implicit row boundaries (max_segs={_max_segs})"
             )
 
-    # ── Layer 0.5: PipeSeparator (mainframe ASCII 画线) ──
+    # ── Layer 0.5: pipe separator (mainframe ASCII art) ──
     t0 = time.time()
     pipe_table = _extract_by_pipe_delimited(work_page)
     _t("L0.5_pipe", t0)
     if pipe_table and len(pipe_table) >= 3:
         return _return([pipe_table], "pipe_delimited")
 
-    # 预分类跳转: 如果 hint='char', Skip Layer 1~1.8
+    # Pre-classification jump: if hint='char', skip Layers 1–1.8
     if classify_hint != "char":
-        # ── Layer 1: lines 策略 ──
+        # ── Layer 1: lines strategy ──
         t0 = time.time()
         if _segmented_h_lines:
             settings = dict(TABLE_SETTINGS_LINES)
@@ -236,26 +224,26 @@ def extract_tables_layered(
                 "lines",
             )
 
-        # 预分类跳转: 如果 hint='text', Skip L1a/L1.5 直接到 L1b
-        # 也Skip: 当 h_lines 很多但 v_lines=0 时, L1a hline_columns 效果差,
-        # L1b TEXT 更适合 (如招商银行: 192 h_lines + 0 v_lines)
+        # Pre-classification jump: if hint='text', skip L1a/L1.5 to L1b
+        # Also skip when many h_lines but v_lines=0 (L1a hline_columns is poor,
+        # L1b TEXT is better — e.g. 192 h_lines + 0 v_lines)
         _skip_l1a = (classify_hint == "text") or (
             _h_line_count >= 20 and _v_line_count == 0
         )
         if not _skip_l1a:
-            # ── Layer 1a: 水平线列边界法 ──
+            # ── Layer 1a: horizontal-line column boundary method ──
             t0 = time.time()
             table = _extract_by_hline_columns(work_page)
             _t("L1a_hline", t0)
             if table and len(table) >= 3 and _tables_look_valid([table], has_borders=has_borders):
-                # Table header质量检查: 如果第一行看起来像Data行(含Date), 放弃 L1a
+                # Header quality check: if the first row looks like data (contains date), reject L1a
                 _first_cell = (table[0][0] or "").strip()
                 _header_looks_like_data = bool(
                     re.match(r"^\d{4}[-./]\d{2}[-./]\d{2}", _first_cell)
                     or re.match(r"^\d{8}$", _first_cell)
                 )
                 logger.debug(
-                    f"[v2] L1a header check: first_cell={_first_cell!r} "
+                    f"L1a header check: first_cell={_first_cell!r} "
                     f"looks_like_data={_header_looks_like_data}"
                 )
                 if not _header_looks_like_data:
@@ -264,9 +252,9 @@ def extract_tables_layered(
                         "hline_columns",
                     )
                 else:
-                    logger.info(f"[v2] L1a rejected: header looks like data row")
+                    logger.info(f"L1a rejected: header looks like data row")
 
-            # ── Layer 1.5: 矩形列边界法 ──
+            # ── Layer 1.5: rectangle column boundary method ──
             has_header_only = (
                 tables and any(
                     t and len(t) == 1 and len(t[0]) >= 3
@@ -283,7 +271,7 @@ def extract_tables_layered(
                         "rect_columns",
                     )
 
-        # ── Layer 1b: text 策略 ──
+        # ── Layer 1b: text strategy ──
         t0 = time.time()
         tables = work_page.extract_tables(table_settings=TABLE_SETTINGS)
         _t("L1b_text", t0)
@@ -293,8 +281,8 @@ def extract_tables_layered(
                 "text",
             )
 
-    # ── Layer 0.9: pdfplumber 安全网 (L1 全Skip或全Failed时) ──
-    # 先尝试Default extract_tables(), 再尝试 TABLE_SETTINGS (text 策略)。
+    # ── Layer 0.9: pdfplumber safety net (when L1 is skipped or all layers fail) ──
+    # Try default extract_tables() first, then TABLE_SETTINGS (text strategy).
     t0 = time.time()
     tables = work_page.extract_tables()
     _t("L0.9_default", t0)
@@ -315,18 +303,18 @@ def extract_tables_layered(
 
     # (RapidTable at L2.5 — too slow for early pipeline, ~10s/page CPU)
 
-    # ── Layer 2: char-level 竞争选优 (并行Execute) ──
+    # ── Layer 2: char-level competitive selection (parallel execution) ──
     t0 = time.time()
 
     def _run_method(name, func, wp):
-        """在线程中运行一个 char-level Method, Returns (table, name, score) 或 None。"""
+        """Run a char-level method in a thread; return (table, name, score) or None."""
         try:
             tbl = func(wp)
             if tbl and len(tbl) >= 2:
                 score = _score_header_by_vocabulary(tbl[0])
                 return (tbl, name, score)
         except Exception as ex:
-            logger.debug(f"[v2] L2 {name} error: {ex}")
+            logger.debug(f"L2 {name} error: {ex}")
         return None
 
     methods = [
@@ -350,7 +338,7 @@ def extract_tables_layered(
     _t("L2_char_level", t0)
 
     if candidates:
-        # 惩罚项: 如果Extract出的Table有很多"塞入多行"的单元格, 降低其优先级
+        # Penalty: if extracted table has many stuffed cells, lower its priority
         def _get_sort_key(c):
             tbl = c[0]
             vocab_score = c[2]
@@ -368,23 +356,23 @@ def extract_tables_layered(
     else:
         _layer2_fallback = None
 
-    # ── Layer 2.5: RapidTable 视觉模型 (慢 ~10s, 仅当 L2 也Failed时) ──
+    # ── Layer 2.5: RapidTable vision model (slow ~10 s, only when L2 also fails) ──
     t0 = time.time()
     rapid_result = _extract_by_rapid_table(page_plum)
     _t("L2.5_rapid_table", t0)
     if rapid_result and len(rapid_result) >= 2:
         rt_vocab = _score_header_by_vocabulary(rapid_result[0])
-        if rt_vocab >= 2:  # 至少 2 个Table header词Match
+        if rt_vocab >= 2:  # At least 2 header vocabulary matches
             return _return([rapid_result], "rapid_table")
 
-    # ── Layer 3: x Coordinates聚类 ──
+    # ── Layer 3: x-coordinate clustering ──
     t0 = time.time()
     table = detect_columns_by_clustering(work_page)
     _t("L3_clustering", t0)
     if table and len(table) >= 2:
         return _return([table], "x_clustering")
 
-    # Layer 2 低分候选 fallback (优于 pdfplumber Default)
+    # Layer 2 low-score candidate fallback (still better than pdfplumber default)
     if _layer2_fallback:
         return _return([_layer2_fallback[0]], _layer2_fallback[1])
 
@@ -392,14 +380,14 @@ def extract_tables_layered(
 
 
 def _extract_by_rapid_table(page_plum) -> Optional[List[List[str]]]:
-    """L1.8: using RapidTable ONNX 视觉模型Extract tables结构。
+    """L1.8: table structure extraction using RapidTable ONNX vision model.
 
-    RapidTable 是专门的Table结构Recognize模型 (CPU ONNX v3),
-    对无线 table、三线 table和复杂Table header效果显著。
-    usingSingletonEngineavoid重复Load模型。
+    RapidTable is a dedicated table-structure recognition model (CPU ONNX v3)
+    that excels at borderless tables, three-line tables, and complex headers.
+    Uses a singleton engine to avoid reloading the model.
 
     Returns:
-        二维TableList，或 None (Not installed/RecognizeFailed时)。
+        2-D table list, or ``None`` when not installed / recognition fails.
     """
     from .rapid_table_engine import get_rapid_table_engine
 
@@ -410,11 +398,11 @@ def _extract_by_rapid_table(page_plum) -> Optional[List[List[str]]]:
     try:
         import numpy as np
 
-        # via pdfplumber Page rendering为Image (200 DPI)
+        # Render pdfplumber page to image (200 DPI)
         img = page_plum.to_image(resolution=200)
         img_np = np.array(img.original)
 
-        # call RapidTable v3
+        # Call RapidTable v3
         result = engine(img_np)
         if result is None or not result.pred_htmls:
             return None
@@ -423,16 +411,16 @@ def _extract_by_rapid_table(page_plum) -> Optional[List[List[str]]]:
         if not html_str:
             return None
 
-        # Parse HTML → 二维数组
+        # Parse HTML → 2-D array
         return _parse_html_table(html_str)
 
     except Exception as e:
-        logger.debug(f"[v2] RapidTable error: {e}")
+        logger.debug(f"RapidTable error: {e}")
         return None
 
 
 def _parse_html_table(html_str: str) -> Optional[List[List[str]]]:
-    """将 RapidTable Output的 HTML Parse为二维数组, supports colspan/rowspan。"""
+    """Parse RapidTable HTML output into a 2-D array with colspan/rowspan support."""
     try:
         import re as _re
 
@@ -459,7 +447,7 @@ def _parse_html_table(html_str: str) -> Optional[List[List[str]]]:
         if len(raw_rows) < 2:
             return None
 
-        # 展开 colspan/rowspan 到二维网格
+        # Expand colspan/rowspan into a 2-D grid
         grid: list = []  # List[List[str]]
         carry: dict = {}  # {col_idx: (text, remaining_rowspan)}
 
@@ -471,7 +459,7 @@ def _parse_html_table(html_str: str) -> Optional[List[List[str]]]:
             current_cell = next(cell_iter, None)
 
             while current_cell is not None or col_idx in carry:
-                # 填入上一行的 rowspan 延续
+                # Fill in rowspan carry-over from previous rows
                 if col_idx in carry:
                     text, remaining = carry[col_idx]
                     row_out.append(text)
@@ -488,7 +476,7 @@ def _parse_html_table(html_str: str) -> Optional[List[List[str]]]:
                 text, colspan, rowspan = current_cell
                 for ci in range(colspan):
                     actual_col = col_idx + ci
-                    # Skip被 carry 占据的位置
+                    # Skip positions occupied by carry
                     while actual_col in carry:
                         ct, cr = carry[actual_col]
                         row_out.append(ct)
@@ -504,7 +492,7 @@ def _parse_html_table(html_str: str) -> Optional[List[List[str]]]:
                 col_idx = len(row_out)
                 current_cell = next(cell_iter, None)
 
-            # Processing尾部 carry
+            # Process trailing carry entries
             while col_idx in carry:
                 text, remaining = carry[col_idx]
                 row_out.append(text)
@@ -516,7 +504,7 @@ def _parse_html_table(html_str: str) -> Optional[List[List[str]]]:
 
             grid.append(row_out)
 
-        # Alignment列数
+        # Align column counts
         if grid:
             max_cols = max(len(r) for r in grid)
             for row in grid:
@@ -524,7 +512,8 @@ def _parse_html_table(html_str: str) -> Optional[List[List[str]]]:
                     row.append("")
 
         return grid if len(grid) >= 2 else None
-    except Exception:
+    except Exception as exc:
+        logger.debug(f"operation: suppressed {exc}")
         return None
 
 
@@ -532,18 +521,20 @@ def detect_merged_cells(
     page_plum,
     table_zone_bbox: Optional[Tuple[float, float, float, float]] = None,
 ) -> List[Dict]:
-    """P3-2: 从 pdfplumber DetectTable中的Merge单元格。
+    """P3-2: detect merged cells in a pdfplumber table.
 
-    using pdfplumber 的 find_tables() API 获取 Table.cells Information,
-    viaCompare实际 cell bbox 与均匀网格来Detect colspan/rowspan。
+    Uses pdfplumber's ``find_tables()`` API to get cell bounding boxes,
+    then compares actual cell bboxes against an even grid to detect
+    colspan / rowspan.
 
     Args:
-        page_plum: pdfplumber page Object
-        table_zone_bbox: OptionalTable区域Crop框
+        page_plum: pdfplumber page object.
+        table_zone_bbox: Optional table-zone crop box.
 
     Returns:
-        Merge单元格List: [{"row": r, "col": c, "rowspan": rs, "colspan": cs}, ...]
-        未Detect到时Returns空List。
+        List of merged cells:
+        ``[{"row": r, "col": c, "rowspan": rs, "colspan": cs}, ...]``
+        Returns an empty list when none are detected.
     """
     try:
         work_page = page_plum
@@ -551,8 +542,8 @@ def detect_merged_cells(
             try:
                 x0, y0, x1, y1 = table_zone_bbox
                 work_page = page_plum.crop((0, y0, page_plum.width, y1))
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug(f"operation: suppressed {exc}")
 
         tables = work_page.find_tables()
         if not tables or not tables[0].cells:
@@ -562,14 +553,14 @@ def detect_merged_cells(
         if len(cells) < 4:
             return []
 
-        # 收集all唯一的 x 和 y 边界
+        # Collect all unique x and y boundaries
         x_coords = sorted(set(round(c[0], 1) for c in cells) | set(round(c[2], 1) for c in cells))
         y_coords = sorted(set(round(c[1], 1) for c in cells) | set(round(c[3], 1) for c in cells))
 
         if len(x_coords) < 2 or len(y_coords) < 2:
             return []
 
-        # Create网格行/列IndexMap
+        # Create grid row/column index mapping
         def _find_nearest_index(val, coords):
             best_idx = 0
             best_dist = abs(val - coords[0])
@@ -601,12 +592,12 @@ def detect_merged_cells(
                 })
 
         if merged:
-            logger.debug(f"[v2] detected {len(merged)} merged cells")
+            logger.debug(f"detected {len(merged)} merged cells")
 
         return merged
 
     except Exception as e:
-        logger.debug(f"[v2] merged cell detection failed: {e}")
+        logger.debug(f"merged cell detection failed: {e}")
         return []
 
 

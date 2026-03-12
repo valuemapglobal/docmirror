@@ -1,62 +1,46 @@
-
 """
-多模态ParseContract layer (MultiModal Parsing Contract Layer)
+MultiModal Parsing Contract Layer
+=================================
 
-本Moduledefine了多模态Parse系统的“DataContract”与“基准行为”。
-It serves as the decoupling point between Dispatcher and parsers, ensuring consistency
-in parsing flow and output format across different formats (PDF, Image, Office).
+This module defines the "Data Contract" and baseline behavior of the multi-modal
+parsing system. It serves as the decoupling point between the Dispatcher and
+individual parsers (adapters), ensuring consistency in the parsing flow and
+output format across different document formats (PDF, Image, Office).
 
-核心组件:
-1. ParserStatus: Parsing lifecycle status enum.
-2. ParserOutput: Standardized parser output model with backward-compatible API.
-3. BaseParser: Abstract base class defining the parse() interface all parsers must implement.
+Core Components:
+1. ParserStatus: Parsing lifecycle status enumeration.
+2. ParserOutput: Standardized internal parser output model (backward-compatible).
+3. BaseParser: Abstract base class defining the unified interface all parsers
+   must implement.
 """
+from __future__ import annotations
 
-from abc import ABC, abstractmethod
-from typing import Dict, Any, List, Optional, Union
+from abc import ABC
+from typing import Dict, Any, List, Optional
 from pydantic import BaseModel, Field
 from enum import Enum
 from pathlib import Path
 
-# Import四 layer模型define (对外统一模型)
-from docmirror.models.perception_result import (
-    ContentBlock,
-    ContentBlockType,
-    Diagnostics,
-    DocumentContent,
-    ErrorDetail,
-    KeyValueBlock,
-    PerceptionResult,
-    Provenance,
-    ResultStatus,
-    SourceInfo,
-    TableBlock,
-    TextBlock,
-    TimingInfo,
-    ValidationResult,
-    ParserStep,
-)
-from docmirror.models.domain_models import (
-    BankStatementData,
-    DomainData,
-)
+# Import 4-layer schema definitions (the unified external models)
+from docmirror.models.perception_result import ContentBlock, ContentBlockType, DocumentContent, ErrorDetail, KeyValueBlock, PerceptionResult, Provenance, ResultStatus, SourceInfo, TableBlock, TextBlock, TimingInfo, ValidationResult, ParserStep
 
 class ParserStatus(str, Enum):
     """
-    Parsing status enum marking the quality level of parser results.
+    Parsing status enumeration indicating the quality level of parser results.
     """
     SUCCESS = "success"             # Complete success
-    PARTIAL_SUCCESS = "partial_success"     # Partial success (e.g., some tables failed but text exists)
+    PARTIAL_SUCCESS = "partial_success"  # Partial success (e.g., text exists but some tables failed)
     FAILURE = "failure"             # Core logic failure
 
 class ParserOutput(BaseModel):
     """
-    Standard parser output model.
+    Standard internal parser output model.
     
     Design goals:
-    1. Uniformity: Whether PDF or OCR, the returned data structure must be consistent.
-    2. Compatibility: Seamlessly connects to legacy PerceptionResponse API via properties.
-    3. Conversion: Provides to_perception_result() to map internal model to the 4-layer PerceptionResult.
+    1. Uniformity: Ensures returned data structure consistency across PDF, image, etc.
+    2. Compatibility: Seamlessly connects to legacy `PerceptionResponse` API via properties.
+    3. Conversion: Provides `to_perception_result()` to translate this internal
+       payload into the standardized 4-layer `PerceptionResult` model.
     """
     metadata: Dict[str, Any] = Field(default_factory=dict, description="File metadata (author, creation date, page count, etc.)")
     structured_text: str = Field("", description="Reconstructed structured text (typically Markdown)")
@@ -64,9 +48,9 @@ class ParserOutput(BaseModel):
     key_entities: Dict[str, Any] = Field(default_factory=dict, description="Business-relevant entity extraction (e.g., bank name, account)")
     status: ParserStatus = ParserStatus.SUCCESS
     error: Optional[str] = None
-    confidence: float = Field(1.0, description="Overall parsing confidence score (0-1.0)")
+    confidence: float = Field(1.0, description="Overall parsing confidence score (0.0-1.0)")
 
-    # ── Compatibility properties (for legacy PerceptionResponse callers) ──
+    # ── Compatibility properties (for callers expecting the legacy PerceptionResponse API) ──
 
     @property
     def success(self) -> bool:
@@ -75,30 +59,30 @@ class ParserOutput(BaseModel):
 
     @property
     def coverage(self) -> float:
-        """Alias for confidence, adapting legacy API."""
+        """Alias for confidence, adapting the legacy API."""
         return self.confidence
 
     @property
     def tables(self) -> List[List]:
         """
         Extract raw table data blocks from document_structure.
-        Supports new format (headers + rows) and legacy format (data).
+        Supports both the new format (`headers` + `rows`) and legacy format (`data`).
         """
         result = []
         for b in self.document_structure:
             if b.get("type") != "table":
                 continue
-            # New format: headers + rows
+            # New format: explicit headers and rows
             if "headers" in b and "rows" in b:
                 result.append([b["headers"]] + b["rows"])
-            # Legacy format: data
+            # Legacy format: raw data array
             elif "data" in b:
                 result.append(b["data"])
         return result
 
     @property
     def raw_response(self) -> Optional[Dict]:
-        """Alias for metadata, mapping to legacy interface."""
+        """Alias for metadata, mapping to the legacy interface."""
         return self.metadata
 
     def to_perception_result(
@@ -119,23 +103,24 @@ class ParserOutput(BaseModel):
     ) -> "PerceptionResult":
         """
         [Core Mapping Method]
-        Converts Parser internal payload to the standardized 4-layer PerceptionResult model.
+        Converts the Parser internal payload to the standardized 4-layer
+        PerceptionResult model.
 
-        Mapping logic:
-        1. Envelope: Maps status, timing, and error.
-        2. Content: Maps document_structure blocks to ContentBlocks (Table/Text/KV).
+        Mapping Logic:
+        1. Envelope: Maps execution status, timing, and error details.
+        2. Content: Maps `document_structure` blocks into strongly-typed ContentBlocks (Table/Text/KV).
         3. Provenance: Maps source file info, PDF properties, and validation status.
-        4. Domain: Maps domain-specific models based on category (e.g., bank statement).
+        4. Domain: Maps domain-specific models based on category (e.g., BankStatementData).
 
         Args:
             file_path: Original file path.
             file_type: Detected file format (pdf, image...).
-            file_size: File size (bytes).
+            file_size: File size in bytes.
             parser_name: Executed parser class name.
-            elapsed_ms: Total processing time.
-            doc_info: Business metadata from DigitalPDFParser.classify().
-            is_forged: (Forgery detection) Whether the file is suspected forged.
-            forgery_reasons: (Forgery detection) List of suspected forgery reasons.
+            elapsed_ms: Total processing time in milliseconds.
+            doc_info: Business metadata classified by Adapters.
+            is_forged: (Forgery detection) Flag indicating suspected forgery.
+            forgery_reasons: (Forgery detection) List of reasons supporting the forgery suspicion.
         """
         
         # ── 1. Envelope: Status sync ──
@@ -159,7 +144,7 @@ class ParserOutput(BaseModel):
                 if "headers" in b and "rows" in b:
                     headers = b["headers"]
                     rows = b["rows"]
-                # Legacy format: data (header = data[0], rows = data[1:])
+                # Legacy format: data array (header = data[0], rows = data[1:])
                 elif "data" in b:
                     raw_data = b["data"]
                     headers = raw_data[0] if raw_data else []
@@ -182,7 +167,7 @@ class ParserOutput(BaseModel):
                     ),
                 ))
             elif btype == "key_value":
-                # 新Format: pairs / 旧Format: pairs from entities
+                # New format: `pairs` / Legacy format: pairs from `entities`
                 pairs = b.get("pairs", {})
                 if not pairs:
                     pairs = b.get("entities", {})
@@ -193,7 +178,7 @@ class ParserOutput(BaseModel):
                         key_value=KeyValueBlock(pairs=pairs),
                     ))
             elif btype == "summary":
-                # Legacy: summary → key_value
+                # Legacy: summary block mapped to key_value
                 pairs = b.get("entities", b.get("pairs", {}))
                 if pairs:
                     blocks.append(ContentBlock(
@@ -201,8 +186,28 @@ class ParserOutput(BaseModel):
                         page=page,
                         key_value=KeyValueBlock(pairs=pairs),
                     ))
+            elif btype == "title":
+                # Title blocks → HEADING type
+                blocks.append(ContentBlock(
+                    type=ContentBlockType.HEADING,
+                    page=page,
+                    text=TextBlock(
+                        content=b.get("content", b.get("text", "")),
+                        level=b.get("level", 1) or 1,
+                    ),
+                ))
+            elif btype == "image":
+                # Image blocks → IMAGE type with caption
+                blocks.append(ContentBlock(
+                    type=ContentBlockType.IMAGE,
+                    page=page,
+                    text=TextBlock(
+                        content=b.get("caption", ""),
+                        level=0,
+                    ),
+                ))
             else:
-                # title / footer / text → TextBlock
+                # Default text categories: footer / generic text → TextBlock
                 blocks.append(ContentBlock(
                     type=ContentBlockType.TEXT,
                     page=page,
@@ -220,14 +225,14 @@ class ParserOutput(BaseModel):
             page_count=self.metadata.get("page_count", 0),
         )
 
-        # ── 3. Provenance: Parse chain tracking & metadata ──
-        # Extract key PDF properties
-        pdf_props = {}
+        # ── 3. Provenance: Parse chain tracking & metadata extraction ──
+        # Extract key Document properties
+        document_properties = {}
         target_keys = ("format", "producer", "creator", "creationDate", "modDate",
                       "title", "author", "subject", "keywords", "trapped", "encryption")
         for k in target_keys:
             if k in self.metadata:
-                pdf_props[k] = str(self.metadata[k]) if self.metadata[k] is not None else ""
+                document_properties[k] = str(self.metadata[k]) if self.metadata[k] is not None else ""
 
         # Extract validation scores (L1/L2 validation) and forgery detection results
         validation = None
@@ -255,12 +260,12 @@ class ParserOutput(BaseModel):
                 mime_type=mime_type or None,
                 checksum=checksum or None,
             ),
-            # Record first hop of parse chain
+            # Record the first hop of the parse chain
             parser_chain=[ParserStep(parser=parser_name, action="parse", elapsed_ms=elapsed_ms)]
                 if parser_name else [],
             validation=validation,
             diagnostics=self._build_diagnostics(meta),
-            pdf_properties=pdf_props,
+            document_properties=document_properties,
         )
 
         # ── 4. Domain: Plugin-based domain data abstraction ──
@@ -290,63 +295,50 @@ class ParserOutput(BaseModel):
     @staticmethod
     def _build_diagnostics(meta: Dict[str, Any]):
         """Extract debug diagnostics from metadata."""
-        diag_data = meta.get("_diagnostics", {})
-        if not diag_data:
-            return None
-        return Diagnostics(
-            extraction_method=diag_data.get("extraction_method", ""),
-            template_id=diag_data.get("template_id", ""),
-            template_source=diag_data.get("template_source", ""),
-            pages_processed=diag_data.get("pages_processed", 0),
-            raw_rows_extracted=diag_data.get("raw_rows_extracted", 0),
-            rows_after_cleaning=diag_data.get("rows_after_cleaning", 0),
-            rows_final=diag_data.get("rows_final", 0),
-            step_timing_ms=diag_data.get("step_timing_ms", {}),
-            detected_columns=diag_data.get("detected_columns", []),
-            missing_columns=diag_data.get("missing_columns", []),
-            supplemented_columns=diag_data.get("supplemented_columns", []),
-            failed_rows_sample=diag_data.get("failed_rows_sample", []),
-            duplicate_rows_detected=diag_data.get("duplicate_rows_detected", 0),
-            llm_usage=diag_data.get("llm_usage"),
-        )
+        from docmirror.models.construction._shared import build_diagnostics
+        return build_diagnostics(meta)
 
 class BaseParser(ABC):
     """
-    Abstract base class for document parsers.
+    Abstract base class for all document parsers.
 
-    New interface: ``perceive()`` → PerceptionResult (recommended)
-    Legacy interface: ``parse()`` → ParserOutput (deprecated, kept for compatibility)
+    New Unified Interface: ``perceive()`` → PerceptionResult (highly recommended)
+    Legacy Interface: ``parse()`` → ParserOutput (deprecated, retained for compatibility)
     """
 
     async def to_base_result(self, file_path: Path, **kwargs):
         """
-        Extract file to BaseResult. Subclasses should implement this method.
-        Not implemented by default; perceive() will fallback to parse().
+        Extract the file into a BaseResult. 
+        Subclasses should ideally implement this method. It is not implemented 
+        by default; `perceive()` will fallback to `parse()` if this is missing.
         """
         raise NotImplementedError
 
     async def perceive(self, file_path: Path, **context) -> "PerceptionResult":
         """
-        New unified interface: file → PerceptionResult (single step).
+        New unified interface mapping a file directly to a standardized `PerceptionResult` 
+        in a single step.
 
-        Default impl: to_base_result() → Builder → PerceptionResult.
-        If subclass doesn't implement to_base_result(), falls back to parse() → to_perception_result().
+        Execution pipeline:
+        `to_base_result()` → Builder Pipeline → `PerceptionResult`.
+        If the subclass does not implement `to_base_result()`, it falls back to 
+        `parse()` → `to_perception_result()`.
         """
         try:
             base_result = await self.to_base_result(file_path)
             from docmirror.models.builder import PerceptionResultBuilder
             return PerceptionResultBuilder.build(base_result, **context)
         except NotImplementedError:
-            # fallback 到旧Interface
+            # Fallback to the legacy interface
             result = await self.parse(file_path)
             return result.to_perception_result(**context)
 
     async def parse(self, file_path: Path, **kwargs) -> ParserOutput:
         """
-        [DEPRECATED] Implement to_base_result() instead.
-        This method is kept only for backward compatibility.
+        [DEPRECATED] Interface.
+        Implement `to_base_result()` instead. This method is maintained solely for
+        backward compatibility with older integrations.
         """
         raise NotImplementedError(
             f"{self.__class__.__name__} does not implement parse(). Use perceive() instead."
         )
-

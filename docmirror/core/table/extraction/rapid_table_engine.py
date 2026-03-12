@@ -1,4 +1,5 @@
-"""RapidTable SingletonEngine — Thread-safe的Table结构Recognize。
+"""
+RapidTable Singleton Engine — Thread-safe table structure recognition.
 
 Usage::
 
@@ -6,8 +7,8 @@ Usage::
     engine = get_rapid_table_engine()
     result = engine(img_np)  # -> RapidTableOutput
 """
-
 from __future__ import annotations
+
 
 import logging
 import threading
@@ -23,9 +24,10 @@ except ImportError:
 
 
 class RapidTableEngine:
-    """Thread-safe的 RapidTable Singleton。
+    """Thread-safe RapidTable singleton.
 
-    首次call时懒Load模型 (~1-3s), 后续call复用同一Instance。
+    The model is lazily loaded on first invocation (~1–3 s); subsequent
+    calls reuse the same instance.
     """
 
     _instance: Optional["RapidTableEngine"] = None
@@ -44,7 +46,7 @@ class RapidTableEngine:
         return cls._instance
 
     def _ensure_engine(self) -> bool:
-        """懒LoadEngine, ReturnsWhether可用。"""
+        """Lazily load the engine.  Returns whether it is available."""
         if not self._available:
             return False
         if self._engine is not None:
@@ -63,13 +65,13 @@ class RapidTableEngine:
                 return False
 
     def __call__(self, img) -> Optional["RapidTableOutput"]:
-        """运行Table结构Recognize。
+        """Run table structure recognition.
 
         Args:
-            img: numpy ndarray (RGB/BGR), PIL Image, 或ImagePath。
+            img: numpy ndarray (RGB/BGR), PIL Image, or image path.
 
         Returns:
-            RapidTableOutput 或 None (不可用/Failed时)。
+            ``RapidTableOutput``, or ``None`` if unavailable / on failure.
         """
         if not self._ensure_engine():
             return None
@@ -85,5 +87,5 @@ class RapidTableEngine:
 
 
 def get_rapid_table_engine() -> RapidTableEngine:
-    """获取Global RapidTable EngineSingleton。"""
+    """Return the global RapidTable engine singleton."""
     return RapidTableEngine.get_instance()

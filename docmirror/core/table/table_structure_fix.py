@@ -1,49 +1,59 @@
 """
-Table structure fixEngine (Table Structure Fix Engine)
-=============================================
+Table Structure Fix Engine
+===========================
 
-通用、泛化的Table结构Post-processingFixModule。
-在 OCR/Extractafter、最终OutputbeforeExecute，Fix常见的Table结构缺陷。
+A general-purpose, domain-agnostic module for post-processing table
+structure defects.  Runs after OCR / extraction and before final output.
 
-4 个独立FixFunction + 1 个统一Entry point:
-    1. merge_split_rows     — Merge被Split的多行记录
-    2. clean_cell_text      — Clean单元格内多余空格/Newline
-    3. split_concat_cells   — Split粘连单元格 (如 Balance+Account number)
-    4. align_row_columns    — Alignment行列数到Table header
+10 independent fix functions + 1 unified entry point:
+    1. ``merge_split_rows``             — Merge records split across multiple rows
+    2. ``clean_cell_text``              — Remove excess whitespace / newlines in cells
+    3. ``split_concatenated_cells``     — Split concatenated cells (e.g. balance + account number)
+    4. ``align_row_columns``            — Align row column counts to the header
+    5. ``strip_underline_footer``       — Remove underline-delimited footer statistics
+    6. ``trim_trailing_empty_columns``  — Trim all-empty trailing columns
+    7. ``merge_digit_spaces``           — Remove spaces inside pure-digit cells
+    8. ``strip_header_labels_from_cells`` — Remove bilingual column-title suffixes from data cells
+    9. ``remove_empty_tables``          — Remove fully empty tables
+   10. ``split_account_from_name``      — Split account numbers prefixed to account names
+   11. ``strip_currency_prefix``        — Strip currency code prefixes from amounts
+   12. ``remove_empty_interior_columns``— Remove all-empty interior columns
 
 Design principles:
-    - 纯Function, 无Status, 无副作用
-    - 每次Fix都做安全检查, 不确定时不修改
-    - 对Empty table/单行Table直接Returns
+    - Pure functions, no state, no side effects.
+    - Every fix performs a safety check; uncertain cases are left unmodified.
+    - Empty / single-row tables are returned as-is.
 """
-
 from __future__ import annotations
+
 
 import logging
 import re
-from typing import List, Optional
+from typing import List
 
 logger = logging.getLogger(__name__)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Fix 1: Merge被Split的多行记录
+# Fix 1: Merge records split across multiple rows
 # ═══════════════════════════════════════════════════════════════════════════════
 
-# 纯时间Mode (HH:MM:SS 或 HH:MM)
+# Pure time pattern (HH:MM:SS or HH:MM)
 _TIME_ONLY_RE = re.compile(r"^\d{1,2}:\d{2}(:\d{2})?$")
-# DateMode (YYYY-MM-DD 或 YYYY.MM.DD 或 YYYY/MM/DD)
+# Date pattern (YYYY-MM-DD or YYYY.MM.DD or YYYY/MM/DD)
 _DATE_RE = re.compile(r"^\d{4}[-./]\d{1,2}[-./]\d{1,2}$")
 
 
 def merge_split_rows(table: List[List[str]]) -> List[List[str]]:
-    """Merge被Split的多行记录。
+    """Merge records that were split across multiple rows.
 
-    规则 (按优先级):
-      R1: 行首为纯时间 (HH:MM:SS) 且上一行首列为Date → Merge时间到Date
-      R2: 行大partial列为空 (>60%) 且非汇总行 → Merge非Empty column到上一行
+    Rules (by priority):
+      R1: Row starts with a pure time (HH:MM:SS) and the previous row's
+          first cell is a date → merge time into date.
+      R2: Row is mostly empty (> 60 % columns) and is not a summary row
+          → merge non-empty columns into the previous row.
 
-    泛化: 不Dependency特定列名或银行Format。
+    Generalised: no dependency on specific column names or bank formats.
     """
     if not table or len(table) < 3:
         return table
@@ -56,15 +66,15 @@ def merge_split_rows(table: List[List[str]]) -> List[List[str]]:
     while i < len(table):
         row = table[i]
 
-        # ensure列数一致 (防御)
+        # Ensure consistent column count (defensive)
         if len(row) < col_count:
             row = row + [""] * (col_count - len(row))
 
-        # ── R1: 纯时间行 → Merge到上一行Date ──
+        # ── R1: pure time row → merge into previous row's date ──
         first_cell = row[0].strip() if row else ""
         if (
-            result  # 有上一行
-            and len(result) > 1  # notTable header
+            result  # previous row exists
+            and len(result) > 1  # not the header
             and _TIME_ONLY_RE.match(first_cell)
         ):
             prev_row = list(result[-1])
@@ -73,7 +83,7 @@ def merge_split_rows(table: List[List[str]]) -> List[List[str]]:
             if _DATE_RE.match(prev_first):
                 # Merge: "2025-12-24" + "01:21:34" → "2025-12-24 01:21:34"
                 prev_row[0] = f"{prev_first} {first_cell}"
-                # MergeOther非Empty column
+                # Merge other non-empty columns
                 for j in range(1, min(len(row), len(prev_row))):
                     if row[j].strip() and not prev_row[j].strip():
                         prev_row[j] = row[j]
@@ -83,22 +93,22 @@ def merge_split_rows(table: List[List[str]]) -> List[List[str]]:
                 i += 1
                 continue
 
-        # ── R2: 大partial列为空 → Merge到上一行 ──
+        # ── R2: mostly empty row → merge into previous row ──
         non_empty = sum(1 for c in row if c.strip())
         empty_ratio = 1 - (non_empty / col_count) if col_count > 0 else 0
 
         if (
             empty_ratio > 0.6
-            and len(result) > 1  # notTable header
-            and non_empty > 0  # not全Empty row
-            and not _is_summary_row(row)  # not汇总行
+            and len(result) > 1  # not the header
+            and non_empty > 0  # not a fully empty row
+            and not _is_summary_row(row)  # not a summary row
         ):
             prev_row = list(result[-1])
             for j in range(min(len(row), len(prev_row))):
                 if row[j].strip() and not prev_row[j].strip():
                     prev_row[j] = row[j]
                 elif row[j].strip() and prev_row[j].strip():
-                    # 追加 (对方Account name等多行文本)
+                    # Append (multi-line text such as counterparty names)
                     prev_row[j] = prev_row[j] + row[j]
             result[-1] = prev_row
             i += 1
@@ -111,37 +121,37 @@ def merge_split_rows(table: List[List[str]]) -> List[List[str]]:
 
 
 def _is_summary_row(row: List[str]) -> bool:
-    """Detect汇总行 (不应被Merge)。"""
+    """Detect summary rows (should not be merged)."""
     text = "".join(str(c) for c in row)
-    summary_keywords = ["总收入", "总支出", "合计", "总计", "小计", "本页", "累计"]
+    summary_keywords = ["\u603b\u6536\u5165", "\u603b\u652f\u51fa", "\u5408\u8ba1", "\u603b\u8ba1", "\u5c0f\u8ba1", "\u672c\u9875", "\u7d2f\u8ba1"]
     return any(kw in text for kw in summary_keywords)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Fix 2: Clean单元格内文本
+# Fix 2: Clean cell text
 # ═══════════════════════════════════════════════════════════════════════════════
 
-# 中文字符之间的空格 (应remove)
+# Spaces between CJK characters (should be removed)
 _CJK_SPACE_RE = re.compile(
     r"([\u4e00-\u9fff\u3400-\u4dbf])\s+([\u4e00-\u9fff\u3400-\u4dbf])"
 )
 
 
 def clean_cell_text(text: str) -> str:
-    """Clean单元格内多余空格/Newline。
+    """Remove excess whitespace and newlines from a cell.
 
-    规则:
-      - 中文字符之间的空格 → remove (PDF 多行文本重组产物)
-      - retain: 英文之间、数字之间、中英之间的空格
-      - 首尾Whitespace去除
+    Rules:
+      - Spaces between CJK characters \u2192 removed (artefact of PDF multi-line text reassembly).
+      - Preserved: spaces between English words, digits, or CJK-English boundaries.
+      - Leading / trailing whitespace is trimmed.
     """
     if not text or not text.strip():
         return text.strip()
 
-    # replaceNewline为空格
+    # Replace newlines with spaces
     text = text.replace("\n", " ").replace("\r", "")
 
-    # 多次迭代remove中文间空格 (Processing连续 "A B C" → "ABC")
+    # Iteratively remove spaces between CJK characters (handles "A B C" \u2192 "ABC")
     prev = ""
     while prev != text:
         prev = text
@@ -151,7 +161,7 @@ def clean_cell_text(text: str) -> str:
 
 
 def clean_table_cells(table: List[List[str]]) -> List[List[str]]:
-    """对Tableall单元格ExecuteText cleanup。"""
+    """Apply text cleanup to all cells in a table."""
     return [
         [clean_cell_text(cell) if isinstance(cell, str) else cell for cell in row]
         for row in table
@@ -159,25 +169,26 @@ def clean_table_cells(table: List[List[str]]) -> List[List[str]]:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Fix 3: Split粘连单元格
+# Fix 3: Split concatenated cells
 # ═══════════════════════════════════════════════════════════════════════════════
 
-# 数字→字母边界 (如 "110.9731080243CNYFC")
+# Digit\u2192letter boundary (e.g. "110.9731080243CNYFC")
 _NUM_ALPHA_BOUNDARY_RE = re.compile(
-    r"(\d{1,3}\.\d{2})"           # Amountpartial (如 110.97)
-    r"(\d{5,}[A-Z]*\d*)"         # Account numberpartial (如 31080243CNYFC0445)
+    r"(\d{1,3}\.\d{2})"           # Amount portion (e.g. 110.97)
+    r"(\d{5,}[A-Z]*\d*)"         # Account number portion (e.g. 31080243CNYFC0445)
 )
 
 
 def split_concatenated_cells(
     table: List[List[str]],
 ) -> List[List[str]]:
-    """Split粘连单元格 — 当行列数少于Table header时尝试Split。
+    """Split concatenated cells \u2014 triggered when a row has fewer columns
+    than the header.
 
-    规则:
-      - 只在行列数 < Table header列数时Trigger
-      - Detect 数字.数字+数字字母 的粘连Mode
-      - Split后列数应等于Table header列数
+    Rules:
+      - Only triggered when row column count < header column count.
+      - Detects digit.digit + digit-alpha concatenation patterns.
+      - After splitting, column count should equal the header count.
     """
     if not table or len(table) < 2:
         return table
@@ -191,7 +202,7 @@ def split_concatenated_cells(
             result.append(row)
             continue
 
-        # 尝试Split粘连单元格
+        # Attempt to split concatenated cells
         deficit = header_col_count - len(row)
         if deficit <= 0:
             result.append(row)
@@ -204,7 +215,7 @@ def split_concatenated_cells(
                 new_row.append(cell)
                 continue
 
-            # DetectAmount+Account number粘连
+            # Detect amount + account-number concatenation
             m = _NUM_ALPHA_BOUNDARY_RE.match(str(cell))
             if m and splits_done < deficit:
                 new_row.append(m.group(1))  # Amount
@@ -213,25 +224,25 @@ def split_concatenated_cells(
             else:
                 new_row.append(cell)
 
-        # 如果Split后列数Match, using新行
+        # Use the new row if column count matches; otherwise keep the original
         if len(new_row) == header_col_count:
             result.append(new_row)
         else:
-            result.append(row)  # SplitFailed, retain原行
+            result.append(row)  # Split failed — keep the original row
 
     return result
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Fix 4: Alignment行列数
+# Fix 4: Align row column counts
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def align_row_columns(table: List[List[str]]) -> List[List[str]]:
-    """Alignmentall行的列数到Table header列数。
+    """Align all rows' column counts to the header.
 
-    规则:
-      - 列数少于Table header → 末尾补空字符串
-      - 列数多于Table header → 尾部多余列Merge到最后一列
+    Rules:
+      - Fewer columns than header \u2192 pad with empty strings at the end.
+      - More columns than header \u2192 merge excess trailing columns into the last column.
     """
     if not table:
         return table
@@ -246,7 +257,7 @@ def align_row_columns(table: List[List[str]]) -> List[List[str]]:
         elif len(row) < target:
             result.append(row + [""] * (target - len(row)))
         else:
-            # 多余列Merge到最后一列
+            # Merge excess columns into the last column
             merged = row[:target - 1] + [" ".join(str(c) for c in row[target - 1:] if c)]
             result.append(merged)
 
@@ -254,20 +265,21 @@ def align_row_columns(table: List[List[str]]) -> List[List[str]]:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Fix 5: UnderlineFooterClean
+# Fix 5: Strip underline footer
 # ═══════════════════════════════════════════════════════════════════════════════
 
-# Match ≥3 个连续Underline (Footer分隔线)
+# Match >= 3 consecutive underscores (footer separator line)
 _UNDERLINE_RE = re.compile(r"_{3,}")
 
 
 def strip_underline_footer(table: List[List[str]]) -> List[List[str]]:
-    """Clean单元格中Underline拼接的Footer统计Information。
+    """Remove underline-delimited footer statistics from cells.
 
-    Mode: "4085.26___支出交易总额:...___收入交易总额:...___合计笔数:..."
-    规则: 截断到第一个 ___（retain前面的实际Data值）。
+    Pattern: "4085.26___Total debits:...__Total credits:...__Count:..."
+    Rule: truncate at the first ``___`` (keep the actual data value before it).
 
-    泛化: 不Dependency特定列名, anycontains ___ 的单元格都Processing。
+    Generalised: not dependent on specific column names; any cell containing
+    ``___`` is processed.
     """
     for row in table:
         for ci in range(len(row)):
@@ -279,14 +291,14 @@ def strip_underline_footer(table: List[List[str]]) -> List[List[str]]:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Fix 6: Crop尾部Empty column
+# Fix 6: Trim trailing empty columns
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
 def trim_trailing_empty_columns(table: List[List[str]]) -> List[List[str]]:
-    """Crop全为空的尾部列。
+    """Trim all-empty trailing columns.
 
-    泛化: 只裁尾部, 不影响中间的Empty column。
+    Generalised: only trims from the end; does not affect interior empty columns.
     """
     if not table or not table[0]:
         return table
@@ -309,22 +321,23 @@ def trim_trailing_empty_columns(table: List[List[str]]) -> List[List[str]]:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Fix 7: 纯数字空格Merge
+# Fix 7: Merge digit spaces
 # ═══════════════════════════════════════════════════════════════════════════════
 
-# Match "数字 数字" Mode (中间only空格, 无字母/汉字)
+# Match pure "digits + spaces" pattern (no letters / CJK)
 _DIGIT_SPACE_RE = re.compile(r"^[\d\s]+$")
 
 
 def merge_digit_spaces(table: List[List[str]]) -> List[List[str]]:
-    """Merge纯数字单元格中间的空格。
+    """Remove spaces inside pure-digit cells.
 
-    Mode: "6216911304 963684" → "6216911304963684"
-    规则: 只对纯数字+空格的 cell 生效, 不影响含字母/汉字的 cell。
+    Pattern: "6216911304 963684" \u2192 "6216911304963684"
+    Rule: only applies to cells containing digits and spaces only;
+    cells with letters or CJK are not affected.
 
-    泛化: 自动Detect, 不Dependency列名, 适用一切Bank statement。
+    Generalised: automatic detection, no column-name dependency.
     """
-    for row in table[1:]:  # SkipTable header
+    for row in table[1:]:  # Skip header
         for ci in range(len(row)):
             cell = (row[ci] or "").strip()
             if cell and _DIGIT_SPACE_RE.match(cell) and " " in cell:
@@ -333,10 +346,10 @@ def merge_digit_spaces(table: List[List[str]]) -> List[List[str]]:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Fix 8: Clean粘连在Data值后面的双语列Title
+# Fix 8: Strip bilingual header labels from data cells
 # ═══════════════════════════════════════════════════════════════════════════════
 
-# 常见的双语列Title尾缀 (英文partial) — 按长度降序Match
+# Common bilingual column-title suffixes (English portion) — matched longest-first
 _BILINGUAL_SUFFIXES = [
     "Counterparty Institution", "Counterparty Name",
     "Transaction Amount", "Transaction Date",
@@ -344,7 +357,7 @@ _BILINGUAL_SUFFIXES = [
     "Serial Number", "Description",
     "Debit", "Credit",
 ]
-# 构建正则: Match "中文...英文尾缀" Mode
+# Regex: match "CJK...English suffix" pattern
 _BILINGUAL_SUFFIX_RE = re.compile(
     r"([\u4e00-\u9fff][\u4e00-\u9fff\s]*)\s*("
     + "|".join(re.escape(s) for s in _BILINGUAL_SUFFIXES)
@@ -353,35 +366,37 @@ _BILINGUAL_SUFFIX_RE = re.compile(
 
 
 def strip_header_labels_from_cells(table: List[List[str]]) -> List[List[str]]:
-    """CleanData单元格中粘连的双语列Title后缀。
+    """Remove bilingual column-title suffixes concatenated to data cells.
 
-    Mode: "0.90DebitDebit" → "0.90"
-          "浦发银行重庆分行营业部对手机构 Counterparty Institution" → "浦发银行重庆分行营业部"
+    Patterns:
+      - "0.90DebitDebit" \u2192 "0.90"
+      - "\u6d66\u53d1\u94f6\u884c\u91cd\u5e86\u5206\u884c\u8425\u4e1a\u90e8 Counterparty Institution" \u2192 "\u6d66\u53d1\u94f6\u884c\u91cd\u5e86\u5206\u884c\u8425\u4e1a\u90e8"
 
-    规则: Detect cell 末尾的 "中文+英文" 列TitleComposition, 截断到中文partialbefore。
-    泛化: 不Dependency特定列, based on通用双语列TitleKeywords。
+    Rule: detect "CJK + English" column-title composition at cell end,
+    truncate before the CJK portion.
+    Generalised: based on common bilingual column-title keywords, not specific columns.
     """
-    for row in table[1:]:  # SkipTable header
+    for row in table[1:]:  # Skip header
         for ci in range(len(row)):
             cell = (row[ci] or "").strip()
             if not cell or len(cell) < 5:
                 continue
             m = _BILINGUAL_SUFFIX_RE.search(cell)
             if m:
-                # 截断到中文列Titlebeginbefore
+                # Truncate before the CJK column-title begins
                 row[ci] = cell[: m.start()].rstrip()
     return table
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Fix 9: remove全Empty table
+# Fix 9: Remove fully empty tables
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
 def remove_empty_tables(tables: List[List[List[str]]]) -> List[List[List[str]]]:
-    """removeall cell 均为空的Table。
+    """Remove tables where all cells are empty.
 
-    泛化: 只删全Empty table, 不影响有anyData的Table。
+    Generalised: only removes fully empty tables; tables with any data are kept.
     """
     result = []
     for table in tables:
@@ -398,34 +413,36 @@ def remove_empty_tables(tables: List[List[List[str]]]) -> List[List[List[str]]]:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Fix 11: Split粘连在Account name开头的Account number数字
+# Fix 11: Split account numbers prefixed to account names
 # ═══════════════════════════════════════════════════════════════════════════════
 
-# ≥10位连续数字 + 中文 (Account number粘连Account name)
+# >= 10 consecutive digits + CJK (account number concatenated with account name)
 _ACCT_PREFIX_RE = re.compile(r"^(\d{10,})([\u4e00-\u9fff].*)$")
 
 
 def split_account_from_name(table: List[List[str]]) -> List[List[str]]:
-    """Split粘连在Account name列开头的长数字Account number。
+    """Split long digit prefixes (account numbers) from account-name cells.
 
-    Mode: "7065018800015镇江一生一世好游戏有限公司" →
-          对方Account="7065018800015"  对方Account name="镇江一生一世好游戏有限公司"
+    Pattern: "7065018800015\u9547\u6c5f\u4e00\u751f\u4e00\u4e16\u597d\u6e38\u620f\u6709\u9650\u516c\u53f8" \u2192
+             counterparty account = "7065018800015",
+             counterparty name = "\u9547\u6c5f\u4e00\u751f\u4e00\u4e16\u597d\u6e38\u620f\u6709\u9650\u516c\u53f8"
 
-    规则:
-      - 如果 cell 以 ≥10 位连续数字开头, 后接中文 → Split
-      - 数字partialMerge到前一列 (如果前一列Table header含 "Account"/"Account number")
-      - 泛化: 不Dependency列名 hard-coding, based onTable header内容Match
+    Rules:
+      - If a cell starts with >= 10 consecutive digits followed by CJK \u2192 split.
+      - The digit portion is merged into the preceding column (if its header
+        contains "account" / "account number").
+      - Generalised: based on header content matching, not column-name hard-coding.
     """
     if not table or len(table) < 2 or len(table[0]) < 2:
         return table
 
     header = table[0]
 
-    # 找 "对方Account"/"对方Account number" 列和其右邻列
+    # Find the "counterparty account" column and its right neighbour
     acct_col = None
     for ci, h in enumerate(header):
         h_text = (h or "").strip()
-        if ("Account" in h_text or "Account number" in h_text) and "对方" in h_text:
+        if ("\u8d26\u6237" in h_text or "\u8d26\u53f7" in h_text) and "\u5bf9\u65b9" in h_text:
             if ci + 1 < len(header):
                 acct_col = ci
                 break
@@ -442,7 +459,7 @@ def split_account_from_name(table: List[List[str]]) -> List[List[str]]:
         m = _ACCT_PREFIX_RE.match(cell)
         if m:
             digits, name = m.group(1), m.group(2)
-            # Merge数字到Account列 (prepend, 用空格分隔已有值)
+            # Merge digits into the account column (prepend, space-separated)
             existing = (row[acct_col] or "").strip()
             row[acct_col] = (digits + " " + existing).strip() if existing else digits
             row[name_col] = name.strip()
@@ -451,10 +468,10 @@ def split_account_from_name(table: List[List[str]]) -> List[List[str]]:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Fix 12: 剥离货币前缀
+# Fix 12: Strip currency prefix
 # ═══════════════════════════════════════════════════════════════════════════════
 
-# Match "RMB 352.10" 或 "CNY352.10" 或 "USD 1,000.00"
+# Match "RMB 352.10" or "CNY352.10" or "USD 1,000.00"
 _CURRENCY_PREFIX_RE = re.compile(
     r"^(RMB|CNY|USD|EUR|JPY|HKD|GBP)\s*"
     r"([\-\d,]+\.?\d*)\s*$"
@@ -462,13 +479,14 @@ _CURRENCY_PREFIX_RE = re.compile(
 
 
 def strip_currency_prefix(table: List[List[str]]) -> List[List[str]]:
-    """剥离单元格中的货币代码前缀。
+    """Strip currency code prefixes from amount cells.
 
-    Mode: "RMB 352.10" → "352.10", "RMB7.77" → "7.77"
-    规则: 只Processing "货币代码+数字" 的纯Amount cell, 不影响含文字的 cell。
-    泛化: supports RMB/CNY/USD/EUR/JPY/HKD/GBP。
+    Patterns: "RMB 352.10" \u2192 "352.10", "RMB7.77" \u2192 "7.77"
+    Rule: only processes pure "currency code + number" cells; cells with
+    other text are not affected.
+    Supports: RMB / CNY / USD / EUR / JPY / HKD / GBP.
     """
-    for row in table[1:]:  # SkipTable header
+    for row in table[1:]:  # Skip header
         for ci in range(len(row)):
             cell = (row[ci] or "").strip()
             if not cell:
@@ -480,29 +498,30 @@ def strip_currency_prefix(table: List[List[str]]) -> List[List[str]]:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 统一Entry point
+# Unified entry point
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def fix_table_structure(table: List[List[str]]) -> List[List[str]]:
-    """Table structure fix统一Entry point。
+    """Unified entry point for table structure fixes.
 
-    按顺序Execute:
-      1. Line merging (Date+时间, 多行单元格)
-      2. 粘连单元格Split (Balance+Account number)
-      3. 列数Alignment
-      4. 单元格Text cleanup
-      5. UnderlineFooterClean
-      6. 尾部Empty columnCrop
-      7. 纯数字空格Merge
-      8. 双语列TitleClean
-      9. Account numberAccount nameSplit
-      10. 货币前缀剥离
+    Executes in order:
+      1. Row merging (date + time, multi-line cells)
+      2. Concatenated cell splitting (balance + account number)
+      3. Column count alignment
+      4. Cell text cleanup
+      5. Underline footer removal
+      6. Trailing empty column trimming
+      7. Pure-digit space merging
+      8. Bilingual header-label removal
+      9. Account number / name splitting
+     10. Currency prefix stripping
+     11. Empty interior column removal
 
     Args:
-        table: 原始Table (二维字符串List, 第 0 行为Table header)。
+        table: Raw table (2-D string list; row 0 is the header).
 
     Returns:
-        Fix后的Table。
+        Fixed table.
     """
     if not table or len(table) < 2:
         return table
@@ -525,7 +544,7 @@ def fix_table_structure(table: List[List[str]]) -> List[List[str]]:
     if fixed_rows != original_rows:
         logger.info(
             f"[DocMirror] table_structure_fix: "
-            f"{original_rows} → {fixed_rows} rows "
+            f"{original_rows} \u2192 {fixed_rows} rows "
             f"(merged {original_rows - fixed_rows})"
         )
 
@@ -533,16 +552,19 @@ def fix_table_structure(table: List[List[str]]) -> List[List[str]]:
 
 
 def remove_empty_interior_columns(table: List[List[str]]) -> List[List[str]]:
-    """Delete全空的Internal列 (含Table header也为空或为相邻列重复)。
+    """Remove all-empty interior columns (including those with empty or
+    duplicate headers).
 
-    交通银行等双行Table header场景: DebitTransaction amount/CreditTransaction amount 被 post_process Merge后,
-    产生Empty column + 重复列名。本Function只Delete **allData行都为空** 的列。
+    In dual-row header scenarios (e.g. Bank of Communications), debit / credit
+    amount columns may produce empty columns + duplicate header names after
+    post-processing.  This function only removes columns where **all** data
+    rows are empty.
 
     Args:
-        table: Fix后的Table, 第 0 行为Table header。
+        table: Fixed table (row 0 is the header).
 
     Returns:
-        DeleteEmpty column后的Table。
+        Table with empty interior columns removed.
     """
     if not table or len(table) < 2:
         return table
@@ -551,7 +573,7 @@ def remove_empty_interior_columns(table: List[List[str]]) -> List[List[str]]:
     if n_cols <= 1:
         return table
 
-    # 找出allData行全为空的列
+    # Identify columns where all data rows are empty
     empty_cols: set = set()
     for ci in range(n_cols):
         if all(
@@ -563,13 +585,13 @@ def remove_empty_interior_columns(table: List[List[str]]) -> List[List[str]]:
     if not empty_cols:
         return table
 
-    # 构建Table header出现次数, 用于Detect重复
+    # Build header-value occurrence counts for duplicate detection
     header_vals = [(table[0][ci] if ci < len(table[0]) else "").strip() for ci in range(n_cols)]
     header_counts: dict = {}
     for h in header_vals:
         header_counts[h] = header_counts.get(h, 0) + 1
 
-    # Delete条件: Data全空 AND (Table header为空 OR Table header是重复值)
+    # Removal condition: data all-empty AND (header is empty OR header is a duplicate)
     cols_to_remove: set = set()
     for ci in empty_cols:
         hv = header_vals[ci]
@@ -589,7 +611,3 @@ def remove_empty_interior_columns(table: List[List[str]]) -> List[List[str]]:
         f"{sorted(cols_to_remove)}"
     )
     return result
-
-
-
-

@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  docmirror:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: docmirror:latest
+    container_name: docmirror_engine
+    ports:
+      - "8000:8000"
+    volumes:
+      # Map host cache to container to prevent redownloading ONNX models every time
+      - ./model_cache:/root/.cache
+    environment:
+      # Optional: Enable full enhancement mode for parsing
+      - DOCMIRROR_ENHANCE_MODE=standard
+      # Optional: Control concurrency
+      - OMP_NUM_THREADS=4
+    restart: unless-stopped
+    # Optional: If you intend to run GPU-accelerated OCR in the future
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]

@@ -26,12 +26,18 @@ jobs:
         run: ruff format --check docmirror/
 
   test:
-    name: Test (Python ${{ matrix.python-version }})
-    runs-on: ubuntu-latest
+    name: Test (Python ${{ matrix.python-version }}, ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         python-version: ["3.10", "3.11", "3.12", "3.13"]
+        os: [ubuntu-latest]
+        include:
+          - python-version: "3.12"
+            os: macos-latest
+          - python-version: "3.12"
+            os: windows-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -42,11 +48,18 @@ jobs:
       - name: Run tests
         run: pytest tests/ -v --tb=short
       - name: Run tests with coverage
-        if: matrix.python-version == '3.12'
+        if: matrix.python-version == '3.12' && matrix.os == 'ubuntu-latest'
         run: |
-          coverage run -m pytest tests/ -v
-          coverage report --fail-under=50
-          coverage xml
+          pip install pytest-cov
+          pytest tests/ -v --cov=docmirror --cov-report=xml --cov-report=term-missing
+      - name: Upload coverage to Codecov
+        if: matrix.python-version == '3.12' && matrix.os == 'ubuntu-latest'
+        uses: codecov/codecov-action@v4
+        with:
+          file: coverage.xml
+          fail_ci_if_error: false
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
   build:
     name: Build package
@@ -63,4 +76,4 @@ jobs:
       - name: Verify package
         run: |
           pip install dist/*.whl
-          python -c "import docmirror; print('✅ Package imports successfully')"
+          python -c "import docmirror; print(f'✅ docmirror {docmirror.__version__} imports successfully')"

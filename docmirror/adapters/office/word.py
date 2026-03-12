@@ -18,24 +18,37 @@ Processing logic:
        does not have a reliable page-level structure at the parsing layer.
 
 Metadata includes:
-    - source_format: "docx"
+    - source_format: "docx" or "doc"
     - paragraph_count: total paragraphs (including empty ones)
     - table_count: total tables in the document
 """
-
 from __future__ import annotations
+
 
 import logging
 from pathlib import Path
 
-from docmirror.framework.base import BaseParser, ParserOutput, ParserStatus
+from docmirror.framework.base import BaseParser
 from docmirror.models.domain import BaseResult, Block, PageLayout
 
 logger = logging.getLogger(__name__)
 
 
 class WordAdapter(BaseParser):
-    """Word (.docx) format adapter — extracts paragraphs and tables."""
+    """Word (.docx/.doc) format adapter — native parsing prioritizing `python-docx`.
+
+    Processing strategy:
+        1. **Modern formats (.docx):** Direct deep extraction via ``python-docx``
+           preserving document flow, tables, and structural elements at zero OCR cost.
+        2. **Legacy formats (.doc):** Automatically transcoded to PDF via LibreOffice,
+           then processed through the standard PDF pipeline.
+    """
+
+    async def perceive(self, file_path: Path, **context):
+        """
+        Native primary extraction for modern .docx.
+        """
+        return await super().perceive(file_path, **context)
 
     async def to_base_result(self, file_path: Path) -> BaseResult:
         """
@@ -52,18 +65,41 @@ class WordAdapter(BaseParser):
         blocks = []
         text_parts = []
 
+        from docmirror.adapters.office.omml_extractor import OMMLExtractor
+
         # Extract paragraphs — skip empty ones
         for para in doc.paragraphs:
+            # 1. First extract OMML math elements inside the paragraph
+            try:
+                # Use XPath to find m:oMath objects (Word equations)
+                math_elements = para._element.findall('.//m:oMath', namespaces={
+                    'm': 'http://schemas.openxmlformats.org/officeDocument/2006/math'
+                })
+                for math_elem in math_elements:
+                    latex = OMMLExtractor.convert_element(math_elem)
+                    if latex:
+                        blocks.append(Block(
+                            block_type="formula",
+                            raw_content=latex.strip(),
+                            page=0,
+                        ))
+                        text_parts.append(f"$${latex.strip()}$$")
+            except Exception as e:
+                logger.debug(f"[WordAdapter] OMML math extraction failed: {e}")
+
             if not para.text.strip():
                 continue
 
-            # Detect heading style (e.g., "Heading 1", "Heading 2")
+            # 2. Extract heading style (e.g., "Heading 1", "Heading 2")
             btype = "title" if para.style and para.style.name.startswith("Heading") else "text"
             level = None
             if btype == "title":
                 try:
-                    level = int(para.style.name[-1])
-                except (IndexError, ValueError):
+                    # Extract trailing digits — handles "Heading 1" through "Heading 10+"
+                    import re
+                    m = re.search(r'(\d+)$', para.style.name)
+                    level = int(m.group(1)) if m else 1
+                except (ValueError, AttributeError):
                     level = 1
 
             blocks.append(Block(
@@ -86,7 +122,7 @@ class WordAdapter(BaseParser):
 
         page = PageLayout(page_number=0, blocks=tuple(blocks))
         metadata = {
-            "source_format": "docx",
+            "source_format": "word",
             "paragraph_count": len(doc.paragraphs),
             "table_count": len(doc.tables),
         }

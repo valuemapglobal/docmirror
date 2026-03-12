@@ -2,22 +2,21 @@
 Markdown Exporter (OmniDocBench Adapt)
 ======================================
 
-将 CoreExtractor 产出的 BaseResult Convert为 OmniDocBench 评测所需的
-per-page Markdown File。
+Convert the BaseResult produced by CoreExtractor into the per-page Markdown File required for OmniDocBench evaluation.
 
-OmniDocBench 评估流程::
+OmniDocBench evaluation process::
 
-    model Parse PDF → 每页 .md → 评测Script对比 GT → 分数
+    model Parse PDF -> per-page .md -> EvalScript compares GT -> score
 
-核心Map:
-    - title  → # / ## / ### (按 heading_level)
-    - text   → Paragraph (双Newline分隔)
+Core Map:
+    - title  → # / ## / ### (by heading_level)
+    - text   → Paragraph (Double newlines separated)
     - table  → Markdown table (header + |---| + rows)
     - formula → $$LaTeX$$
-    - key_value / footer / image → Skip (benchmark 不评测)
+    - key_value / footer / image → Skip (benchmark not evaluated)
 """
-
 from __future__ import annotations
+
 
 import logging
 import re
@@ -30,34 +29,34 @@ logger = logging.getLogger(__name__)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 公共 API
+# Public API
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
 def export_document(result: BaseResult) -> List[str]:
-    """将整个 BaseResult Convert为按页分割的 Markdown List。
+    """Convert the entire BaseResult into a Markdown List split by page.
 
     Args:
-        result: CoreExtractor 产出的ImmutableExtractResult。
+        result: ImmutableExtractResult produced by CoreExtractor.
 
     Returns:
-        List[str]: each元素是一页的 Markdown 文本。
-        Index 0 对应第一页。
+        List[str]: Each element is a page of Markdown text.
+        Index 0 corresponds to the first page.
     """
     return [export_page(page) for page in result.pages]
 
 
 def export_page(page: PageLayout) -> str:
-    """将单页 PageLayout Convert为 Markdown 字符串。
+    """Convert a single page PageLayout into a Markdown string.
 
-    Blocks 按 reading_order Sort后依次渲染。
-    相邻块之间用双Newline分隔 (Markdown ParagraphSeparator)。
+    Blocks are rendered sequentially after sorting by reading_order.
+    Adjacent blocks are separated by double newlines (Markdown ParagraphSeparator).
 
     Args:
-        page: 单页版面结构。
+        page: Single page layout structure.
 
     Returns:
-        完整的 Markdown 字符串。
+        Complete Markdown string.
     """
     if not page.blocks:
         return ""
@@ -74,15 +73,15 @@ def export_page(page: PageLayout) -> str:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 逐Type渲染
+# Render by Type
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
 def _render_block(block: Block) -> Optional[str]:
-    """based on block_type Dispatch渲染。
+    """Dispatch render based on block_type.
 
     Returns:
-        渲染后的 Markdown 片段, 或 None 表示Skip。
+        Rendered Markdown snippet, or None indicates Skip.
     """
     renderer = _RENDERERS.get(block.block_type)
     if renderer is None:
@@ -91,7 +90,7 @@ def _render_block(block: Block) -> Optional[str]:
 
 
 def _render_title(block: Block) -> Optional[str]:
-    """Title → # 层级。"""
+    """Title -> # level."""
     text = _get_text(block)
     if not text:
         return None
@@ -102,7 +101,7 @@ def _render_title(block: Block) -> Optional[str]:
 
 
 def _render_text(block: Block) -> Optional[str]:
-    """Body textParagraph → 纯文本。"""
+    """Body text Paragraph -> plain text."""
     text = _get_text(block)
     return text if text else None
 
@@ -111,14 +110,14 @@ def _render_table(block: Block) -> Optional[str]:
     """Table → Markdown table。
 
     raw_content Format: List[List[str]]
-    第一行视为 header，后续行为 data。
-    如果only一行，也Output为 header-only table。
+    The first row is treated as header, subsequent rows are data.
+    If there is only one row, output as a header-only table.
     """
     rows = block.raw_content
     if not rows or not isinstance(rows, list):
         return None
 
-    # 清洗: ensureeach cell 都是字符串
+    # Clean: ensure each cell is a string
     clean_rows: List[List[str]] = []
     for row in rows:
         if not isinstance(row, (list, tuple)):
@@ -128,13 +127,13 @@ def _render_table(block: Block) -> Optional[str]:
     if not clean_rows:
         return None
 
-    # 统一列数 (取最大列数)
+    # Unify column count (take max col count)
     max_cols = max(len(r) for r in clean_rows)
     for row in clean_rows:
         while len(row) < max_cols:
             row.append("")
 
-    # 渲染
+    # Render
     header = clean_rows[0]
     lines: List[str] = []
 
@@ -155,7 +154,7 @@ def _render_formula(block: Block) -> Optional[str]:
     if not latex:
         return None
 
-    # 去掉may已存在的 $ 定界符
+    # Remove potentially existing $ delimiters
     latex = latex.strip()
     if latex.startswith("$$") and latex.endswith("$$"):
         return latex
@@ -171,15 +170,15 @@ def _render_formula(block: Block) -> Optional[str]:
 
 
 def _get_text(block: Block) -> str:
-    """从 Block 中Extract文本。
+    """Extract text from Block.
 
-    优先从 raw_content Extract (如果是 str)，
-    otherwise从 spans 拼接。
+    Prefer to extract from raw_content (if str),
+    Otherwise concatenate from spans.
     """
     if isinstance(block.raw_content, str):
         return _normalize_text(block.raw_content)
 
-    # 从 spans 拼接
+    # Concatenate from spans
     if block.spans:
         return _normalize_text(" ".join(s.text for s in block.spans))
 
@@ -187,29 +186,29 @@ def _get_text(block: Block) -> str:
 
 
 def _normalize_text(text: str) -> str:
-    """Text normalization: NFC + 去除多余Whitespace。"""
+    """Text normalization: NFC + remove redundant whitespace."""
     text = unicodedata.normalize("NFC", text)
-    # 多个空格/制 table符Merge为单个空格
+    # Merge multiple spaces/tabs into a single space
     text = re.sub(r"[ \t]+", " ", text)
-    # 去除首尾Whitespace
+    # Remove leading and trailing whitespace
     text = text.strip()
     return text
 
 
 def _clean_cell(value) -> str:
-    """清洗Table cell 值。"""
+    """Clean Table cell value."""
     if value is None:
         return ""
     s = str(value).strip()
-    # Pipe符会破坏 Markdown table 语法
+    # Pipe char will break Markdown table syntax
     s = s.replace("|", "\\|")
-    # 换Line merging
+    # Newline merging
     s = s.replace("\n", " ")
     return s
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 渲染器Registry
+# Renderer Registry
 # ═══════════════════════════════════════════════════════════════════════════════
 
 _RENDERERS = {
@@ -217,7 +216,7 @@ _RENDERERS = {
     "text": _render_text,
     "table": _render_table,
     "formula": _render_formula,
-    # belowTypeSkip
+    # Skip types below
     "key_value": None,
     "footer": None,
     "image": None,

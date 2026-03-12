@@ -19,21 +19,35 @@ Processing logic:
 Metadata includes:
     - source_format: "excel"
     - sheet_names: list of all worksheet names
+    - table_count: total tables extracted
 """
-
 from __future__ import annotations
+
 
 import logging
 from pathlib import Path
 
-from docmirror.framework.base import BaseParser, ParserOutput, ParserStatus
+from docmirror.framework.base import BaseParser
 from docmirror.models.domain import BaseResult, Block, PageLayout
 
 logger = logging.getLogger(__name__)
 
 
 class ExcelAdapter(BaseParser):
-    """Excel (.xlsx) format adapter — each sheet becomes a separate page."""
+    """Excel (.xlsx/.xls) format adapter — native parsing prioritizing `openpyxl`.
+
+    Processing strategy:
+        1. **Modern formats (.xlsx):** Direct deep extraction via ``openpyxl``
+           preserving tabular accuracy and sheet separations natively.
+        2. **Legacy formats (.xls):** Automatically transcoded to PDF via LibreOffice,
+           then processed through the standard PDF pipeline.
+    """
+
+    async def perceive(self, file_path: Path, **context):
+        """
+        Native primary extraction for modern .xlsx.
+        """
+        return await super().perceive(file_path, **context)
 
     async def to_base_result(self, file_path: Path) -> BaseResult:
         """
@@ -89,5 +103,9 @@ class ExcelAdapter(BaseParser):
         return BaseResult(
             pages=tuple(pages),
             full_text="\n\n".join(text_parts),
-            metadata={"source_format": "excel", "sheet_names": wb.sheetnames},
+            metadata={
+                "source_format": "excel", 
+                "sheet_names": wb.sheetnames,
+                "table_count": len(pages),
+            },
         )

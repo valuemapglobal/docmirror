@@ -1,7 +1,7 @@
 """
-Parse result cache — file-level Redis cache keyed by SHA256.
+Parse Result Cache — File-level Redis cache keyed by SHA256.
 
-Avoids redundant parsing of the same file. Cache key format: parse:{sha256}:{doc_type}
+Avoids redundant parsing of the same file. Cache key format: ``parse:{sha256}:{doc_type}``
 Default TTL: 24 hours.
 
 Usage::
@@ -11,11 +11,12 @@ Usage::
     # Lookup cache
     cached = await parse_cache.get(checksum, doc_type)
     if cached:
-        return cached  # PerceptionResult JSON str
+        return cached  # PerceptionResult JSON string
 
     # Write cache
     await parse_cache.set(checksum, doc_type, result_json)
 """
+from __future__ import annotations
 
 import logging
 import os
@@ -23,18 +24,18 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-# Default TTL: 24 hours
+# Default TTL: 24 hours (in seconds)
 _DEFAULT_TTL = 86400
 
 
 class ParseCache:
-    """Async Redis parse result cache."""
+    """Async Redis-based parse result cache."""
 
     def __init__(self):
         self._redis = None
 
     async def _get_redis(self):
-        """Lazily connect to Redis using REDIS_URL env var."""
+        """Lazily connect to Redis using the REDIS_URL environment variable."""
         if self._redis is None:
             try:
                 import redis.asyncio as aioredis
@@ -48,12 +49,12 @@ class ParseCache:
 
     @staticmethod
     def _key(checksum: str, doc_type: str = "") -> str:
-        """Generate cache key."""
+        """Generate the Redis cache key."""
         suffix = f":{doc_type}" if doc_type else ""
         return f"parse:{checksum}{suffix}"
 
     async def get(self, checksum: str, doc_type: str = "") -> Optional[str]:
-        """Lookup cache, returns JSON string or None."""
+        """Lookup cache. Returns the cached JSON string or None on miss."""
         r = await self._get_redis()
         if not r:
             return None
@@ -70,7 +71,7 @@ class ParseCache:
     async def set(
         self, checksum: str, doc_type: str, json_str: str, ttl: int = _DEFAULT_TTL
     ) -> bool:
-        """Write to cache."""
+        """Write a JSON string to the cache with an expiration."""
         r = await self._get_redis()
         if not r:
             return False
@@ -84,5 +85,5 @@ class ParseCache:
             return False
 
 
-# Global singleton
+# Global singleton cache instance
 parse_cache = ParseCache()

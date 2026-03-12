@@ -34,7 +34,6 @@ pip install docmirror[all]
 | `table` | rapid-table | Advanced table structure recognition |
 | `formula` | rapid-latex-ocr | Mathematical formula recognition |
 | `office` | python-docx, openpyxl, python-pptx | Word, Excel, PowerPoint |
-| `vlm` | httpx | Vision-Language Model integration |
 | `security` | pikepdf | PDF forgery detection |
 | `cache` | redis | Parse result caching |
 | `langdetect` | fast-langdetect | Language detection |

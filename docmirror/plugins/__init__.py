@@ -9,10 +9,10 @@ that provides:
 1. Scene matching rules (keywords, patterns)
 2. Entity extraction logic (key fields to extract)
 3. Domain data construction (structured output model)
-4. Column mapping hints (standard column names)
 
 Built-in plugins are auto-discovered from ``docmirror.plugins.*``.
-Third-party plugins can register via the ``docmirror.plugins`` entry point group.
+Third-party plugins can register via the ``docmirror.plugins``
+entry point group.
 
 Usage::
 
@@ -32,20 +32,9 @@ import importlib
 import logging
 import pkgutil
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, Optional, Sequence, Tuple
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass(frozen=True)
-class ColumnHint:
-    """Standard column definition for tabular data."""
-    standard_name: str
-    aliases: Sequence[str] = ()
-    description: str = ""
-    required: bool = False
 
 
 class DomainPlugin(ABC):
@@ -73,7 +62,7 @@ class DomainPlugin(ABC):
         """
         Keywords that indicate this domain when found in document text.
         Used by SceneDetector for automatic classification.
-        Returns empty sequence if this plugin does not participate in scene detection.
+        Returns empty sequence if it doesn't participate in scene detection.
         """
         return ()
 
@@ -86,14 +75,7 @@ class DomainPlugin(ABC):
         """
         return ()
 
-    @property
-    def standard_columns(self) -> Sequence[ColumnHint]:
-        """
-        Standard column definitions for tabular data in this domain.
-        Used by ColumnMapper for column name standardization.
-        Returns empty sequence if not applicable.
-        """
-        return ()
+
 
     def build_domain_data(
         self,
@@ -133,16 +115,21 @@ class PluginRegistry:
         self._plugins: Dict[str, DomainPlugin] = {}
         self._discovered = False
 
-    def register(self, plugin: DomainPlugin, *, override: bool = False) -> None:
+    def register(
+        self, plugin: DomainPlugin, *, override: bool = False
+    ) -> None:
         """Register a domain plugin."""
         name = plugin.domain_name
         if name in self._plugins and not override:
             logger.warning(
-                f"Plugin '{name}' already registered; use override=True to replace"
+                f"Plugin '{name}' already registered; "
+                "use override=True to replace"
             )
             return
         self._plugins[name] = plugin
-        logger.debug(f"Registered domain plugin: {name} ({plugin.display_name})")
+        logger.debug(
+            f"Registered domain plugin: {name} ({plugin.display_name})"
+        )
 
     def get(self, domain_name: str) -> Optional[DomainPlugin]:
         """Get a registered plugin by domain name."""
@@ -155,7 +142,7 @@ class PluginRegistry:
         return {name: p.display_name for name, p in self._plugins.items()}
 
     def get_all_scene_keywords(self) -> Dict[str, Sequence[str]]:
-        """Return {domain_name: keywords} for all plugins with scene keywords."""
+        """Return {domain_name: keywords} for plugins with scene keywords."""
         self._ensure_discovered()
         return {
             name: p.scene_keywords
@@ -186,21 +173,32 @@ class PluginRegistry:
         """Discover and load plugins from docmirror.plugins subpackage."""
         try:
             import docmirror.plugins as plugins_pkg
-            for importer, modname, ispkg in pkgutil.iter_modules(plugins_pkg.__path__):
+            for _, modname, _ in pkgutil.iter_modules(plugins_pkg.__path__):
                 if modname.startswith("_"):
                     continue
                 try:
-                    mod = importlib.import_module(f"docmirror.plugins.{modname}")
+                    mod = importlib.import_module(
+                        f"docmirror.plugins.{modname}"
+                    )
                     # Convention: each plugin module has a `plugin` attribute
                     if hasattr(mod, "plugin"):
                         self.register(mod.plugin)
                     elif hasattr(mod, "Plugin"):
                         self.register(mod.Plugin())
                 except Exception as e:
-                    logger.warning(f"Failed to load plugin docmirror.plugins.{modname}: {e}")
+                    logger.warning(
+                        f"Failed to load plugin "
+                        f"docmirror.plugins.{modname}: {e}"
+                    )
         except ImportError:
             logger.debug("No docmirror.plugins package found")
 
 
 # Global singleton registry
 registry = PluginRegistry()
+
+__all__ = [
+    "DomainPlugin",
+    "PluginRegistry",
+    "registry",
+]

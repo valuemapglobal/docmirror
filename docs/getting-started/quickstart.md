@@ -7,14 +7,12 @@ import asyncio
 from docmirror import perceive_document
 
 async def main():
-    result = await perceive_document(
-        "statement.pdf",
-        enhance_mode="standard",  # raw | standard | full
-    )
+    result = await perceive_document("statement.pdf")
 
     # Check status
     print(f"Status: {result.status}")
     print(f"Confidence: {result.confidence:.0%}")
+    print(f"Scene: {result.scene}")  # "bank_statement", "invoice", etc.
 
     # Full text (Markdown format)
     print(result.content.text)
@@ -43,6 +41,50 @@ result = await perceive_document("receipt.jpg")
 print(result.content.text)  # OCR-extracted text
 ```
 
+## CLI Usage
+
+```bash
+# Basic parse
+python3 -m docmirror invoice.pdf
+
+# Force re-parse (skip Redis cache)
+python3 -m docmirror --skip-cache invoice.pdf
+
+# Don't save output to disk
+python3 -m docmirror --no-save invoice.pdf
+```
+
+## API Output Structure
+
+The `to_api_dict()` method returns a flat JSON structure:
+
+```json
+{
+  "success": true,
+  "scene": "bank_statement",
+  "identity": {
+    "document_type": "bank_statement",
+    "page_count": 12,
+    "properties": {
+      "institution": "Example National Bank",
+      "account_holder": "Acme Technology Co., Ltd.",
+      "account_number": "6200000000001234567"
+    }
+  },
+  "blocks": [...],
+  "trust": {
+    "validation_score": 1.0,
+    "validation_passed": true,
+    "validation_details": {...},
+    "image_quality": {...}
+  },
+  "diagnostics": {
+    "parser": "PDFAdapter",
+    "elapsed_ms": 12000
+  }
+}
+```
+
 ## Batch Processing
 
 ```python
@@ -57,8 +99,7 @@ async def batch_parse(folder: str):
 ## Configuration via Environment
 
 ```bash
-export DOCMIRROR_ENHANCE_MODE=full
-export DOCMIRROR_ENABLE_LLM=true
+export DOCMIRROR_ENHANCE_MODE=standard
 export DOCMIRROR_MAX_PAGES=100
 export DOCMIRROR_OCR_DPI=200
 ```

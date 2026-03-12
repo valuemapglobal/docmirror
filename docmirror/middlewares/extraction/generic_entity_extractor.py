@@ -1,15 +1,13 @@
 """
-GenericEntityExtractor — 跨Format通用Entity extraction middleware
-====================================================
+GenericEntityExtractor \u2014 Universal Entity Extraction Middleware
+==============================================================
 
-从 BaseResult 的 key_value Block 中Extract entities。
-不DependencyanyFormat专有逻辑，适用于allFileFormat。
+Extracts entities iteratively cleanly across any document format securely.
 """
-
 from __future__ import annotations
 
+
 import logging
-from typing import Any, Dict, Optional
 
 from ..base import BaseMiddleware
 from ...models.enhanced import EnhancedResult
@@ -18,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 class GenericEntityExtractor(BaseMiddleware):
-    """Generic entitiesExtract — 从 KV blocks Extract entities到 enhanced_data。"""
+    """Generic entities Extraction \u2014 Harvests target explicitly safely."""
 
     def process(self, result: EnhancedResult) -> EnhancedResult:
         if result.base_result is None:

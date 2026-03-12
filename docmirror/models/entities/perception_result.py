@@ -1,31 +1,32 @@
 """
-PerceptionResult — MultiModal Unified output model
+PerceptionResult \u2014 MultiModal Unified Output Topology Model
+===========================================================
 
-4 层架构::
+4-Layer Architecture Setup::
 
-    ┌─────────────────────────────────────────────────────┐
-    │  Envelope: status / confidence / timing / error     │
-    │  Content:  text + blocks (table/text/kv)            │
-    │  Domain:   BankStatementData / InvoiceData / ...    │
-    │  Provenance: source / parser_chain / validation     │
-    └─────────────────────────────────────────────────────┘
+    \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510
+    \u2502  Envelope: status / confidence / timing / error     \u2502
+    \u2502  Content:  text + blocks (table/text/kv)            \u2502
+    \u2502  Domain:   BankStatementData / InvoiceData / ...    \u2502
+    \u2502  Provenance: source / parser_chain / validation     \u2502
+    \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518
 """
-
 from __future__ import annotations
+
 
 import logging
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Literal, Optional, Tuple, Union
+from typing import Any, Dict, List, Literal, Optional, Tuple
 
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
 
-# ═══════════════════════════════════════════════════════════════════════════
-# Envelope 信封 layer
-# ═══════════════════════════════════════════════════════════════════════════
+# \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+# Envelope Layer definitions explicitly securely functionally
+# \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 
 class ResultStatus(str, Enum):
     SUCCESS = "success"
@@ -34,22 +35,22 @@ class ResultStatus(str, Enum):
 
 
 class ErrorDetail(BaseModel):
-    """结构化ErrorInformation"""
-    code: str = "unknown"              # "encrypted_pdf" | "parse_timeout" | ...
+    """Structured Error Notification Details"""
+    code: str = "unknown"  # e.g., "encrypted_pdf", "timeout"
     message: str = ""
     recoverable: bool = False
 
 
 class TimingInfo(BaseModel):
-    """Parse耗时Information"""
+    """Performance Timing Bounds Analysis Metrics cleanly expertly"""
     started_at: Optional[datetime] = None
     elapsed_ms: float = 0.0
-    parser_name: str = ""              # "CCBParser" | "DigitalPDFParser"
+    parser_name: str = ""
 
 
-# ═══════════════════════════════════════════════════════════════════════════
-# Content 内容 layer
-# ═══════════════════════════════════════════════════════════════════════════
+# \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+# Content Mapping Layer
+# \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 
 class ContentBlockType(str, Enum):
     TEXT = "text"
@@ -60,7 +61,7 @@ class ContentBlockType(str, Enum):
 
 
 class TableBlock(BaseModel):
-    """结构化Table"""
+    """Structured table representation with headers, rows, and optional bbox."""
     headers: List[str] = Field(default_factory=list)
     rows: List[List[str]] = Field(default_factory=list)
     page: Optional[int] = None
@@ -69,22 +70,18 @@ class TableBlock(BaseModel):
 
 
 class TextBlock(BaseModel):
-    """文本Paragraph"""
+    """Textual paragraph or heading content."""
     content: str = ""
-    level: int = 0                     # heading level (0=body, 1=h1 ...)
+    level: int = 0  # 0 indicates standard body text
 
 
 class KeyValueBlock(BaseModel):
-    """键值对 (Document头Information等)"""
+    """Dictionary of extracted key-value pairs."""
     pairs: Dict[str, str] = Field(default_factory=dict)
 
 
 class ContentBlock(BaseModel):
-    """
-    通用内容块 — Document由有序块序列组成。
-
-    based on ``type`` Field, 对应的子Object (table / text / key_value) 被填充。
-    """
+    """Generic content block — wraps one of text, table, or key-value data."""
     type: ContentBlockType
     page: Optional[int] = None
     table: Optional[TableBlock] = None
@@ -93,30 +90,28 @@ class ContentBlock(BaseModel):
 
 
 class DocumentContent(BaseModel):
-    """DocumentExtract的通用内容"""
-    text: str = ""                     # 全文 Markdown / Plain
+    """Structured document content with text, blocks, and entities."""
+    text: str = ""  # Plain or Markdown format extraction
     text_format: Literal["markdown", "plain"] = "plain"
     blocks: List[ContentBlock] = Field(default_factory=list)
     entities: Dict[str, str] = Field(default_factory=dict)
     page_count: int = 0
 
 
-# ═══════════════════════════════════════════════════════════════════════════
-# Provenance 溯源 layer
-# ═══════════════════════════════════════════════════════════════════════════
+# \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+# Provenance Audit Definitions
+# \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 
 class SourceInfo(BaseModel):
-    """File来源"""
+    """Origin file metadata (path, size, type, checksum)."""
     file_path: str = ""
-    file_size: int = 0                 # bytes
-    file_type: str = ""                # "pdf" | "image" | "excel"
+    file_size: int = 0  # bytes
+    file_type: str = ""
     mime_type: Optional[str] = None
-    checksum: Optional[str] = None     # SHA256
+    checksum: Optional[str] = None
 
     def sanitize(self) -> "SourceInfo":
-        """
-        脱敏Processing: 隐藏绝对Path，仅retainFile名。
-        """
+        """Strip absolute paths, retaining only basenames for privacy."""
         import os
         if self.file_path:
             self.file_path = os.path.basename(self.file_path)
@@ -124,14 +119,14 @@ class SourceInfo(BaseModel):
 
 
 class ParserStep(BaseModel):
-    """Parse链中的一步"""
-    parser: str = ""                   # "CCBParser"
-    action: str = ""                   # "classify" | "extract" | "validate"
+    """Single step in the parser chain audit trail."""
+    parser: str = ""
+    action: str = ""
     elapsed_ms: float = 0.0
 
 
 class ValidationResult(BaseModel):
-    """Parse质量Validate"""
+    """Quality validation and verification results."""
     l1_anomaly_count: int = 0
     l1_repaired_count: int = 0
     l1_reverted_count: int = 0
@@ -141,128 +136,136 @@ class ValidationResult(BaseModel):
     l2_details: Optional[Dict[str, float]] = None
     l2_llm_used: bool = False
     balance_truncation_repaired: int = 0
+    image_quality: Optional[Dict[str, Any]] = None
     is_forged: Optional[bool] = None
     forgery_reasons: List[str] = Field(default_factory=list)
 
+    @property
+    def trust_score(self) -> Optional[float]:
+        """Composite trust score combining parsing quality and security."""
+        if self.l2_score is None:
+            return None
+        score = self.l2_score
+        # Forgery penalty: halve the trust score if tampering detected
+        if self.is_forged:
+            score *= 0.5
+        return round(score, 4)
+
 
 class Diagnostics(BaseModel):
-    """ParseDebug诊断Information"""
-    # ExtractPath诊断
-    extraction_method: str = ""                    # coordinate / pdfplumber / ocr_fallback
-    template_id: str = ""                          # Template ID
-    template_source: str = ""                      # memory / yaml / llm_inferred
+    """Pipeline diagnostic and debugging metadata."""
+    extraction_method: str = ""
+    template_id: str = ""
+    template_source: str = ""
     pages_processed: int = 0
-    raw_rows_extracted: int = 0                    # Step 2 原始行数
-    rows_after_cleaning: int = 0                   # Step 4 清洗后行数
-    rows_final: int = 0                            # 最终Standard化行数
+    raw_rows_extracted: int = 0
+    rows_after_cleaning: int = 0
+    rows_final: int = 0
 
-    # 各步骤耗时 (ms)
     step_timing_ms: Dict[str, float] = Field(default_factory=dict)
-
-    # 列Map诊断
     detected_columns: List[str] = Field(default_factory=list)
     missing_columns: List[str] = Field(default_factory=list)
     supplemented_columns: List[str] = Field(default_factory=list)
-
-    # 问题行样本 (最多 10 行)
     failed_rows_sample: List[Dict[str, Any]] = Field(default_factory=list)
-
-    # Duplicate rowsDetect
     duplicate_rows_detected: int = 0
-
-    # LLM call成本
     llm_usage: Optional[Dict[str, Any]] = None
 
 
 class Provenance(BaseModel):
-    """Parse溯源"""
+    """Full provenance chain: source info, parser steps, and validation."""
     source: SourceInfo = Field(default_factory=SourceInfo)
     parser_chain: List[ParserStep] = Field(default_factory=list)
     validation: Optional[ValidationResult] = None
     diagnostics: Optional[Diagnostics] = None
-    pdf_properties: Dict[str, str] = Field(default_factory=dict)
+    document_properties: Dict[str, str] = Field(default_factory=dict)
 
     def sanitize(self) -> "Provenance":
-        """
-        脱敏Processing: 递归脱敏 SourceInfo。
-        """
+        """Recursively sanitize paths for privacy."""
         self.source.sanitize()
         return self
 
 
-# ═══════════════════════════════════════════════════════════════════════════
-# PerceptionResult 顶 layer
-# ═══════════════════════════════════════════════════════════════════════════
+# \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+# Top-Level PerceptionResult
+# \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 
 class PerceptionResult(BaseModel):
     """
-    MultiModal Unified output model。
+    Unified output model for all document parsing operations.
 
-    all Parser 最终Returns此Type, 替代原有 ``ParserOutput``。
-    via ``@property`` 提供Backward compatibleField。
+    Supersedes legacy ``ParserOutput``; backward-compatible @property
+    accessors are provided for smooth migration.
     """
 
-    # ── Envelope ──
+    # \u2500\u2500 Envelope \u2500\u2500
     status: ResultStatus = ResultStatus.SUCCESS
     confidence: float = Field(1.0, ge=0.0, le=1.0)
     timing: TimingInfo = Field(default_factory=TimingInfo)
     error: Optional[ErrorDetail] = None
 
-    # ── Content ──
+    # \u2500\u2500 Content \u2500\u2500
     content: DocumentContent = Field(default_factory=DocumentContent)
 
-    # ── Domain (Optional, 按DocumentType填充) ──
-    domain: Optional[Any] = None       # DomainData, 延迟Importavoid循环
+    # \u2500\u2500    # ── Domain (optional) ──
+    domain: Optional[Any] = None
+
+    # ── Scene (document classification, persisted for cache survival) ──
+    scene: str = "unknown"
 
     # ── Provenance ──
     provenance: Provenance = Field(default_factory=Provenance)
 
-    # ── Internal引用 (Serialization时排除) ──
-    _enhanced: Optional[Any] = None     # EnhancedResult 引用，供深度call方访问
+    # ── Internal Reference (runtime-only, not serialized) ──
+    _enhanced: Optional[Any] = None
 
     def sanitize(self) -> "PerceptionResult":
-        """
-        显式脱敏: removeInternalPath与Parse链细节, 供External API 安全Returns。
-        call此Method后, ObjectStatus将被修改。
-        """
+        """Sanitize file paths for privacy before API output."""
         self.provenance.sanitize()
         return self
 
-    # ═══════════════════════════════════════════════════════════════════════
-    # Backward compatibleProperty — 使旧代码无需修改即可using
-    # ═══════════════════════════════════════════════════════════════════════
+    # \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+    # Backward Compatibility Proxies
+    # \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 
     @property
     def success(self) -> bool:
+        """Whether parsing completed successfully or partially."""
         return self.status in (ResultStatus.SUCCESS, ResultStatus.PARTIAL)
 
     @property
     def coverage(self) -> float:
+        """Alias for ``confidence`` (backward compatibility)."""
         return self.confidence
 
     @property
     def structured_text(self) -> str:
+        """Alias for ``content.text`` (backward compatibility)."""
         return self.content.text
 
     @property
     def tables(self) -> List[List[List[str]]]:
-        """ExtractallTable的 rows (含 headers 作为首行)"""
+        """Extract all tables as nested lists (backward compatibility)."""
         result = []
         for b in self.content.blocks:
             if b.type == ContentBlockType.TABLE and b.table:
-                data = [b.table.headers] + b.table.rows if b.table.headers else b.table.rows
+                data = (
+                    [b.table.headers] + b.table.rows
+                    if b.table.headers
+                    else b.table.rows
+                )
                 result.append(data)
         return result
 
     @property
     def key_entities(self) -> Dict[str, str]:
+        """Alias for ``content.entities`` (backward compatibility)."""
         return self.content.entities
 
     @property
     def metadata(self) -> Dict[str, Any]:
-        """兼容旧call方 — Merge溯源Information + 领域Data为 flat dict"""
+        """Flat metadata dict aggregating provenance and validation info."""
         result: Dict[str, Any] = {}
-        result.update(self.provenance.pdf_properties)
+        result.update(self.provenance.document_properties)
         result["page_count"] = self.content.page_count
         if self.provenance.validation:
             v = self.provenance.validation
@@ -271,7 +274,11 @@ class PerceptionResult(BaseModel):
             result["l1_anomaly_count"] = v.l1_anomaly_count
             result["l1_llm_used"] = v.l1_llm_used
             result["l2_llm_used"] = v.l2_llm_used
-        if self.domain and hasattr(self.domain, "bank_statement") and self.domain.bank_statement:
+        if (
+            self.domain
+            and hasattr(self.domain, "bank_statement")
+            and self.domain.bank_statement
+        ):
             bs = self.domain.bank_statement
             result["Account holder"] = bs.account_holder
             result["Account number"] = bs.account_number
@@ -280,18 +287,28 @@ class PerceptionResult(BaseModel):
 
     @property
     def document_structure(self) -> List[Dict[str, Any]]:
-        """兼容旧call方 — Returns block list as dicts"""
+        """Serialize content blocks to list-of-dicts (backward compatibility)."""
         result = []
         for b in self.content.blocks:
             d: Dict[str, Any] = {"type": b.type.value, "page": b.page}
             if b.type == ContentBlockType.TABLE and b.table:
-                data = [b.table.headers] + b.table.rows if b.table.headers else b.table.rows
+                data = (
+                    [b.table.headers] + b.table.rows
+                    if b.table.headers
+                    else b.table.rows
+                )
                 d["data"] = data
-                d["markdown"] = b.table.markdown
-                d["bbox"] = b.table.bbox
             elif b.type == ContentBlockType.TEXT and b.text:
                 d["content"] = b.text.content
                 d["level"] = b.text.level
+            elif b.type == ContentBlockType.HEADING and b.text:
+                d["content"] = b.text.content
+                d["level"] = b.text.level
+            elif b.type == ContentBlockType.IMAGE and b.text:
+                # Skip empty image blocks (e.g. logos/stamps with no caption)
+                if not b.text.content:
+                    continue
+                d["content"] = b.text.content  # caption
             elif b.type == ContentBlockType.KEY_VALUE and b.key_value:
                 d["pairs"] = b.key_value.pairs
             result.append(d)
@@ -299,43 +316,46 @@ class PerceptionResult(BaseModel):
 
     @property
     def raw_response(self) -> Optional[Dict[str, Any]]:
+        """Alias for ``metadata`` (backward compatibility)."""
         return self.metadata
 
-    def to_api_dict(self, *, output_file: str = "") -> Dict[str, Any]:
-        """
-        扁平化为 API 友好的 dict — 替代 ParseResponse / ParseV2Response。
-
-        前端消费的唯一OutputFormat。
-        """
-        enhanced = getattr(self, '_enhanced', None)
+    def to_api_dict(self) -> Dict[str, Any]:
+        """Serialize to a flat API-friendly dict."""
         meta = self.metadata
 
-        # identity: via Domain Registry动态Parse (替代硬EncodingBank statementField)
         from docmirror.configs.domain_registry import resolve_identity
         entities = dict(self.content.entities)
-        domain = enhanced.scene if enhanced else (
-            self.domain.document_type if self.domain else "unknown"
-        )
-        identity = resolve_identity(domain, entities)
-        identity["page_count"] = self.content.page_count
+        domain = self.scene
+        raw_identity = resolve_identity(domain, entities)
+        # Separate fixed top-level keys from domain-specific properties
+        identity: Dict[str, Any] = {
+            "document_type": raw_identity.pop("document_type", domain),
+            "page_count": self.content.page_count,
+            "properties": raw_identity,  # remaining domain-specific fields
+        }
 
-        # trust: 从 provenance.validation 构建
         trust: Dict[str, Any] = {}
         if self.provenance.validation:
             v = self.provenance.validation
             trust["validation_score"] = v.l2_score
             trust["validation_passed"] = v.l2_passed
             trust["validation_details"] = v.l2_details or {}
+            trust["trust_score"] = v.trust_score
             trust["is_forged"] = v.is_forged
             trust["forgery_reasons"] = v.forgery_reasons
+            if v.image_quality:
+                trust["image_quality"] = v.image_quality
 
-        # diagnostics
         diagnostics: Dict[str, Any] = {
             "parser": self.timing.parser_name or "DocMirror",
             "elapsed_ms": round(self.timing.elapsed_ms, 1),
+            "powered_by": "DocMirror — The Open Source Universal Document Parser. https://github.com/valuemapglobal/docmirror",
             "page_count": self.content.page_count,
             "block_count": len(self.content.blocks),
-            "table_count": sum(1 for b in self.content.blocks if b.type == ContentBlockType.TABLE),
+            "table_count": sum(
+                1 for b in self.content.blocks
+                if b.type == ContentBlockType.TABLE
+            ),
         }
         if self.provenance.diagnostics:
             d = self.provenance.diagnostics
@@ -347,17 +367,10 @@ class PerceptionResult(BaseModel):
             "status": self.status.value,
             "error": self.error.message if self.error else "",
             "identity": identity,
-            "scene": enhanced.scene if enhanced else "unknown",
+            "scene": self.scene,
             "blocks": self.document_structure,
             "trust": trust,
             "diagnostics": diagnostics,
-            "output_file": output_file,
         }
 
-        # 增强Information (仅 PDF Path附带)
-        if enhanced is not None:
-            result["pre_analysis"] = meta.get("pre_analysis", {})
-            result["mutations"] = enhanced.mutation_count
-
         return result
-

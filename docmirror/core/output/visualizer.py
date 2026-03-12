@@ -20,6 +20,7 @@ Color coding:
     - formula:   cyan (#06B6D4)
 """
 
+
 from __future__ import annotations
 
 import logging
@@ -33,13 +34,13 @@ logger = logging.getLogger(__name__)
 
 # Color mapping: block_type → (R, G, B) in 0-1 range
 _COLOR_MAP = {
-    "table":     (0.231, 0.510, 0.965),   # 蓝
-    "title":     (0.937, 0.267, 0.267),   # 红
-    "text":      (0.133, 0.773, 0.369),   # 绿
-    "key_value": (0.976, 0.451, 0.086),   # 橙
-    "footer":    (0.612, 0.639, 0.686),   # 灰
-    "image":     (0.659, 0.333, 0.969),   # 紫
-    "formula":   (0.024, 0.714, 0.831),   # 青
+    "table":     (0.231, 0.510, 0.965),   # blue
+    "title":     (0.937, 0.267, 0.267),   # red
+    "text":      (0.133, 0.773, 0.369),   # green
+    "key_value": (0.976, 0.451, 0.086),   # orange
+    "footer":    (0.612, 0.639, 0.686),   # gray
+    "image":     (0.659, 0.333, 0.969),   # purple
+    "formula":   (0.024, 0.714, 0.831),   # cyan
 }
 
 
@@ -100,7 +101,8 @@ def render_debug_pdf(
                     fontsize=7,
                     color=color,
                 )
-            except Exception:
+            except Exception as exc:
+                logger.debug(f"operation: suppressed {exc}")
                 pass  # Some pages may not support text insertion
 
     # Save debug PDF

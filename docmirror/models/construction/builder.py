@@ -1,74 +1,90 @@
 """
-PerceptionResultBuilder — 统一Builder
-======================================
+PerceptionResultBuilder \u2014 Unified Construction Engine
+=====================================================
 
-取代原有的双重Convert链:
-    EnhancedResult.to_parser_output() → ParserOutput.to_perception_result()
+Supersedes the legacy dual conversion chain:
+    EnhancedResult.to_parser_output() → PerceptionResult
 
-改为单步构建:
-    PerceptionResultBuilder.build(base_result, enhanced=...) → PerceptionResult
+Single-step construction:
+    PerceptionResultBuilder.build(base, enhanced) → PerceptionResult
 """
-
 from __future__ import annotations
+
 
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
-from ..entities.perception_result import (
-    ContentBlock,
-    ContentBlockType,
-    Diagnostics,
-    DocumentContent,
-    ErrorDetail,
-    KeyValueBlock,
-    PerceptionResult,
-    Provenance,
-    ParserStep,
-    ResultStatus,
-    SourceInfo,
-    TableBlock,
-    TextBlock,
-    TimingInfo,
-    ValidationResult,
-)
+from ..entities.perception_result import ContentBlock, ContentBlockType, DocumentContent, ErrorDetail, KeyValueBlock, PerceptionResult, Provenance, ParserStep, ResultStatus, SourceInfo, TableBlock, TextBlock, TimingInfo, ValidationResult
 
 logger = logging.getLogger(__name__)
 
 
 def _map_block(block) -> ContentBlock:
-    """将 domain.Block → schemas.ContentBlock (单步Map)。"""
+    """Convert a domain.Block to a ContentBlock for PerceptionResult."""
     btype = block.block_type
     page = block.page
 
     if btype == "table":
         raw = block.raw_content
         if isinstance(raw, list) and raw:
+            # Guard: if raw is a flat list of strings (e.g. ['客户', '人数上限']),
+            # wrap it into a single-row 2D list so TableBlock validation succeeds.
+            if raw and not isinstance(raw[0], (list, tuple)):
+                raw = [raw]
             headers = raw[0] if raw else []
             rows = raw[1:] if len(raw) > 1 else []
         else:
             headers, rows = [], []
 
         bbox_raw = getattr(block, "bbox", None)
-        bbox = tuple(bbox_raw) if bbox_raw and len(bbox_raw) == 4 and any(bbox_raw) else None
+        has_bbox = bbox_raw and len(bbox_raw) == 4 and any(bbox_raw)
+        bbox = tuple(bbox_raw) if has_bbox else None
 
         return ContentBlock(
             type=ContentBlockType.TABLE,
             page=page,
-            table=TableBlock(headers=headers, rows=rows, page=page, bbox=bbox),
+            table=TableBlock(
+                headers=headers, rows=rows, page=page, bbox=bbox
+            ),
         )
 
     elif btype == "key_value":
-        pairs = block.raw_content if isinstance(block.raw_content, dict) else {}
+        pairs = {}
+        if isinstance(block.raw_content, dict):
+            pairs = block.raw_content
         return ContentBlock(
             type=ContentBlockType.KEY_VALUE,
             page=page,
             key_value=KeyValueBlock(pairs=pairs),
         )
 
+    elif btype == "title":
+        # Title blocks → HEADING type with hierarchy level
+        content = ""
+        if isinstance(block.raw_content, str):
+            content = block.raw_content
+        level = getattr(block, "heading_level", 1) or 1
+        return ContentBlock(
+            type=ContentBlockType.HEADING,
+            page=page,
+            text=TextBlock(content=content, level=level),
+        )
+
+    elif btype == "image":
+        # Image blocks → IMAGE type with caption as content
+        caption = getattr(block, "caption", "") or ""
+        return ContentBlock(
+            type=ContentBlockType.IMAGE,
+            page=page,
+            text=TextBlock(content=caption, level=0),
+        )
+
     else:
-        # text / title / footer → TextBlock
-        content = block.raw_content if isinstance(block.raw_content, str) else ""
+        # text / footer / formula → TextBlock
+        content = ""
+        if isinstance(block.raw_content, str):
+            content = block.raw_content
         level = getattr(block, "heading_level", 0) or 0
         return ContentBlock(
             type=ContentBlockType.TEXT,
@@ -77,36 +93,24 @@ def _map_block(block) -> ContentBlock:
         )
 
 
-def _overlay_standardized_tables(
-    blocks: List[ContentBlock],
-    std_tables: List[Dict[str, Any]],
-) -> None:
-    """
-    将MiddlewareStandard化后的Tableoverride到 ContentBlock 中。
 
-    策略: 用最大Standard化Tablereplace第一个Table块。
-    """
-    if not std_tables or not blocks:
-        return
 
-    main = max(std_tables, key=lambda t: t.get("row_count", 0))
-    for b in blocks:
-        if b.type == ContentBlockType.TABLE and b.table is not None:
-            b.table.headers = main.get("headers", [])
-            b.table.rows = main.get("rows", [])
-            break
 
 
 class PerceptionResultBuilder:
     """
-    统一Build PerceptionResult — 从 BaseResult (+ Optional EnhancedResult) 一步生成。
+    Unified constructor for PerceptionResult objects.
+
+    Builds from BaseResult (+ optional EnhancedResult) in a single step.
 
     Usage::
 
-        # 简单Path (非PDF)
-        result = PerceptionResultBuilder.build(base_result, file_path="a.xlsx", file_type="excel")
+        # Direct simple path (Non-PDF workflows)
+        result = PerceptionResultBuilder.build(
+            base_result, file_path="a.xlsx", file_type="excel"
+        )
 
-        # PDF 增强Path
+        # PDF Enhanced processing workflow
         result = PerceptionResultBuilder.build(
             base_result, enhanced=enhanced_result,
             file_path="a.pdf", file_type="pdf",
@@ -130,23 +134,34 @@ class PerceptionResultBuilder:
         forgery_reasons: Optional[List[str]] = None,
     ) -> PerceptionResult:
         """
-        一步Build PerceptionResult。
+        Rapid one-step compilation.
 
         Args:
-            base_result: CoreExtractor 的 BaseResult Output。
-            enhanced:    Optional的 EnhancedResult (PDF Path)。
-            其余Parameters:     FileContextInformation，由 dispatcher 传入。
+            base_result: CoreExtractor's initial BaseResult output.
+            enhanced:    Optional EnhancedResult with middleware enrichments.
+            Other Params: Context payloads originating from the dispatcher.
         """
         meta = base_result.metadata if base_result else {}
 
-        # ══════════════════════════════════════════════════════════════
-        # 1. Envelope 信封 layer
-        # ══════════════════════════════════════════════════════════════
+        # \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+        # 1. Envelope Layer
+        # \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
         if enhanced is not None:
-            status_map = {"success": ResultStatus.SUCCESS, "partial": ResultStatus.PARTIAL, "failed": ResultStatus.FAILURE}
-            result_status = status_map.get(enhanced.status, ResultStatus.FAILURE)
-            confidence = 1.0 if enhanced.status == "success" else (0.5 if enhanced.status == "partial" else 0.0)
-            error_detail = ErrorDetail(message="; ".join(enhanced.errors)) if enhanced.errors else None
+            status_map = {
+                "success": ResultStatus.SUCCESS,
+                "partial": ResultStatus.PARTIAL,
+                "failed": ResultStatus.FAILURE
+            }
+            result_status = status_map.get(
+                enhanced.status, ResultStatus.FAILURE
+            )
+            confidence = (
+                1.0 if enhanced.status == "success"
+                else (0.5 if enhanced.status == "partial" else 0.0)
+            )
+            error_detail = None
+            if enhanced.errors:
+                error_detail = ErrorDetail(message="; ".join(enhanced.errors))
             p_name = parser_name or "DocMirror"
             p_elapsed = elapsed_ms or enhanced.processing_time
         else:
@@ -156,46 +171,52 @@ class PerceptionResultBuilder:
             p_name = parser_name
             p_elapsed = elapsed_ms
 
-        timing = TimingInfo(started_at=started_at, parser_name=p_name, elapsed_ms=p_elapsed)
+        timing = TimingInfo(
+            started_at=started_at, parser_name=p_name, elapsed_ms=p_elapsed
+        )
 
-        # ══════════════════════════════════════════════════════════════
-        # 2. Content 内容 layer
-        # ══════════════════════════════════════════════════════════════
-        content_blocks = [_map_block(b) for b in base_result.all_blocks] if base_result else []
+        # \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+        # 2. Content Layer
+        # \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+        content_blocks = []
+        if base_result:
+            content_blocks = [_map_block(b) for b in base_result.all_blocks]
 
-        # 如果有 EnhancedResult 的Standard化Table, override原始Table
-        if enhanced is not None:
-            std_tables = enhanced.standardized_tables
-            if std_tables:
-                _overlay_standardized_tables(content_blocks, std_tables)
-
-        # entities: Merge base KV blocks + enhanced Extract
+        # Merge base optionally
         entities = {}
         if base_result:
             entities.update(base_result.entities)
         if enhanced is not None:
-            entities.update(meta.get("extracted_entities", {}))
+            entities.update(enhanced.enhanced_data.get("extracted_entities", {}))
+
+        txt_fmt = "plain"
+        if base_result and base_result.full_text.startswith("|"):
+            txt_fmt = "markdown"
+
+        final_text = base_result.full_text if base_result else ""
 
         content = DocumentContent(
-            text=base_result.full_text if base_result else "",
-            text_format="markdown" if (base_result and base_result.full_text.startswith("|")) else "plain",
+            text=final_text,
+            text_format=txt_fmt,
             blocks=content_blocks,
             entities={k: str(v) for k, v in entities.items()},
             page_count=base_result.page_count if base_result else 0,
         )
 
-        # ══════════════════════════════════════════════════════════════
-        # 3. Provenance 溯源 layer
-        # ══════════════════════════════════════════════════════════════
-        # PDF Property
-        pdf_props = {}
-        target_keys = ("format", "producer", "creator", "creationDate", "modDate",
-                       "title", "author", "subject", "keywords", "trapped", "encryption")
+        # \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+        # 3. Provenance Layer
+        # \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+        # Document properties
+        document_properties = {}
+        target_keys = (
+            "format", "producer", "creator", "creationDate", "modDate",
+            "title", "author", "subject", "keywords", "trapped", "encryption"
+        )
         for k in target_keys:
             if k in meta:
-                pdf_props[k] = str(meta[k]) if meta[k] is not None else ""
+                document_properties[k] = str(meta[k]) if meta[k] is not None else ""
 
-        # Validation result (主要针对 PDF Pipeline)
+        # Validation results
         validation = None
         if enhanced is not None:
             vr = enhanced.validation_result
@@ -204,18 +225,22 @@ class PerceptionResultBuilder:
                     l2_score=vr.get("total_score"),
                     l2_passed=vr.get("passed"),
                     l2_details=vr.get("details"),
+                    image_quality=vr.get("image_quality"),
                 )
-            # L1 FixInformation
-            if any(k in meta for k in ("l1_anomaly_count", "l1_repaired_count")):
+            # L1 anomaly metrics
+            if any(k in meta for k in (
+                    "l1_anomaly_count", "l1_repaired_count")):
                 if validation is None:
                     validation = ValidationResult()
                 validation.l1_anomaly_count = meta.get("l1_anomaly_count", 0)
                 validation.l1_repaired_count = meta.get("l1_repaired_count", 0)
                 validation.l1_reverted_count = meta.get("l1_reverted_count", 0)
                 validation.l1_llm_used = meta.get("l1_llm_used", False)
-                validation.balance_truncation_repaired = meta.get("balance_truncation_repaired", 0)
+                validation.balance_truncation_repaired = meta.get(
+                    "balance_truncation_repaired", 0
+                )
 
-        # 防伪Information
+        # Forgery detection
         if is_forged is not None:
             if validation is None:
                 validation = ValidationResult()
@@ -223,25 +248,14 @@ class PerceptionResultBuilder:
             validation.forgery_reasons = forgery_reasons or []
 
         # Diagnostics
-        diagnostics = None
-        diag_data = meta.get("_diagnostics", {})
-        if diag_data:
-            diagnostics = Diagnostics(
-                extraction_method=diag_data.get("extraction_method", ""),
-                template_id=diag_data.get("template_id", ""),
-                template_source=diag_data.get("template_source", ""),
-                pages_processed=diag_data.get("pages_processed", 0),
-                raw_rows_extracted=diag_data.get("raw_rows_extracted", 0),
-                rows_after_cleaning=diag_data.get("rows_after_cleaning", 0),
-                rows_final=diag_data.get("rows_final", 0),
-                step_timing_ms=diag_data.get("step_timing_ms", {}),
-                detected_columns=diag_data.get("detected_columns", []),
-                missing_columns=diag_data.get("missing_columns", []),
-                supplemented_columns=diag_data.get("supplemented_columns", []),
-                failed_rows_sample=diag_data.get("failed_rows_sample", []),
-                duplicate_rows_detected=diag_data.get("duplicate_rows_detected", 0),
-                llm_usage=diag_data.get("llm_usage"),
-            )
+        from ._shared import build_diagnostics
+        diagnostics = build_diagnostics(meta)
+
+        p_chain = []
+        if p_name:
+            p_chain = [
+                ParserStep(parser=p_name, action="parse", elapsed_ms=p_elapsed)
+            ]
 
         provenance = Provenance(
             source=SourceInfo(
@@ -251,35 +265,47 @@ class PerceptionResultBuilder:
                 mime_type=mime_type or None,
                 checksum=checksum or None,
             ),
-            parser_chain=[ParserStep(parser=p_name, action="parse", elapsed_ms=p_elapsed)] if p_name else [],
+            parser_chain=p_chain,
             validation=validation,
             diagnostics=diagnostics,
-            pdf_properties=pdf_props,
+            document_properties=document_properties,
         )
 
-        # ══════════════════════════════════════════════════════════════
-        # 4. Domain 领域 layer
-        # ══════════════════════════════════════════════════════════════
+        # \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+        # 4. Domain Mapping
+        # \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
         domain = None
         if enhanced is not None:
             cat = enhanced.scene
             if cat == "bank_statement":
                 try:
-                    from ..entities.domain_models import BankStatementData, DomainData
-                    bs = BankStatementData(
-                        account_holder=str(entities.get("Account name", entities.get("Account name", ""))),
-                        account_number=str(entities.get("Account number", entities.get("Card number", ""))),
-                        bank_name=str(entities.get("bank_name", "")),
-                        query_period=str(entities.get("Query period", "")),
-                        currency=str(entities.get("Currency", "CNY")) or "CNY",
+                    from ..entities.domain_models import (
+                        BankStatementData, DomainData
                     )
-                    domain = DomainData(document_type="bank_statement", bank_statement=bs)
+                    from ...configs.domain_registry import normalize_entity_keys
+                    norm_ent = normalize_entity_keys(entities)
+                    acc_h = norm_ent.get(
+                        "Account name", norm_ent.get("Account name", "")
+                    )
+                    acc_n = norm_ent.get(
+                        "Account number", norm_ent.get("Card number", "")
+                    )
+                    bs = BankStatementData(
+                        account_holder=str(acc_h),
+                        account_number=str(acc_n),
+                        bank_name=str(norm_ent.get("bank_name", "")),
+                        query_period=str(norm_ent.get("Query period", "")),
+                        currency=str(norm_ent.get("Currency", "CNY")) or "CNY",
+                    )
+                    domain = DomainData(
+                        document_type="bank_statement", bank_statement=bs
+                    )
                 except ImportError:
                     pass
 
-        # ══════════════════════════════════════════════════════════════
-        # 5. 组装 PerceptionResult
-        # ══════════════════════════════════════════════════════════════
+        # \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+        # 5. Assemble Final Payload
+        # \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
         pr = PerceptionResult(
             status=result_status,
             confidence=confidence,
@@ -287,10 +313,11 @@ class PerceptionResultBuilder:
             error=error_detail,
             content=content,
             domain=domain,
+            scene=enhanced.scene if enhanced else "unknown",
             provenance=provenance,
         )
 
-        # 附带 EnhancedResult 引用 (Private, Serialization时排除)
+        # Attach enhanced result for backward-compatible access
         if enhanced is not None:
             pr._enhanced = enhanced
 

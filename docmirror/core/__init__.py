@@ -10,11 +10,10 @@ __all__ = ["CoreExtractor", "FitzEngine", "PDFPlumberEngine", "OCREngine",
 # ── Backward-compatible shims ──────────────────────────────────────────
 # Many callers still use flat paths like ``core.extractor``, ``core.text_utils``,
 # etc.  Register the canonical subdirectory modules under the old names so
-# that  ``from docmirror.core.extractor import ...``  keeps
-# working without touching every call-site.
-import importlib as _il, sys as _sys
+# that  ``from docmirror.core.extractor import ...``  keeps working.
+from docmirror._compat import register_shims as _register_shims
 
-_SHIM_MAP = {
+_register_shims({
     # extraction/
     f"{__name__}.extractor":       f"{__name__}.extraction.extractor",
     f"{__name__}.foundation":      f"{__name__}.extraction.foundation",
@@ -36,10 +35,5 @@ _SHIM_MAP = {
     # output/
     f"{__name__}.markdown_exporter": f"{__name__}.output.markdown_exporter",
     f"{__name__}.visualizer":      f"{__name__}.output.visualizer",
-}
-for _old, _new in _SHIM_MAP.items():
-    if _old not in _sys.modules:
-        try:
-            _sys.modules[_old] = _il.import_module(_new)
-        except ImportError:
-            pass  # optional dependencies (e.g. layout_model) may not be available
+})
+

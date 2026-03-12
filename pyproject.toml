@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "docmirror"
-version = "0.1.0"
+version = "0.2.0"
 description = "Universal document parsing engine with OCR, layout analysis, and table extraction"
 requires-python = ">=3.10"
 license = {text = "Apache-2.0"}
@@ -35,11 +35,15 @@ dependencies = [
     "pydantic>=2.0",
     "filetype>=1.2",
     "PyYAML>=6.0",
+    "rich>=13.0.0",
 ]
+
+[project.scripts]
+docmirror = "docmirror.__main__:main"
 
 [project.urls]
 Homepage = "https://github.com/valuemapglobal/docmirror"
-Documentation = "https://docmirror.readthedocs.io"
+Documentation = "https://valuemapglobal.github.io/docmirror"
 Repository = "https://github.com/valuemapglobal/docmirror"
 Issues = "https://github.com/valuemapglobal/docmirror/issues"
 Changelog = "https://github.com/valuemapglobal/docmirror/blob/main/CHANGELOG.md"
@@ -51,12 +55,12 @@ layout = ["rapid-layout>=0.1"]
 table = ["rapid-table>=0.2"]
 formula = ["rapid-latex-ocr>=0.0.6"]
 office = ["python-docx>=1.0", "openpyxl>=3.1", "python-pptx>=0.6"]
-vlm = ["httpx>=0.25"]
 security = ["pikepdf>=8.0"]
 cache = ["redis>=5.0"]
 langdetect = ["fast-langdetect>=0.2"]
+server = ["fastapi>=0.100", "uvicorn>=0.23.0", "python-multipart>=0.0.9"]
 all = [
-    "docmirror[pdf,ocr,layout,table,formula,office,vlm,security,cache,langdetect]",
+    "docmirror[pdf,ocr,layout,table,formula,office,security,cache,langdetect,server]",
 ]
 dev = [
     "pytest>=8.0",
@@ -64,6 +68,7 @@ dev = [
     "ruff>=0.3",
     "mypy>=1.8",
     "coverage>=7.4",
+    "pre-commit>=3.5",
 ]
 docs = [
     "mkdocs-material>=9.5",
@@ -87,3 +92,21 @@ python_version = "3.10"
 warn_return_any = true
 warn_unused_configs = true
 ignore_missing_imports = true
+
+[tool.coverage.run]
+source = ["docmirror"]
+omit = [
+    "tests/*",
+    "**/__init__.py",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "pass",
+    "raise ImportError",
+]

@@ -1,51 +1,104 @@
 """
-MultiModal Exception体系 (Exception Hierarchy)
+DocMirror Exception Hierarchy
 ======================================
 
-统一的Type化Exception layer级，替代裸 Exception。
+Unified typed exception hierarchy, replacing bare Exceptions.
 
-层级结构::
+Hierarchy::
 
     MultiModalError (base)
-    ├── ExtractionError      — CoreExtractor / 物理Extraction failed
-    ├── LayoutAnalysisError   — 版面Analyze / Zone PartitionedFailed
-    ├── MiddlewareError       — MiddlewareProcessingFailed (携带 middleware_name)
-    └── ValidationError       — DataVerify不via
+    ├── InputValidationError   — Constructor Theory guards (impossible transformations)
+    │   ├── FileTooSmallError
+    │   ├── FileTooLargeError
+    │   ├── ResolutionTooLowError
+    │   └── UnsupportedFormatError
+    ├── ExtractionError        — CoreExtractor / Physical extraction failed
+    │   ├── OCREngineError     — OCR engine failed or unavailable
+    │   └── TableExtractionError — Table detection/reconstruction failed
+    ├── LayoutAnalysisError    — Layout analysis / Zone partitioning failed
+    ├── MiddlewareError        — Middleware processing failed (carries middleware_name)
+    ├── ValidationError        — Data validation failed
+    └── SerializationError     — Result serialization failed
 
-using指南:
-    - 可resumeError: 在 try/except 中捕获并 add_error(), 不终止Pipeline
-    - 不可resumeError: 抛出，由上 layer Pipeline 的 fail_strategy 决定Processing方式
+Design Principle (Deutsch):
+    Each exception type represents a *specific* failure mode that cannot
+    be substituted for another — making error handling 'hard to vary'.
+
+Usage Guide:
+    - Resumable Error: Caught in try/except and add_error(), does not terminate Pipeline
+    - Non-resumable Error: Thrown, processing method determined by the fail_strategy
 """
-
 from __future__ import annotations
 
 
+
 class MultiModalError(Exception):
-    """MultiModal ExceptionBase class。"""
+    """MultiModal Exception Base class."""
 
     def __init__(self, message: str = "", *, detail: str = ""):
         self.detail = detail
         super().__init__(message)
 
 
-class ExtractionError(MultiModalError):
-    """CoreExtractor 物理Extract过程中的Error。
+# ── Layer 0: Input Validation (Constructor Theory Guards) ──
 
-    示例: PDF 打开Failed, pdfplumber ParseFailed, Page超上限等。
+class InputValidationError(MultiModalError):
+    """File is outside the system's capability boundary."""
+    pass
+
+
+class FileTooSmallError(InputValidationError):
+    """Document is below minimum parseable size."""
+    pass
+
+
+class FileTooLargeError(InputValidationError):
+    """Document exceeds maximum allowed size."""
+    pass
+
+
+class ResolutionTooLowError(InputValidationError):
+    """Image resolution is below OCR minimum."""
+    pass
+
+
+class UnsupportedFormatError(InputValidationError):
+    """File format is not supported by any registered adapter."""
+    pass
+
+
+# ── Layer 1: Extraction ──
+
+class ExtractionError(MultiModalError):
+    """Error during CoreExtractor physical extraction.
+
+    Examples: PDF open failed, pdfplumber parse failed, page limit exceeded, etc.
     """
     pass
 
 
-class LayoutAnalysisError(MultiModalError):
-    """版面Analyze / Zone Partitioned / TableExtract layer的Error。"""
+class OCREngineError(ExtractionError):
+    """OCR engine failed or is unavailable."""
     pass
 
 
+class TableExtractionError(ExtractionError):
+    """Table detection or reconstruction failed."""
+    pass
+
+
+class LayoutAnalysisError(MultiModalError):
+    """Error in Layout Analysis / Zone Partitioning / Table Extraction layer."""
+    pass
+
+
+# ── Layer 2: Enhancement / Middleware ──
+
 class MiddlewareError(MultiModalError):
-    """MiddlewareProcessing过程中的Error。
+    """Error during Middleware processing.
 
     Attributes:
-        middleware_name: 出错的MiddlewareName。
+        middleware_name: The name of the Middleware that failed.
     """
 
     def __init__(self, message: str = "", *, middleware_name: str = "", detail: str = ""):
@@ -58,8 +111,15 @@ class MiddlewareError(MultiModalError):
 
 
 class ValidationError(MultiModalError):
-    """DataVerify不via。
+    """Data validation failed.
 
-    示例: TableInconsistent column count, Dateoverride率过低, Confidence低于Threshold等。
+    Examples: Inconsistent table column count, low date coverage rate.
     """
+    pass
+
+
+# ── Layer 3: Serialization ──
+
+class SerializationError(MultiModalError):
+    """Failed to serialize or deserialize a result."""
     pass

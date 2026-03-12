@@ -12,8 +12,7 @@ Structure:
 Enhancement modes:
     - ``raw``:      No middlewares — returns the raw extraction result.
     - ``standard``: Default production pipeline with scene detection,
-                    entity extraction, column mapping, and validation.
-    - ``full``:     Standard + repair middleware (LLM-powered row fixing).
+                    entity extraction, institution detection, and validation.
 
 The wildcard entry ``"*"`` serves as a fallback for unregistered formats.
 If the requested enhance_mode is not found within a format's config,
@@ -31,8 +30,9 @@ Usage::
 
     middlewares = get_pipeline_config("pdf", "full")
     # ['SceneDetector', 'EntityExtractor', 'InstitutionDetector',
-    #  'ColumnMapper', 'Validator', 'Repairer']
+    #  'Validator']
 """
+from __future__ import annotations
 
 from typing import Dict, List
 
@@ -45,16 +45,13 @@ FORMAT_PIPELINES: Dict[str, Dict[str, List[str]]] = {
             "SceneDetector",
             "EntityExtractor",
             "InstitutionDetector",
-            "ColumnMapper",
             "Validator",
         ],
         "full": [
             "SceneDetector",
             "EntityExtractor",
             "InstitutionDetector",
-            "ColumnMapper",
             "Validator",
-            "Repairer",
         ],
     },
     "image": {

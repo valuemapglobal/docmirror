@@ -17,30 +17,31 @@ Converts PDF files into structured output via two paths:
 The orchestrator singleton is lazily initialized on first use to avoid
 import-time overhead from heavy dependencies (PyMuPDF, pdfplumber).
 """
-
 from __future__ import annotations
 
+
 import logging
+import threading
 from pathlib import Path
-from typing import Optional
 
 from docmirror.framework.base import BaseParser, ParserOutput
 from docmirror.models.domain import BaseResult
 
 logger = logging.getLogger(__name__)
 
-# Module-level orchestrator singleton. Lazily created on first call to
-# _get_shared_orchestrator() so that importing this module does not
-# trigger heavy dependency loading (PyMuPDF, layout models, etc.).
+# Module-level orchestrator singleton with thread-safe lazy initialization.
 _orchestrator = None
+_orchestrator_lock = threading.Lock()
 
 
 def _get_shared_orchestrator():
     """Return (and lazily create) the shared Orchestrator singleton."""
     global _orchestrator
     if _orchestrator is None:
-        from docmirror.framework.orchestrator import Orchestrator
-        _orchestrator = Orchestrator()
+        with _orchestrator_lock:
+            if _orchestrator is None:  # double-check
+                from docmirror.framework.orchestrator import Orchestrator
+                _orchestrator = Orchestrator()
     return _orchestrator
 
 

@@ -6,14 +6,13 @@ Provides bank-statement-specific processing:
 - Scene detection keywords
 - Identity field definitions (account holder, account number, etc.)
 - Domain data construction (BankStatementData)
-- Standard column definitions for transaction tables
 """
-
 from __future__ import annotations
+
 
 from typing import Any, Dict, Optional, Sequence, Tuple
 
-from docmirror.plugins import ColumnHint, DomainPlugin
+from docmirror.plugins import DomainPlugin
 
 
 class BankStatementPlugin(DomainPlugin):
@@ -44,28 +43,19 @@ class BankStatementPlugin(DomainPlugin):
     @property
     def identity_fields(self) -> Sequence[Tuple[str, Sequence[str]]]:
         return (
-            ("account_holder", ("Account holder", "Account name", "Card holder", "Customer name")),
-            ("account_number", ("Account number", "Card number", "Customer account number")),
+            ("account_holder", (
+                "Account holder", "Account name",
+                "Card holder", "Customer name"
+            )),
+            ("account_number", (
+                "Account number", "Card number", "Customer account number"
+            )),
             ("bank_name", ("Bank name", "Bank branch", "bank_name")),
             ("query_period", ("Query period", "From/to date", "Period")),
             ("currency", ("Currency",)),
             ("print_date", ("Print date",)),
         )
 
-    @property
-    def standard_columns(self) -> Sequence[ColumnHint]:
-        return (
-            ColumnHint("transaction_date", ("Date", "Trans Date", "Transaction date"), required=True),
-            ColumnHint("description", ("Description", "Summary", "Particulars", "Memo"), required=True),
-            ColumnHint("debit", ("Debit", "Withdrawal", "Debit amount")),
-            ColumnHint("credit", ("Credit", "Deposit", "Credit amount")),
-            ColumnHint("balance", ("Balance", "Running Balance", "Closing Balance")),
-            ColumnHint("amount", ("Amount", "Transaction amount")),
-            ColumnHint("currency", ("Currency", "Ccy")),
-            ColumnHint("reference", ("Reference", "Ref No", "Txn Ref")),
-            ColumnHint("counterparty", ("Counterparty", "Payee", "Beneficiary")),
-            ColumnHint("channel", ("Channel", "Transaction Channel")),
-        )
 
     def build_domain_data(
         self,
@@ -79,17 +69,26 @@ class BankStatementPlugin(DomainPlugin):
         )
 
         bs = BankStatementData(
-            account_holder=str(metadata.get("Account holder", entities.get("account_holder", ""))),
-            account_number=str(metadata.get("Account number", entities.get("account_number", ""))),
+            account_holder=str(metadata.get(
+                "Account holder", entities.get("account_holder", "")
+            )),
+            account_number=str(metadata.get(
+                "Account number", entities.get("account_number", "")
+            )),
             bank_name=str(entities.get("bank_name", "")),
-            query_period=str(metadata.get("Query period", entities.get("query_period", ""))),
-            currency=str(metadata.get("Currency", entities.get("currency", "CNY"))) or "CNY",
+            query_period=str(metadata.get(
+                "Query period", entities.get("query_period", "")
+            )),
+            currency=(
+                str(metadata.get(
+                    "Currency", entities.get("currency", "CNY")
+                )) or "CNY"
+            ),
         )
         return DomainData(document_type="bank_statement", bank_statement=bs)
 
     def get_middleware_config(self) -> Dict[str, Any]:
         return {
-            "column_mapper_enabled": True,
             "institution_detector_enabled": True,
             "amount_splitter_enabled": True,
         }

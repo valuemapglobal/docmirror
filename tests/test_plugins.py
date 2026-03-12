@@ -3,7 +3,7 @@ Plugin system tests — verify plugin interface, registry, and built-in plugins.
 """
 
 import pytest
-from docmirror.plugins import DomainPlugin, PluginRegistry, ColumnHint, registry
+from docmirror.plugins import DomainPlugin, PluginRegistry, registry
 from docmirror.plugins.bank_statement import BankStatementPlugin
 
 
@@ -31,13 +31,6 @@ class TestPluginInterface:
         assert "account_holder" in names
         assert "account_number" in names
 
-    def test_bank_statement_standard_columns(self):
-        """Plugin should define standard columns."""
-        plugin = BankStatementPlugin()
-        cols = plugin.standard_columns
-        assert any(c.standard_name == "transaction_date" for c in cols)
-        assert any(c.standard_name == "balance" for c in cols)
-        assert any(c.required for c in cols)
 
     def test_bank_statement_build_domain_data(self):
         """Plugin should build domain data from metadata and entities."""

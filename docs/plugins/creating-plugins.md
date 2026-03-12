@@ -5,7 +5,7 @@
 Create a new file in `docmirror/plugins/` (for built-in) or your own package:
 
 ```python
-from docmirror.plugins import DomainPlugin, ColumnHint
+from docmirror.plugins import DomainPlugin
 
 class InvoicePlugin(DomainPlugin):
     @property
@@ -30,22 +30,10 @@ class InvoicePlugin(DomainPlugin):
             ("invoice_date", ("Date", "Invoice Date")),
         )
 
-    @property
-    def standard_columns(self):
-        return (
-            ColumnHint("item", ("Item", "Description"), required=True),
-            ColumnHint("quantity", ("Qty", "Quantity")),
-            ColumnHint("unit_price", ("Unit Price", "Price")),
-            ColumnHint("amount", ("Amount", "Total"), required=True),
-        )
-
     def build_domain_data(self, metadata, entities):
+        from docmirror.models.entities.domain_models import DomainData
         # Return your domain-specific data model
-        return {
-            "document_type": "invoice",
-            "invoice_number": entities.get("invoice_number", ""),
-            "total_amount": entities.get("total_amount", ""),
-        }
+        return DomainData(document_type="invoice")
 
 # Required: module-level instance for auto-discovery
 plugin = InvoicePlugin()

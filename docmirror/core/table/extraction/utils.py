@@ -1,45 +1,29 @@
-"""Auto-split from table_extraction.py"""
-
+"""Shared utility functions split from table_extraction.py."""
 from __future__ import annotations
 
-import concurrent.futures
-import contextvars
-import logging
-import math
-import re
-import time
-from collections import Counter, defaultdict
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
 
-from ...utils.text_utils import _is_cjk_char, _smart_join, normalize_table
-from ...utils.vocabulary import (
-    KNOWN_HEADER_WORDS,
-    PIPE_CHARS,
-    HLINE_CHARS,
-    _ALL_BORDER_CHARS,
-    _is_header_row,
-    _normalize_for_vocab,
-    _score_header_by_vocabulary,
-    _RE_IS_DATE,
-    _RE_IS_AMOUNT,
-)
+import logging
+from typing import Dict, List, Tuple
+
+from ...utils.text_utils import _is_cjk_char, _smart_join
+from ...utils.vocabulary import _ALL_BORDER_CHARS, _is_header_row, _normalize_for_vocab, _score_header_by_vocabulary, _RE_IS_DATE, _RE_IS_AMOUNT
 
 logger = logging.getLogger(__name__)
 
 
 
-# ── SharedUtility functions ──
+# ── Shared utility functions ──
 
 def _adaptive_row_tolerance(chars: List[Dict]) -> float:
-    """F-1: Calculate行分组的自适应 y 容差。
+    """F-1: Calculate adaptive y-tolerance for row grouping.
 
-    based on字符中位Height动态Calculate，prevent:
-      - 小Font size PDF 的 3pt 固定容差导致多Line merging
-      - 大Font size PDF 的 3pt 容差导致同行字符被Split
+    Based on the median character height, dynamically adjusts the tolerance
+    to prevent:
+      - Small font-size PDFs: fixed 3 pt tolerance merging multiple lines.
+      - Large font-size PDFs: 3 pt tolerance splitting same-row characters.
 
     Returns:
-        自适应容差值 (typically 1.5 ~ 5.0pt)
+        Adaptive tolerance value (typically 1.5–5.0 pt).
     """
     if not chars or len(chars) < 5:
         return 3.0
@@ -51,7 +35,7 @@ def _adaptive_row_tolerance(chars: List[Dict]) -> float:
 
     heights.sort()
     median_h = heights[len(heights) // 2]
-    # 容差 = 中位字符Height × 0.6, 限制在 [1.5, 5.0] 范围
+    # Tolerance = median character height × 0.6, clamped to [1.5, 5.0]
     tol = max(1.5, min(5.0, median_h * 0.6))
     return tol
 
@@ -59,14 +43,15 @@ def _adaptive_row_tolerance(chars: List[Dict]) -> float:
 def _group_chars_into_rows(
     chars: List[Dict], y_tolerance: float = 3.0
 ) -> List[Tuple[float, List[Dict]]]:
-    """按 y Coordinates将字符分组到行。
+    """Group characters into rows by y-coordinate proximity.
 
-    F-1 增强: 当 y_tolerance <= 0 时自动using _adaptive_row_tolerance。
+    F-1 enhancement: when ``y_tolerance <= 0``, automatically uses
+    ``_adaptive_row_tolerance``.
     """
     if not chars:
         return []
 
-    # F-1: 自适应容差
+    # F-1: adaptive tolerance
     if y_tolerance <= 0:
         y_tolerance = _adaptive_row_tolerance(chars)
 
@@ -94,10 +79,12 @@ def _group_chars_into_rows(
 def _cluster_x_positions(
     x_coords: List[float], gap_multiplier: float = 2.0, min_col_width: float = 10.0
 ) -> List[Tuple[float, float]]:
-    """x Coordinates聚类: 找列边界。
+    """X-coordinate clustering: find column boundaries.
 
-    Optimize3: using IQR (Tukey Fence) 自适应Threshold替代 median × multiplier,
-    对窄间距列更鲁棒。当 gap 数量不足 (< 4) 时退回原逻辑。
+    Optimisation 3: uses an IQR-inspired adaptive threshold (natural-break)
+    instead of ``median × multiplier``, making it more robust for narrow
+    inter-column gaps.  Falls back to ``median × multiplier`` when there
+    are too few gap samples (< 4).
     """
     if not x_coords:
         return []
@@ -112,13 +99,15 @@ def _cluster_x_positions(
     if not non_zero_gaps:
         return [(sorted_x[0], sorted_x[-1])]
 
-    # ── Optimize3: 自适应Threshold (Natural Break) ──
-    # 列间 gap typically呈双峰分布 (小 gap = 同列字符间距, 大 gap = 列间距)
-    # 找 sorted gaps 中最大的跳变点, 在该点设置Threshold
+    # ── Adaptive threshold (natural break) ──
+    # Column gaps typically follow a bimodal distribution:
+    #   small gaps = intra-column character spacing
+    #   large gaps = inter-column spacing
+    # Find the largest jump in the sorted gaps to set the threshold
     median_gap = non_zero_gaps[len(non_zero_gaps) // 2]
 
     if len(non_zero_gaps) >= 4:
-        # 找Sort后 gaps 中最大的相邻跳变
+        # Find the largest adjacent jump in sorted gaps
         max_jump = 0
         jump_idx = -1
         for j in range(len(non_zero_gaps) - 1):
@@ -128,13 +117,13 @@ def _cluster_x_positions(
                 jump_idx = j
 
         if max_jump > median_gap * 2 and jump_idx >= 0:
-            # 明显的双峰分布: Threshold = 跳变点中位
+            # Clear bimodal distribution: threshold = midpoint of the jump
             threshold = (non_zero_gaps[jump_idx] + non_zero_gaps[jump_idx + 1]) / 2
         else:
-            # 连续分布: 退回 median × multiplier
+            # Continuous distribution: fall back to median × multiplier
             threshold = median_gap * gap_multiplier
     else:
-        # Data点太少, 退回原逻辑
+        # Too few data points: fall back to original logic
         threshold = median_gap * gap_multiplier
 
     col_bounds: List[Tuple[float, float]] = []
@@ -157,25 +146,26 @@ def _cluster_x_positions(
 def _assign_chars_to_columns(
     row_chars: List[Dict], col_bounds: List[Tuple[float, float]]
 ) -> List[str]:
-    """将一行中的字符按列分割线归箱。
+    """Assign a row's characters to column bins using divider midpoints.
 
-    分割线 = 相邻列之间的中点。
-    比固定容差更精确 (不受列宽不均影响),
-    比最近中心更稳定 (不受宽窄列不对称吸引)。
+    Divider lines are placed at the midpoint between adjacent column
+    boundaries.  This is more precise than fixed-tolerance binning
+    (unaffected by uneven column widths) and more stable than nearest-
+    centre (unaffected by wide/narrow column asymmetry).
     """
     if not col_bounds:
         return []
 
     cells = ["" for _ in col_bounds]
 
-    # Calculate相邻列之间的分割线
-    dividers = [col_bounds[0][0] - 10]  # 左边界
+    # Compute divider lines between adjacent columns
+    dividers = [col_bounds[0][0] - 10]  # Left boundary
     for i in range(len(col_bounds) - 1):
         mid = (col_bounds[i][1] + col_bounds[i + 1][0]) / 2
         dividers.append(mid)
-    dividers.append(col_bounds[-1][1] + 10)  # 右边界
+    dividers.append(col_bounds[-1][1] + 10)  # Right boundary
 
-    # 将相邻字符Merge成 word (avoid单词从中间被切断)
+    # Merge adjacent characters into words (prevents word-boundary splitting)
     sorted_chars = sorted(row_chars, key=lambda x: x["x0"])
     words = []
     curr_word = None
@@ -204,7 +194,7 @@ def _assign_chars_to_columns(
 
     for w in words:
         char_x = (w["x0"] + w["x1"]) / 2
-        # 二分查找所属列
+        # Binary search for the containing column
         col_idx = len(col_bounds) - 1
         for i in range(len(dividers) - 1):
             if dividers[i] <= char_x < dividers[i + 1]:
@@ -225,7 +215,7 @@ def _assign_chars_to_columns(
 
 
 def _chars_to_text(chars: List[Dict]) -> str:
-    """将字符ListMerge为文本。"""
+    """Merge a list of character dicts into a single text string."""
     if not chars:
         return ""
     sorted_c = sorted(chars, key=lambda c: c["x0"])
@@ -236,4 +226,3 @@ def _chars_to_text(chars: List[Dict]) -> str:
             parts.append(" ")
         parts.append(sorted_c[i].get("text", ""))
     return "".join(parts)
-

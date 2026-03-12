@@ -1,10 +1,11 @@
 """
-防篡改与造假视觉DetectEngine (Anti-Forgery & Tampering Detection Engine)
+Anti-Forgery & Tampering Visual Detection Engine
 
-为 MultiModal 架构提供轻量级的本地化Document安全鉴定：
-1. PDF 篡改Detect: Dependency fitz 检查数字Signature断链、非法元Data (Photoshop/Acrobat)、增量Update等Exception。
-2. 图像伪造Detect: based on OpenCV 提供 Error Level Analysis (ELA 误差级别Analyze) 算法Detect克隆与拼接。
+Provides lightweight localized document security authentication for the MultiModal architecture:
+1. PDF Tampering Detection: Depends on fitz to check for broken digital signature chains, illegal metadata (Photoshop/Acrobat), incremental update anomalies, etc.
+2. Image Forgery Detection: Based on OpenCV, provides Error Level Analysis (ELA) algorithm to detect cloning and splicing.
 """
+from __future__ import annotations
 
 import logging
 from pathlib import Path
@@ -13,15 +14,15 @@ import fitz
 
 logger = logging.getLogger(__name__)
 
-# 常见 PDF 编辑Tool/造假来源黑名单 (出现在 Creator/Producer 中极其可疑)
+# Common PDF editing tools/forgery source blacklist (Highly suspicious if found in Creator/Producer)
 _SUSPICIOUS_METADATA_LOWER = [
     "photoshop",
     "illustrator",
-    "acrobat",      # 官方账单极少用 Acrobat 甚至 Reader Export
-    "foxit",        # 福昕阅读器/编辑器
+    "acrobat",      # Official statements rarely use Acrobat or even Reader Export
+    "foxit",        # Foxit Reader/Editor
     "wps",          # WPS Office
-    "skia",         # 浏览器打印存PDFEngine (Chrome)
-    "quartz",       # macOS 原生打印/另存为PDF
+    "skia",         # Browser print to PDF engine (Chrome)
+    "quartz",       # macOS native print/save as PDF
     "coreldraw",
     "pdf24",
     "pdfcreator"
@@ -30,14 +31,14 @@ _SUSPICIOUS_METADATA_LOWER = [
 
 def detect_pdf_forgery(file_path: str | Path) -> Tuple[bool, List[str]]:
     """
-    检查 PDF FileWhether疑似被编辑/篡改过。
-    开销极低，仅读取物理头部和结构树。
+    Check if a PDF file is suspected of being edited/tampered.
+    Extremely low overhead, only reads physical headers and structure tree.
 
     Args:
-        file_path: PDF Path。
+        file_path: PDF Path.
 
     Returns:
-        (疑似篡改标志: bool, List of anomaly reasons: List[str])
+        (Suspected tampering flag: bool, List of anomaly reasons: List[str])
     """
     is_forged = False
     reasons = []
@@ -48,7 +49,7 @@ def detect_pdf_forgery(file_path: str | Path) -> Tuple[bool, List[str]]:
         logger.warning(f"Verification failed to open PDF {file_path}: {e}")
         return False, []
 
-    # 1. 元Data黑名单Detect (Metadata Blacklist)
+    # 1. Metadata Blacklist Detection
     meta = doc.metadata or {}
     creator = meta.get("creator", "").lower()
     producer = meta.get("producer", "").lower()
@@ -61,23 +62,23 @@ def detect_pdf_forgery(file_path: str | Path) -> Tuple[bool, List[str]]:
             is_forged = True
             reasons.append(f"Suspicious Core Metadata (Producer): Found '{suspicious_term}' ({meta.get('producer')})")
 
-    # 2. XREF 增量UpdateDetect (Multiple Incremental Updates)
-    # PyMuPDF 可以获取历史修改Version数。如果not 1，说明该 PDF 被后续追加了修改并Save。
-    # 电子账单生成时必然是 1。
+    # 2. XREF Incremental Update Detection
+    # PyMuPDF can get the historical modification version count. If not 1, it indicates the PDF was subsequently modified and saved.
+    # Electronic statements are typically guaranteed to be 1 at generation.
     try:
         version_count = len(doc.resolve_names()) if hasattr(doc, 'resolve_names') else 1 # fallback check
-        # PyMuPDF 没有直接Public XREF trailer count 的安全 api，但我们可以via xref 获取某些Exception
-        # 这里用更安全的替代策略：检查Whether有未固化的Form
-    except Exception:
-        pass
+        # PyMuPDF lacks a safe direct public API for XREF trailer count, but we can catch certain anomalies via xref
+        # Using a safer alternative strategy here: check for unfixed interactive forms
+    except Exception as exc:
+        logger.debug(f"operation: suppressed {exc}")
         
     if doc.is_form_pdf:
         is_forged = True
         reasons.append("PDF contains interactive form fields (Unexpected for electronic origination)")
 
-    # 3. 数字Signature检查 (Digital Signature)
-    # 在这个 L0 层我们不严格要求必须有Signature（因为notall银行都有），
-    # 但如果「带有被破坏或无法Verify的SignatureField」，说明是被中途拦截并编辑过。
+    # 3. Digital Signature Check
+    # In this L0 layer, we do not strictly enforce the presence of a signature (as not all banks have them),
+    # but if it 'contains a corrupted or unverifiable signature field', it indicates interception and editing.
     has_sig = False
     for p in doc:
         for w in p.widgets():
@@ -91,17 +92,17 @@ def detect_pdf_forgery(file_path: str | Path) -> Tuple[bool, List[str]]:
 
 def detect_image_forgery(file_path: str | Path) -> Tuple[bool, List[str]]:
     """
-    Check if scan/photo has suspected splicing or tampering (Error Level Analysis - ELA)。
+    Check if scan/photo has suspected splicing or tampering (Error Level Analysis - ELA).
 
     Core idea:
     Re-save image at 95% quality; original captures show uniform error distribution.
     Spliced regions (e.g., tampered amounts) show inconsistent compression artifacts at edges.
     
     Args:
-        file_path: Image path (jpg, png 等)
+        file_path: Image path (jpg, png, etc.)
 
     Returns:
-        (疑似篡改标志: bool, List of anomaly reasons: List[str])
+        (Suspected tampering flag: bool, List of anomaly reasons: List[str])
     """
     is_forged = False
     reasons = []
@@ -123,21 +124,21 @@ def detect_image_forgery(file_path: str | Path) -> Tuple[bool, List[str]]:
         if original is None:
             return False, ["Unreadable Image Format"]
 
-        # ELA 算法: In-memory re-compression 95质量
+        # ELA algorithm: In-memory re-compression at 95 quality
         encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), 95]
         _, encimg = cv2.imencode('.jpg', original, encode_param)
         compressed = cv2.imdecode(encimg, 1)
 
-        # Extract residual and amplify(Enhance visualization)
+        # Extract residual and amplify (Enhance visualization)
         diff = cv2.absdiff(original, compressed)
         
         # Extract max difference to evaluate if there are abnormally mutated blocks
-        # Normal image residual(95压缩下)mostly in 0-15 range。Block-clustered values far exceeding threshold may indicate cloning。
+        # Normal image residual (at 95 compression) is mostly in the 0-15 range. Block-clustered values far exceeding the threshold may indicate cloning.
         max_diff = np.max(diff)
         
-        # Simple heuristic threshold check：If color value jump exceeds threshold after high-quality re-compression 50 (RGB跨度)，Highly suspicious
+        # Simple heuristic threshold check: If color value jump exceeds threshold after high-quality re-compression (e.g., >50 RGB span), it is highly suspicious
         if max_diff > 50:
-            # Further check connected components of anomalous pixels。If area is too large, indicates pasting/editing。
+            # Further check connected components of anomalous pixels. If area is too large, it indicates pasting/editing.
             gray_diff = cv2.cvtColor(diff, cv2.COLOR_BGR2GRAY)
             _, thresh = cv2.threshold(gray_diff, 40, 255, cv2.THRESH_BINARY)
             contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
