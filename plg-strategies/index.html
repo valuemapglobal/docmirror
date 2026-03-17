@@ -1,0 +1,2544 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Universal document parsing engine — extract structured data from any document format">
+      
+      
+        <meta name="author" content="ValueMap Global">
+      
+      
+        <link rel="canonical" href="https://valuemapglobal.github.io/docmirror/plg-strategies/">
+      
+      
+        <link rel="prev" href="../api/">
+      
+      
+        <link rel="next" href="../integrations/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+    
+    
+      
+        <title>PLG Strategies (Growth) - DocMirror</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="amber">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#docmirror-plg" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="DocMirror" class="md-header__button md-logo" aria-label="DocMirror" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DocMirror
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              PLG Strategies (Growth)
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="amber"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="amber"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/valuemapglobal/docmirror" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    valuemapglobal/docmirror
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="DocMirror" class="md-nav__button md-logo" aria-label="DocMirror" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    DocMirror
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/valuemapglobal/docmirror" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    valuemapglobal/docmirror
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guide/architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guide/configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guide/external-ocr/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    External OCR (Low-Quality Handoff)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guide/formats/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Format Support
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guide/error-handling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Error Handling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/solution-design/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Solution Design (Gaps & Risks)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/performance-optimization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Performance Optimization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/page-concurrency-implementation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Page Concurrency Implementation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Development
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../development/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugins
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Plugins
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plugins/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plugins/creating-plugins/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Creating Plugins
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PLG Strategies (Growth)
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PLG Strategies (Growth)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        一、产品即广告：让每一次输出都成为传单
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="一、产品即广告：让每一次输出都成为传单">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        策略 1：水印的"软硬兼施"
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="策略 1：水印的&#34;软硬兼施&#34;">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.1 硬水印（默认开启）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.2 软水印（可选关闭）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        策略 4：故障即机会（升级为诊断报告）
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="策略 4：故障即机会（升级为诊断报告）">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 结构化诊断卡片
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2 游戏化引导语
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#43" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.3 后续动作闭环
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5trust-score-trust-score-as-social-proof" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        策略 5：Trust Score 信任评分透明化 (Trust Score as Social Proof)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        二、社交货币：满足极客的炫耀心理
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="二、社交货币：满足极客的炫耀心理">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#2cli" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        策略 2：CLI 成就系统与品牌人格化
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="策略 2：CLI 成就系统与品牌人格化">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21-banner" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.1 视觉震撼 Banner
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.2 动态身份识别
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#23-easter-egg" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.3 Easter Egg 彩蛋
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-benchmark" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        策略 3：排行榜思维的 Benchmark 系统
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="策略 3：排行榜思维的 Benchmark 系统">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 动态对比基准
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32-benchmark" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2 可分享的 Benchmark 卡片
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#8debug" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        策略 8：Debug 图的"赛博朋克"风格化
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="策略 8：Debug 图的&#34;赛博朋克&#34;风格化">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#81" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.1 主题化渲染引擎
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#82" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.2 社交传播激励
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        三、生态入侵：寄生与共生
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="三、生态入侵：寄生与共生">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#6langchain" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        策略 6：LangChain 生态的"救援式营销"
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="策略 6：LangChain 生态的&#34;救援式营销&#34;">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#61-loader" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.1 独立 Loader 先行策略
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#62" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.2 对比视觉锤
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#63" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.3 后续动作
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#7-gradio-webui-playground" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        策略 7：一键即用的零配置网页游乐场 (Gradio WebUI Playground)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#9-the-bad-cases-bounty" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        策略 9：稀奇古怪样本文档悬赏榜 (The Bad Cases Bounty)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#10jupyter-notebook-magic-commands" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        策略 10：Jupyter 环境下的魔法命令 (Notebook Magic Commands)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="策略 10：Jupyter 环境下的魔法命令 (Notebook Magic Commands)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#101" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10.1 魔法命令开发
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#102" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10.2 团队传播杠杆
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#103" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10.3 激励机制
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        四、策略落地路线图
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="四、策略落地路线图">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        数据驱动迭代
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mvp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        最小可行性测试（MVP）优先级
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        社区运营配合
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        核心总结
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../integrations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../changelog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        一、产品即广告：让每一次输出都成为传单
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="一、产品即广告：让每一次输出都成为传单">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        策略 1：水印的"软硬兼施"
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="策略 1：水印的&#34;软硬兼施&#34;">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.1 硬水印（默认开启）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.2 软水印（可选关闭）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        策略 4：故障即机会（升级为诊断报告）
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="策略 4：故障即机会（升级为诊断报告）">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 结构化诊断卡片
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2 游戏化引导语
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#43" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.3 后续动作闭环
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5trust-score-trust-score-as-social-proof" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        策略 5：Trust Score 信任评分透明化 (Trust Score as Social Proof)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        二、社交货币：满足极客的炫耀心理
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="二、社交货币：满足极客的炫耀心理">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#2cli" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        策略 2：CLI 成就系统与品牌人格化
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="策略 2：CLI 成就系统与品牌人格化">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21-banner" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.1 视觉震撼 Banner
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.2 动态身份识别
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#23-easter-egg" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.3 Easter Egg 彩蛋
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-benchmark" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        策略 3：排行榜思维的 Benchmark 系统
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="策略 3：排行榜思维的 Benchmark 系统">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 动态对比基准
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32-benchmark" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2 可分享的 Benchmark 卡片
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#8debug" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        策略 8：Debug 图的"赛博朋克"风格化
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="策略 8：Debug 图的&#34;赛博朋克&#34;风格化">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#81" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.1 主题化渲染引擎
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#82" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.2 社交传播激励
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        三、生态入侵：寄生与共生
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="三、生态入侵：寄生与共生">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#6langchain" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        策略 6：LangChain 生态的"救援式营销"
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="策略 6：LangChain 生态的&#34;救援式营销&#34;">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#61-loader" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.1 独立 Loader 先行策略
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#62" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.2 对比视觉锤
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#63" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.3 后续动作
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#7-gradio-webui-playground" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        策略 7：一键即用的零配置网页游乐场 (Gradio WebUI Playground)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#9-the-bad-cases-bounty" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        策略 9：稀奇古怪样本文档悬赏榜 (The Bad Cases Bounty)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#10jupyter-notebook-magic-commands" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        策略 10：Jupyter 环境下的魔法命令 (Notebook Magic Commands)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="策略 10：Jupyter 环境下的魔法命令 (Notebook Magic Commands)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#101" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10.1 魔法命令开发
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#102" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10.2 团队传播杠杆
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#103" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10.3 激励机制
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        四、策略落地路线图
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="四、策略落地路线图">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        数据驱动迭代
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mvp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        最小可行性测试（MVP）优先级
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        社区运营配合
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        核心总结
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="docmirror-plg">DocMirror 产品驱动增长 (PLG) 与病毒式传播策略全书<a class="headerlink" href="#docmirror-plg" title="Permanent link">&para;</a></h1>
+<p>作为一款开源的文档解析引擎，优异的算法是我们的护城河，而<strong>传播机制</strong>则是我们触达开发者的武器。本指南汇总了所有 Product-Led Growth (PLG) 策略，旨在 <strong>将技术能力、心理学洞察与社区运营有机结合，让传播成为产品体验的一部分</strong>，最终把 DocMirror 打造为开发者社区中的"现象级工具"。</p>
+<hr />
+<h2 id="_1">一、产品即广告：让每一次输出都成为传单<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h2>
+<blockquote>
+<p><strong>核心逻辑</strong>：通过产品使用过程中的自然输出，实现被动传播。</p>
+</blockquote>
+<h3 id="1">策略 1：水印的"软硬兼施"<a class="headerlink" href="#1" title="Permanent link">&para;</a></h3>
+<p><strong>目标</strong>：在不影响用户体验的前提下，将输出结果转化为传播媒介，提升品牌曝光。</p>
+<h4 id="11">1.1 硬水印（默认开启）<a class="headerlink" href="#11" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p><strong>优化点</strong>：极简化设计，降低用户抵触心理。</p>
+</blockquote>
+<p><strong>实施步骤</strong>：
+1. 设计简短、高辨识度的水印，避免冗长文案干扰内容：
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>📄 Structured &amp; Parsed by DocMirror — The Open Source Universal Document Parser.
+</code></pre></div>
+2. 支持自定义开关（如 <code>--no-watermark</code> 参数），但默认开启。
+3. 测试不同颜色、字体对阅读体验的影响，确保水印"低调但可见"。</p>
+<p><strong>心理学原理</strong>：
+- <strong>最小干扰原则</strong>：简短水印对用户内容干扰小，保留概率更高。
+- <strong>品牌识别惯性</strong>：反复出现简洁 Logo / 名称，强化用户心智中的品牌关联。</p>
+<p><strong>收益</strong>：当用户拿着高质量的提取结果撰写报告、发布博客或分享给同事时，项目将获得大量被动的免费外链与曝光。</p>
+<h4 id="12">1.2 软水印（可选关闭）<a class="headerlink" href="#12" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p><strong>优化点</strong>：通过视觉设计增强专业感，让用户主动保留。</p>
+</blockquote>
+<p><strong>实施步骤</strong>：
+1. 在 Markdown / HTML 中为标题添加特定样式（如 CSS 类 <code>docmirror-title</code> + 📚 icon）。
+2. 提供样式表（如 <code>docmirror.css</code>），用户可一键引入美化文档。
+3. 示例效果：
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="gh"># 📚 分析报告 📄 (Parsed by DocMirror)</span>
+</code></pre></div></p>
+<p><strong>心理学原理</strong>：
+- <strong>专业感溢价</strong>：用户倾向保留提升内容专业度的标记，视为"增值元素"。
+- <strong>社交展示需求</strong>：美观的水印成为用户展示工作质量的"加分项"。</p>
+<p><strong>潜在挑战与应对</strong>：
+| 挑战 | 应对方案 |
+|------|---------|
+| 部分用户可能反感水印 | 提供关闭选项，但通过文案引导（如"保留水印可解锁高级功能"） |
+| 水印被手动删除 | 展示水印带来的实际价值（如引用权威报告需标注来源） |</p>
+<hr />
+<h3 id="4">策略 4：故障即机会（升级为诊断报告）<a class="headerlink" href="#4" title="Permanent link">&para;</a></h3>
+<p><strong>目标</strong>：将错误体验转化为社区互动与数据收集的契机。</p>
+<h4 id="41">4.1 结构化诊断卡片<a class="headerlink" href="#41" title="Permanent link">&para;</a></h4>
+<p>当系统遇到 <code>Unsupported Format</code> 或极低置信度异常时，不再仅仅抛出异常栈，而是生成包含文件哈希、错误类型、环境信息的 JSON 卡片，并提供一键复制按钮简化提交流程。</p>
+<p><strong>示例输出</strong>：
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>🚨 诊断卡片
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>• 文件哈希：XXXXXXX
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>• 错误类型：TableFormatError
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>• 环境：Python 3.9 | macOS 12.4
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>✂️ 复制代码并提交至 → https://bit.ly/docmirror-issues
+</code></pre></div></p>
+<h4 id="42">4.2 游戏化引导语<a class="headerlink" href="#42" title="Permanent link">&para;</a></h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>🎖️ 您的文件正在帮助我们训练更强大的模型！提交诊断即可获得贡献者勋章。
+</code></pre></div>
+<p><strong>心理学原理</strong>：
+- <strong>使命感赋予</strong>：让用户感觉自己的报错是"有意义的数据贡献"。
+- <strong>即时反馈</strong>：勋章系统激发即时成就感，提升提交意愿。</p>
+<h4 id="43">4.3 后续动作闭环<a class="headerlink" href="#43" title="Permanent link">&para;</a></h4>
+<ol>
+<li>自动为提交者添加 GitHub 贡献标签（如 <code>bug-hunter</code>）。</li>
+<li>修复后邮件致谢，附上解析成功案例，增强归属感。</li>
+</ol>
+<p><strong>潜在挑战与应对</strong>：
+| 挑战 | 应对方案 |
+|------|---------|
+| 用户可能懒得提交报错 | 减少摩擦：一键复制 + 预设模板 |
+| 提交率不达预期 | 制造稀缺性："前 100 名提交者将获得专属周边" |</p>
+<hr />
+<h3 id="5trust-score-trust-score-as-social-proof">策略 5：Trust Score 信任评分透明化 (Trust Score as Social Proof)<a class="headerlink" href="#5trust-score-trust-score-as-social-proof" title="Permanent link">&para;</a></h3>
+<p><strong>目标</strong>：通过透明的质量评分增强信任，高分截图天然适合社交传播。</p>
+<p><strong>机制</strong>：每次解析输出都包含 <code>trust.validation_score</code> 和详细的 7 维度评分明细（<code>column_alignment</code>、<code>encoding_fidelity</code>、<code>page_coverage</code> 等），让用户对解析质量一目了然。</p>
+<p><strong>收益</strong>：透明的质量评分增强了用户对解析结果的信任，同时高分截图天然适合社交传播（"看！我的月度财报解析准确率 98.7%！"）。</p>
+<hr />
+<h2 id="_2">二、社交货币：满足极客的炫耀心理<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h2>
+<blockquote>
+<p><strong>核心逻辑</strong>：设计可分享的"高光时刻"，激发用户主动传播。</p>
+</blockquote>
+<h3 id="2cli">策略 2：CLI 成就系统与品牌人格化<a class="headerlink" href="#2cli" title="Permanent link">&para;</a></h3>
+<p><strong>目标</strong>：让终端交互成为身份认同的载体。</p>
+<h4 id="21-banner">2.1 视觉震撼 Banner<a class="headerlink" href="#21-banner" title="Permanent link">&para;</a></h4>
+<p>引入 <code>rich</code> 库，在每次调用 <code>python -m docmirror</code> 时打印赛博朋克风格的 ASCII 艺术字 Banner 及一瞥即得的求 Star 标语。新增专属的 <code>docmirror --authors</code> 命令，以优雅的面板罗列所有代码贡献者。</p>
+<h4 id="22">2.2 动态身份识别<a class="headerlink" href="#22" title="Permanent link">&para;</a></h4>
+<p><strong>实施步骤</strong>：
+1. 检测用户 GitHub Star 状态：通过 <code>StarredRepos API</code> 或本地配置。
+2. 识别贡献者：通过 Git 提交记录或 GitHub Actions 标记。</p>
+<p><strong>交互示例</strong>：
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>$ python -m docmirror
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>███████╗ ██████╗ ██╗   ██╗ █████╗ ██████╗
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>██╔════╝██╔═══██╗██║   ██║██╔══██╗██╔══██╗
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>…（DocMirror ASCII Art）
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>Premium User Detected! 🎉
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>感谢您为开源贡献 Star！✨
+</code></pre></div></p>
+<h4 id="23-easter-egg">2.3 Easter Egg 彩蛋<a class="headerlink" href="#23-easter-egg" title="Permanent link">&para;</a></h4>
+<p>随机触发隐藏互动（如输入 <code>docmirror --easter</code> 显示项目趣事）。</p>
+<p><strong>心理学原理</strong>：
+- <strong>社交身份标签</strong>："Premium User" 标签满足开发者对"高级用户"身份的认同需求。
+- <strong>稀缺性效应</strong>：专属徽章创造"我与众不同"的优越感，驱动分享。</p>
+<p><strong>潜在挑战与应对</strong>：
+| 挑战 | 应对方案 |
+|------|---------|
+| 身份检测可能涉及隐私或延迟 | 提供本地配置选项（如 <code>DOCSTAR=true</code> 环境变量） |
+| API 请求导致 CLI 变慢 | 使用缓存机制加速检测 |</p>
+<hr />
+<h3 id="3-benchmark">策略 3：排行榜思维的 Benchmark 系统<a class="headerlink" href="#3-benchmark" title="Permanent link">&para;</a></h3>
+<p><strong>目标</strong>：将性能指标转化为可比较、可传播的社交谈资。</p>
+<h4 id="31">3.1 动态对比基准<a class="headerlink" href="#31" title="Permanent link">&para;</a></h4>
+<p><strong>实施步骤</strong>：
+1. 内置行业主流工具（如 Tesseract）的基准测试结果。
+2. 实时计算速度、准确率对比倍数（如 <code>4.2x faster</code>）。</p>
+<p><strong>输出文案</strong>：
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>⚡ 3500 字符/秒！比行业基准快 4.2 倍 #DocMirrorSpeedWar
+</code></pre></div></p>
+<h4 id="32-benchmark">3.2 可分享的 Benchmark 卡片<a class="headerlink" href="#32-benchmark" title="Permanent link">&para;</a></h4>
+<p>生成包含速度、对比值、机器配置的二维码卡片，扫码直达 Twitter 分享界面。</p>
+<p><strong>心理学原理</strong>：
+- <strong>社会比较理论</strong>：明确的倍数对比激发"我比平均更优秀"的优越感。
+- <strong>FOMO（错失恐惧）</strong>："行业基准"暗示用户若不分享可能被视为"落后者"。</p>
+<p><strong>潜在挑战与应对</strong>：
+| 挑战 | 应对方案 |
+|------|---------|
+| 用户机器差异导致结果不公平 | 提供"同配置排名"（如按 CPU 型号分组） |
+| 绝对数值缺乏可比性 | 强调"相对速度"而非绝对数值 |</p>
+<hr />
+<h3 id="8debug">策略 8：Debug 图的"赛博朋克"风格化<a class="headerlink" href="#8debug" title="Permanent link">&para;</a></h3>
+<p><strong>目标</strong>：将技术 Debug 转化为可传播的视觉艺术。</p>
+<h4 id="81">8.1 主题化渲染引擎<a class="headerlink" href="#81" title="Permanent link">&para;</a></h4>
+<p><strong>实施步骤</strong>：
+1. 添加 <code>--visualize</code> 参数，系统自动渲染重叠式诊断图：各区块 Bounding Boxes，红色代表异常、绿色代表高信度文本，上方显示逐级耗时面板。
+2. 开发主题切换 API（如 <code>--theme matrix</code>）。
+3. 集成图形库（如 <code>matplotlib</code> + <code>asciimatics</code>）。</p>
+<p><strong>主题示例</strong>：
+| 主题名 | 视觉效果 |
+|--------|---------|
+| <code>matrix</code> | 绿色字符流 + 随机代码片段闪烁 |
+| <code>synthwave</code> | 霓虹渐变边框 + 复古像素字体 |</p>
+<h4 id="82">8.2 社交传播激励<a class="headerlink" href="#82" title="Permanent link">&para;</a></h4>
+<ol>
+<li>生成带 <code>#DocMirrorDebugArt</code> 标签的分享模板。</li>
+<li>每月举办"最佳 Debug 图大赛"，获奖者获硬件奖励。</li>
+</ol>
+<p><strong>心理学原理</strong>：
+- <strong>视觉冲击效应</strong>：酷炫风格激发"截图即装逼"的本能，"Show, Don't Tell"。
+- <strong>群体归属驱动</strong>：标签和大赛创造"开发者亚文化圈层"，增强黏性。</p>
+<p><strong>潜在挑战与应对</strong>：
+| 挑战 | 应对方案 |
+|------|---------|
+| 渲染耗时可能影响性能 | 提供 <code>--debug-speed</code> 模式（简化渲染） |
+| 用户不想牺牲性能换视觉 | 允许用户选择"性能优先"或"视觉优先" |</p>
+<hr />
+<h2 id="_3">三、生态入侵：寄生与共生<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h2>
+<blockquote>
+<p><strong>核心逻辑</strong>：通过生态位渗透，实现用户与数据的指数级增长。</p>
+</blockquote>
+<h3 id="6langchain">策略 6：LangChain 生态的"救援式营销"<a class="headerlink" href="#6langchain" title="Permanent link">&para;</a></h3>
+<p><strong>目标</strong>：精准解决 RAG 开发者的痛点，快速占领生态位。</p>
+<h4 id="61-loader">6.1 独立 Loader 先行策略<a class="headerlink" href="#61-loader" title="Permanent link">&para;</a></h4>
+<p><strong>实施步骤</strong>：
+1. 发布 <code>docmirror-loader</code> PyPI 包，独立于主库。
+2. 在 <code>langchain</code> 相关 Issue 中搜索关键词（如"表格解析失败"）。
+3. 精准评论回复：
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>试试 docmirror-loader！一行替换，完美解析嵌套表格
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>→ pip install docmirror-loader
+</code></pre></div></p>
+<h4 id="62">6.2 对比视觉锤<a class="headerlink" href="#62" title="Permanent link">&para;</a></h4>
+<ol>
+<li>制作动态 GIF 对比图（左：混乱解析结果；右：DocMirror 整齐表格）。</li>
+<li>在 HuggingFace Spaces、GitHub Discussions 高频展示。</li>
+</ol>
+<p><strong>心理学原理</strong>：
+- <strong>痛点狙击</strong>：精准解决 RAG 开发者的核心问题（表格解析）。
+- <strong>即时满足</strong>："一行替换"降低尝试成本，利用"损失厌恶"（避免切换麻烦）。</p>
+<h4 id="63">6.3 后续动作<a class="headerlink" href="#63" title="Permanent link">&para;</a></h4>
+<ol>
+<li>合并到官方库后，邮件告知早期用户："感谢您参与内测，现已支持原生调用！"</li>
+<li>向 <code>langchain-community</code> 和 <code>llama-index</code> 提交 PR，成为官方组件库成员。</li>
+<li><strong>状态</strong>：计划在 v0.3 实施，核心 API 稳定后提交上游。</li>
+</ol>
+<p><strong>潜在挑战与应对</strong>：
+| 挑战 | 应对方案 |
+|------|---------|
+| 可能被社区视为"广告" | 先解决问题，再推广工具（真诚帮助姿态） |
+| 缺乏生态信任 | 贡献 PR 优化上游文档，建立互惠关系 |</p>
+<hr />
+<h3 id="7-gradio-webui-playground">策略 7：一键即用的零配置网页游乐场 (Gradio WebUI Playground)<a class="headerlink" href="#7-gradio-webui-playground" title="Permanent link">&para;</a></h3>
+<p><strong>目标</strong>：让非代码人员（产品经理、数据分析师）也能使用和传播 DocMirror。</p>
+<p><strong>实施步骤</strong>：
+1. 用 <code>Gradio</code> 编写不到 50 行代码的可视化界面。
+2. 提供极简安装指令：<code>pip install docmirror[ui] &amp;&amp; docmirror-ui</code>。</p>
+<p><strong>收益</strong>：跨界用户（PM、分析师）的自发传播力甚至超越纯开发者群体，大幅拓宽传播人群。</p>
+<hr />
+<h3 id="9-the-bad-cases-bounty">策略 9：稀奇古怪样本文档悬赏榜 (The Bad Cases Bounty)<a class="headerlink" href="#9-the-bad-cases-bounty" title="Permanent link">&para;</a></h3>
+<p><strong>目标</strong>：免费获取各行业真实的刁钻测试用例，形成长效互动氛围。</p>
+<p><strong>实施步骤</strong>：
+1. 开设一个专栏或固定的 GitHub Issue，设立"毒蘑菇榜"或"最难以解析的 PDF 榜单"。
+2. 配合"故障转换机制"（策略 4），吸引大厂业务线提交棘手 PDF 打榜。</p>
+<p><strong>收益</strong>：黏住高级贡献者，形成打怪升级的社区氛围，同时持续拓展引擎的边界能力。</p>
+<hr />
+<h3 id="10jupyter-notebook-magic-commands">策略 10：Jupyter 环境下的魔法命令 (Notebook Magic Commands)<a class="headerlink" href="#10jupyter-notebook-magic-commands" title="Permanent link">&para;</a></h3>
+<p><strong>目标</strong>：通过 Notebook 的协作属性实现链式传播。</p>
+<h4 id="101">10.1 魔法命令开发<a class="headerlink" href="#101" title="Permanent link">&para;</a></h4>
+<p><strong>实施步骤</strong>：
+1. 继承 IPython 的 <code>magics</code> 模块，实现 <code>%%docmirror</code> 命令。
+2. 支持一键导出解析结果到 Pandas 或 JSON。</p>
+<p><strong>使用示例</strong>：
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="o">%%</span><span class="n">docmirror</span> <span class="n">data</span><span class="o">.</span><span class="n">pdf</span> <span class="o">--</span><span class="n">to</span> <span class="n">dataframe</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="c1"># 输出直接为 DataFrame，无需额外代码</span>
+</code></pre></div></p>
+<h4 id="102">10.2 团队传播杠杆<a class="headerlink" href="#102" title="Permanent link">&para;</a></h4>
+<p>内置"协作水印"：当 Notebook 被共享时，自动在输出添加 <code>Shared with DocMirror</code> 标记（可配置关闭）。</p>
+<p><strong>心理学原理</strong>：
+- <strong>认知偷懒</strong>：一键命令降低数据清洗门槛，满足分析师的"效率追求"。
+- <strong>网络效应</strong>：Notebook 共享天然触发病毒传播（1 个分析师 → 整个团队）。</p>
+<h4 id="103">10.3 激励机制<a class="headerlink" href="#103" title="Permanent link">&para;</a></h4>
+<p>推出"团队共享计划"：团队内共享 Notebook 次数达标后，解锁企业版高级功能。</p>
+<p><strong>潜在挑战与应对</strong>：
+| 挑战 | 应对方案 |
+|------|---------|
+| Jupyter 用户需额外安装插件 | 提供 Conda 一键安装脚本 |
+| Colab 等平台兼容性 | 预置镜像环境，降低使用门槛 |</p>
+<hr />
+<h2 id="_4">四、策略落地路线图<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h2>
+<h3 id="_5">数据驱动迭代<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h3>
+<p>通过埋点追踪核心指标，用 A/B 测试持续优化：</p>
+<table>
+<thead>
+<tr>
+<th>指标</th>
+<th>追踪方式</th>
+<th>A/B 测试方向</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>水印保留率</td>
+<td>输出文件元信息采集</td>
+<td>不同水印文案、位置</td>
+</tr>
+<tr>
+<td>报错提交率</td>
+<td>Issue API 统计</td>
+<td>不同引导话术、奖励机制</td>
+</tr>
+<tr>
+<td>Benchmark 分享率</td>
+<td>短链点击追踪</td>
+<td>不同对比基准、输出格式</td>
+</tr>
+<tr>
+<td>魔法命令使用频率</td>
+<td>Telemetry（可选 opt-in）</td>
+<td>不同命令语法、输出方式</td>
+</tr>
+</tbody>
+</table>
+<h3 id="mvp">最小可行性测试（MVP）优先级<a class="headerlink" href="#mvp" title="Permanent link">&para;</a></h3>
+<p>每个策略先开发简化版本，快速验证效果：</p>
+<table>
+<thead>
+<tr>
+<th>阶段</th>
+<th>策略</th>
+<th>状态</th>
+<th>MVP 切入点</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>已落地</strong></td>
+<td>策略 1 (硬水印)</td>
+<td>✅ 已上线</td>
+<td>输出末尾注入品牌链接</td>
+</tr>
+<tr>
+<td><strong>已落地</strong></td>
+<td>策略 2 (CLI Banner)</td>
+<td>✅ 已上线</td>
+<td>ASCII Art + Authors 面板</td>
+</tr>
+<tr>
+<td><strong>已落地</strong></td>
+<td>策略 3 (Benchmark 基础版)</td>
+<td>✅ 已上线</td>
+<td>终端输出吞吐率 + CTA</td>
+</tr>
+<tr>
+<td><strong>已落地</strong></td>
+<td>策略 4 (错误导流基础版)</td>
+<td>✅ 已上线</td>
+<td>异常时输出 Issue 链接</td>
+</tr>
+<tr>
+<td><strong>已落地</strong></td>
+<td>策略 5 (Trust Score)</td>
+<td>✅ 已上线</td>
+<td>7 维度评分透明输出</td>
+</tr>
+<tr>
+<td><strong>下一步</strong></td>
+<td>策略 4 (诊断卡片升级)</td>
+<td>🔜 计划中</td>
+<td>先做静态 JSON 卡片</td>
+</tr>
+<tr>
+<td><strong>下一步</strong></td>
+<td>策略 8 (Debug 可视化)</td>
+<td>🔜 计划中</td>
+<td>先做静态诊断图，再开发主题引擎</td>
+</tr>
+<tr>
+<td><strong>v0.3</strong></td>
+<td>策略 6 (LangChain Loader)</td>
+<td>🔜 计划中</td>
+<td>独立 PyPI 包 → 上游 PR</td>
+</tr>
+<tr>
+<td><strong>v0.3</strong></td>
+<td>策略 10 (Jupyter Magic)</td>
+<td>🔜 计划中</td>
+<td>基础 <code>%%docmirror</code> 命令</td>
+</tr>
+<tr>
+<td><strong>长期</strong></td>
+<td>策略 2 (动态身份识别)</td>
+<td>📋 规划中</td>
+<td>本地配置 → API 检测</td>
+</tr>
+<tr>
+<td><strong>长期</strong></td>
+<td>策略 3 (Benchmark 卡片)</td>
+<td>📋 规划中</td>
+<td>二维码卡片 + 社交分享</td>
+</tr>
+<tr>
+<td><strong>长期</strong></td>
+<td>策略 7 (Gradio WebUI)</td>
+<td>📋 规划中</td>
+<td>50 行 Gradio 界面</td>
+</tr>
+<tr>
+<td><strong>长期</strong></td>
+<td>策略 9 (Bad Cases Bounty)</td>
+<td>📋 规划中</td>
+<td>固定 GitHub Issue 模板</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_6">社区运营配合<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>社交阵地</strong>：在 Twitter / X、Hacker News 设立官方账号，定期转发用户分享的 Benchmark / Debug 图。</li>
+<li><strong>Discord 社区</strong>：建立频道，为贡献者提供专属交流区（增强归属感）。</li>
+<li><strong>定期活动</strong>：月度 Debug 图大赛、季度"毒蘑菇"悬赏排行榜。</li>
+</ol>
+<hr />
+<h2 id="_7">核心总结<a class="headerlink" href="#_7" title="Permanent link">&para;</a></h2>
+<blockquote>
+<p><strong>不要让代码仅仅停留在后端执行。</strong></p>
+<p>用优秀的交互设计把每一次解析变成具有观赏性、能够激发用户心理（分享欲、攀比欲、求知欲）的极简艺术品，是我们让 DocMirror 实现病毒式传播的关键所在。</p>
+<p><strong>关键在于：将技术能力、心理学洞察与社区运营有机结合，让传播成为产品体验的一部分。</strong> 🌟</p>
+</blockquote>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/valuemapglobal/docmirror" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.instant", "navigation.tracking", "navigation.sections", "navigation.expand", "content.code.copy", "search.suggest", "search.highlight"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

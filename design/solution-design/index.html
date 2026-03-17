@@ -1,0 +1,2866 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Universal document parsing engine — extract structured data from any document format">
+      
+      
+        <meta name="author" content="ValueMap Global">
+      
+      
+        <link rel="canonical" href="https://valuemapglobal.github.io/docmirror/design/solution-design/">
+      
+      
+        <link rel="prev" href="../../guide/error-handling/">
+      
+      
+        <link rel="next" href="../performance-optimization/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+    
+    
+      
+        <title>Solution Design (Gaps & Risks) - DocMirror</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="amber">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#docmirror" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="DocMirror" class="md-header__button md-logo" aria-label="DocMirror" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DocMirror
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Solution Design (Gaps & Risks)
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="amber"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="amber"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/valuemapglobal/docmirror" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    valuemapglobal/docmirror
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="DocMirror" class="md-nav__button md-logo" aria-label="DocMirror" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    DocMirror
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/valuemapglobal/docmirror" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    valuemapglobal/docmirror
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/external-ocr/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    External OCR (Low-Quality Handoff)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/formats/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Format Support
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/error-handling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Error Handling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Solution Design (Gaps & Risks)
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Solution Design (Gaps & Risks)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. 文档概述
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. 文档概述">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.1 目的与范围
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.2 不足与方案映射
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-g1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. 格式与兼容性（G1）
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. 格式与兼容性（G1）">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.1 问题摘要
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.2 设计决策
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#23" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.3 实现要点
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#24" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.4 验收标准
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-g2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. 测试与质量保障（G2）
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. 测试与质量保障（G2）">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 问题摘要
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2 设计决策
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#33" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.3 实现要点
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#34" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.4 验收标准
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-g3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. 错误处理与边界（G3）
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. 错误处理与边界（G3）">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 问题摘要
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2 设计决策
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#43" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.3 实现要点
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#44" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.4 验收标准
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-g4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. 性能与资源（G4）
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. 性能与资源（G4）">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#51" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.1 问题摘要
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#52" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.2 设计决策
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#53" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.3 实现要点
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#54" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.4 验收标准
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-g5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. 安全与隐私（G5）
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. 安全与隐私（G5）">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#61" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.1 问题摘要
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#62" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.2 设计决策
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#63" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.3 实现要点
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#64" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.4 验收标准
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-api-g6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. 文档与 API 一致性（G6）
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. 文档与 API 一致性（G6）">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#71" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.1 问题摘要
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#72" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.2 设计决策
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#73" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.3 实现要点
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#74" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.4 验收标准
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-g7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. 类型与可维护性（G7）
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="8. 类型与可维护性（G7）">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#81" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.1 问题摘要
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#82" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.2 设计决策
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#83" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.3 实现要点
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#84" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.4 验收标准
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. 实施路线图
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="9. 实施路线图">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#91" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.1 阶段划分
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#92" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.2 依赖关系
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#93" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.3 评审与迭代
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. 附录
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="10. 附录">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#a" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A. 错误码建议列表（初版）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#b-expected-json" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B. 金标 expected 最小结构示例（JSON）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#c" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        C. 文档变更清单（随实现更新）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../performance-optimization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Performance Optimization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../page-concurrency-implementation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Page Concurrency Implementation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Development
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugins
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Plugins
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/creating-plugins/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Creating Plugins
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plg-strategies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PLG Strategies (Growth)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../integrations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../changelog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. 文档概述
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. 文档概述">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.1 目的与范围
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.2 不足与方案映射
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-g1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. 格式与兼容性（G1）
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. 格式与兼容性（G1）">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.1 问题摘要
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.2 设计决策
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#23" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.3 实现要点
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#24" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.4 验收标准
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-g2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. 测试与质量保障（G2）
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. 测试与质量保障（G2）">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 问题摘要
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2 设计决策
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#33" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.3 实现要点
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#34" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.4 验收标准
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-g3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. 错误处理与边界（G3）
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. 错误处理与边界（G3）">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 问题摘要
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2 设计决策
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#43" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.3 实现要点
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#44" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.4 验收标准
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-g4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. 性能与资源（G4）
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. 性能与资源（G4）">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#51" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.1 问题摘要
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#52" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.2 设计决策
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#53" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.3 实现要点
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#54" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.4 验收标准
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-g5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. 安全与隐私（G5）
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. 安全与隐私（G5）">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#61" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.1 问题摘要
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#62" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.2 设计决策
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#63" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.3 实现要点
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#64" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.4 验收标准
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-api-g6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. 文档与 API 一致性（G6）
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. 文档与 API 一致性（G6）">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#71" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.1 问题摘要
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#72" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.2 设计决策
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#73" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.3 实现要点
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#74" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.4 验收标准
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-g7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. 类型与可维护性（G7）
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="8. 类型与可维护性（G7）">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#81" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.1 问题摘要
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#82" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.2 设计决策
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#83" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.3 实现要点
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#84" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.4 验收标准
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. 实施路线图
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="9. 实施路线图">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#91" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.1 阶段划分
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#92" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.2 依赖关系
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#93" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.3 评审与迭代
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. 附录
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="10. 附录">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#a" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A. 错误码建议列表（初版）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#b-expected-json" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B. 金标 expected 最小结构示例（JSON）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#c" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        C. 文档变更清单（随实现更新）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="docmirror">DocMirror 不足与风险 — 解决方案设计文档<a class="headerlink" href="#docmirror" title="Permanent link">&para;</a></h1>
+<p>本文档针对《项目深度分析报告》中识别的不足与风险，给出系统化的解决方案设计，包括设计决策、实现要点与验收标准，供迭代开发与评审使用。</p>
+<hr />
+<h2 id="1">1. 文档概述<a class="headerlink" href="#1" title="Permanent link">&para;</a></h2>
+<h3 id="11">1.1 目的与范围<a class="headerlink" href="#11" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>项目</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>目的</strong></td>
+<td>将分析报告中的 7 类不足转化为可执行的设计与实现指引，降低生产环境风险、提升可维护性与可观测性。</td>
+</tr>
+<tr>
+<td><strong>范围</strong></td>
+<td>格式兼容性、测试与质量保障、错误处理与边界、性能与资源、安全与隐私、文档与 API 一致性、类型与可维护性。</td>
+</tr>
+<tr>
+<td><strong>读者</strong></td>
+<td>核心贡献者、架构评审、新成员入职。</td>
+</tr>
+<tr>
+<td><strong>非范围</strong></td>
+<td>不替代具体 Issue/PR 的规格说明；新功能（如流式解析）仅作设计方向，不承诺排期。</td>
+</tr>
+</tbody>
+</table>
+<h3 id="12">1.2 不足与方案映射<a class="headerlink" href="#12" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>编号</th>
+<th>不足类别</th>
+<th>对应章节</th>
+<th>优先级</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>G1</td>
+<td>格式与兼容性</td>
+<td>§2</td>
+<td>P1</td>
+</tr>
+<tr>
+<td>G2</td>
+<td>测试与质量保障</td>
+<td>§3</td>
+<td>P0</td>
+</tr>
+<tr>
+<td>G3</td>
+<td>错误处理与边界</td>
+<td>§4</td>
+<td>P0</td>
+</tr>
+<tr>
+<td>G4</td>
+<td>性能与资源</td>
+<td>§5</td>
+<td>P1</td>
+</tr>
+<tr>
+<td>G5</td>
+<td>安全与隐私</td>
+<td>§6</td>
+<td>P1</td>
+</tr>
+<tr>
+<td>G6</td>
+<td>文档与 API 一致性</td>
+<td>§7</td>
+<td>P2</td>
+</tr>
+<tr>
+<td>G7</td>
+<td>类型与可维护性</td>
+<td>§8</td>
+<td>P2</td>
+</tr>
+</tbody>
+</table>
+<p>优先级约定：<strong>P0</strong> = 必须在本周期解决；<strong>P1</strong> = 下一周期；<strong>P2</strong> = 技术债，可持续消化。</p>
+<hr />
+<h2 id="2-g1">2. 格式与兼容性（G1）<a class="headerlink" href="#2-g1" title="Permanent link">&para;</a></h2>
+<h3 id="21">2.1 问题摘要<a class="headerlink" href="#21" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Legacy <code>.doc</code> 声称支持但依赖 LibreOffice，未安装时行为未定义；Magic Number 映射表缺少 <code>.doc</code>。</li>
+<li>Office 格式（Word/Excel/PPT）的复杂版式、嵌入对象、批注等与 Block 模型的映射未在文档与测试中明确。</li>
+</ul>
+<h3 id="22">2.2 设计决策<a class="headerlink" href="#22" title="Permanent link">&para;</a></h3>
+<p><strong>D1.1 Legacy .doc 支持策略</strong></p>
+<ul>
+<li><strong>选项 A</strong>：将 .doc 从「支持」改为「可选支持」，在文档中明确「需系统安装 LibreOffice 并配置 <code>soffice</code> 路径」。</li>
+<li><strong>选项 B</strong>：在运行时检测 LibreOffice；若不可用，在 <code>_detect_file_type</code> 或 Adapter 入口返回明确错误（错误码 <code>FORMAT_REQUIRES_CONVERTER</code>），而非静默失败。</li>
+<li><strong>采纳</strong>：A + B 组合。文档声明可选依赖与环境要求；代码在 WordAdapter 内检测转换器可用性，不可用时快速失败并带上可恢复建议。</li>
+</ul>
+<p><strong>D1.2 文件类型检测完整性</strong></p>
+<ul>
+<li>在 <code>ParserDispatcher._detect_file_type</code> 的扩展名 <code>mapping</code> 中显式增加 <code>.doc</code> → <code>word</code>。</li>
+<li>当 Magic Number 与扩展名冲突时（例如扩展名为 .doc 但 Magic 为 PDF），优先信任 Magic Number，并在日志中记录冲突；必要时在 <code>Provenance</code> 中增加 <code>detected_vs_extension</code> 供审计。</li>
+</ul>
+<p><strong>D1.3 Office 格式能力边界文档化</strong></p>
+<ul>
+<li>在 <code>docs/guide/formats.md</code> 中为每种 Office 格式增加「能力矩阵」小节：</li>
+<li>支持的要素：正文、标题、表格、列表、图片、页眉页脚等。</li>
+<li>不支持的要素：OLE 嵌入、复杂批注、修订模式、宏等。</li>
+<li>与 Block 类型的对应关系（如 Excel 的 sheet/range → table block）。</li>
+<li>为 Word/Excel/PPT 各增加至少 1 个「边界用例」测试（如多栏、合并单元格、嵌入表），作为回归基线。</li>
+</ul>
+<h3 id="23">2.3 实现要点<a class="headerlink" href="#23" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>WordAdapter</strong>：在 <code>perceive()</code> 或首次处理 .doc 时调用 <code>shutil.which("soffice")</code>（或可配置路径）；若为 .doc 且未找到，在构造 PerceptionResult 时设置 <code>error.code = "FORMAT_REQUIRES_CONVERTER"</code>、<code>error.recoverable = True</code>，并在 <code>error.message</code> 中说明需安装 LibreOffice。</li>
+<li><strong>Dispatcher</strong>：<code>mapping</code> 增加 <code>".doc": "word"</code>；在 <code>_build_failure</code> 或成功路径的 <code>provenance.source</code> 中可选写入 <code>file_type_detected_by</code>（<code>magic</code> | <code>extension</code>）及冲突标记。</li>
+<li><strong>文档</strong>：在 <code>getting-started/installation.md</code> 增加「可选：Legacy .doc 支持」小节，说明安装 LibreOffice 及路径配置。</li>
+</ul>
+<h3 id="24">2.4 验收标准<a class="headerlink" href="#24" title="Permanent link">&para;</a></h3>
+<ul>
+<li>[ ] README 与 formats 文档中 .doc 支持条件与限制已明确。</li>
+<li>[ ] 扩展名为 .doc 且 Magic 为 MS Office 时，能正确路由到 WordAdapter。</li>
+<li>[ ] .doc 在无 LibreOffice 时返回统一错误码与可恢复建议，且不抛未处理异常。</li>
+<li>[ ] formats.md 包含 Word/Excel/PPT 能力矩阵与 Block 映射说明；各至少 1 个边界用例测试并入 CI。</li>
+</ul>
+<hr />
+<h2 id="3-g2">3. 测试与质量保障（G2）<a class="headerlink" href="#3-g2" title="Permanent link">&para;</a></h2>
+<h3 id="31">3.1 问题摘要<a class="headerlink" href="#31" title="Permanent link">&para;</a></h3>
+<ul>
+<li>单测规模相对策略与中间件数量偏少；各 table extraction layer、各 middleware、各 adapter 缺少细粒度单测。</li>
+<li>缺少「真实样本 + 金标」的回归集与可量化的准确率/F1/表格结构匹配指标。</li>
+<li>CI 中无耗时与内存回归门禁，大文档与高并发行为未固化。</li>
+</ul>
+<h3 id="32">3.2 设计决策<a class="headerlink" href="#32" title="Permanent link">&para;</a></h3>
+<p><strong>D2.1 测试分层与覆盖目标</strong></p>
+<ul>
+<li><strong>L1 单元测试</strong>：每个 table extraction layer（pipe、lines、hline、rect、text、char_*、rapid_table、clustering）至少 1 个「输入 page_plum + 预期 table」的纯函数测试；每个 Middleware 至少 1 个「给定 EnhancedResult → 断言 enhanced_data / status」的测试；每个 Adapter 的 <code>to_base_result</code> 或 <code>perceive</code> 用最小 fixture（如 1 页 PDF、1 个简单 xlsx）做快照或关键字段断言。</li>
+<li><strong>L2 集成测试</strong>：保留并扩展 <code>test_e2e_parse.py</code>，覆盖「Dispatcher → Adapter → Orchestrator → PerceptionResult」全链路，格式至少包含 pdf、image、word、excel；使用 fixtures 目录下的真实样本，并记录 <code>status</code>、<code>block_count</code>、<code>table_count</code>、<code>content.text</code> 长度等可重复指标。</li>
+<li><strong>L3 回归与金标</strong>：引入「金标数据集」目录（如 <code>tests/golden/</code>），目录结构按格式与场景分类；每个样本附带 <code>expected.json</code>（或 <code>expected.yaml</code>）描述最小断言（如表格行数、关键实体键存在性）；CI 中运行 golden 测试并对比，差异需显式 approve 或更新 expected。</li>
+</ul>
+<p><strong>D2.2 金标数据与指标</strong></p>
+<ul>
+<li>金标样本不进入主仓库大文件时，使用 Git LFS 或 CI 从外部存储下载；仓库内保留 <code>tests/golden/README.md</code> 说明每类样本的用途与预期指标。</li>
+<li>定义 2～3 个可自动计算的「文档级指标」：例如表格结构一致率（header + 行数列数）、关键实体存在率、Validator 的 l2_score 分布；在 CI 的 golden 运行后输出 summary（如 <code>table_match_rate &gt;= 0.95</code>），门禁可选（先 report-only，再逐步设阈值）。</li>
+</ul>
+<p><strong>D2.3 性能与资源门禁</strong></p>
+<ul>
+<li>在 CI 中增加可选 job（如 <code>ci-performance</code>）：对固定的一组「小/中/大」PDF 与图片，运行 <code>perceive_document</code>，记录总耗时与峰值内存；输出为 artifact；门禁策略可为「不超过基线 1.5x」或「P95 耗时 &lt; 某值」，基线由历史运行结果确定并存储在仓库或 CI 变量中。</li>
+<li>大文档与高并发：在 <code>tests/</code> 下增加 <code>test_concurrent_parse.py</code>（如 5 个并发任务），断言无死锁、无 OOM、所有结果 status 为 success 或 partial；可标记为 <code>@pytest.mark.slow</code> 并在默认 CI 中跳过，由 cron 或手动触发。</li>
+</ul>
+<h3 id="33">3.3 实现要点<a class="headerlink" href="#33" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>目录结构建议</strong>：</li>
+<li><code>tests/unit/table/</code>：按 layer 或策略文件组织 table 单测。</li>
+<li><code>tests/unit/middlewares/</code>：按中间件名称组织。</li>
+<li><code>tests/unit/adapters/</code>：按格式组织。</li>
+<li><code>tests/golden/</code>：按 <code>pdf/</code>、<code>image/</code>、<code>word/</code> 等分子目录，每样本一个子目录，内含源文件 + <code>expected.json</code>。</li>
+<li><strong>金标断言</strong>：使用小型 DSL 或 JSON schema 描述 expected（如 <code>{"tables": [{"min_rows": 2, "header_contains": ["日期"]}], "entities": ["account_holder"]}</code>），由 pytest fixture 加载并做宽松匹配（存在性、最小值），避免对具体文本的强绑定。</li>
+<li><strong>CI 配置</strong>：在 <code>.github/workflows/ci.yml</code> 中增加 <code>tests-golden</code> 与可选的 <code>tests-performance</code> job；性能 job 使用 <code>pytest --benchmark</code> 或自定义 timing 输出。</li>
+</ul>
+<h3 id="34">3.4 验收标准<a class="headerlink" href="#34" title="Permanent link">&para;</a></h3>
+<ul>
+<li>[ ] 每个 table extraction layer 至少有 1 个单测；每个 Middleware 至少有 1 个单测；每个 Adapter 至少有 1 个集成级测试。</li>
+<li>[ ] <code>tests/golden/</code> 存在且至少包含 2 种格式（如 pdf + image）各至少 1 个样本及 expected 描述；CI 中 golden 测试可运行并通过。</li>
+<li>[ ] CI 中可选性能 job 存在，能产出耗时/内存报告；并发测试存在且通过（可标记 slow）。</li>
+<li>[ ] 文档 <code>docs/contributing.md</code> 或新文档 <code>docs/development/testing.md</code> 中说明测试分层、如何添加金标样本与如何运行性能测试。</li>
+</ul>
+<hr />
+<h2 id="4-g3">4. 错误处理与边界（G3）<a class="headerlink" href="#4-g3" title="Permanent link">&para;</a></h2>
+<h3 id="41">4.1 问题摘要<a class="headerlink" href="#41" title="Permanent link">&para;</a></h3>
+<ul>
+<li>大量 <code>except Exception: logger.debug(...)</code> 导致静默降级，难以排查；缺少结构化错误码与可恢复/不可恢复区分。</li>
+<li>「无表格」在纯文本文档中为正常情况，与「解析失败」混用 status/error 易误解。</li>
+<li>PDF 整本失败时无「仅文本 / 仅图片」的降级策略说明。</li>
+</ul>
+<h3 id="42">4.2 设计决策<a class="headerlink" href="#42" title="Permanent link">&para;</a></h3>
+<p><strong>D3.1 统一错误码与可恢复性</strong></p>
+<ul>
+<li>在 <code>docmirror/core/exceptions.py</code>（或新建 <code>docmirror/models/errors.py</code>）中定义 <strong>错误码枚举</strong> 与 <strong>可恢复性</strong> 规则，供 PerceptionResult.error 与 API 使用：</li>
+<li>示例：<code>FILE_NOT_FOUND</code>、<code>FILE_TOO_SMALL</code>、<code>FILE_TOO_LARGE</code>、<code>UNSUPPORTED_FORMAT</code>、<code>FORMAT_REQUIRES_CONVERTER</code>、<code>EXTRACTION_FAILED</code>、<code>ORCHESTRATION_FAILURE</code>、<code>ENCRYPTED_PDF</code>、<code>TIMEOUT</code> 等。</li>
+<li>每个错误码对应 <code>recoverable: bool</code> 与建议的 <code>user_message</code> 模板（可被 i18n 替换）。</li>
+<li>在 <code>ErrorDetail</code> 中强制使用 <code>code: str</code>（来自枚举），保留 <code>message</code> 为详细技术信息；对外 API 可使用 <code>user_message</code> 或根据 code 生成。</li>
+</ul>
+<p><strong>D3.2 区分「无表格」与「解析失败」</strong></p>
+<ul>
+<li>引入或复用 <strong>解析意图 / 文档类型</strong> 信号：例如 PreAnalyzer 的 <code>content_type</code>（<code>table_dominant</code> / <code>text_dominant</code> / <code>mixed</code>）。</li>
+<li>规则：当 <code>content_type != "table_dominant"</code> 且 <code>table_count == 0</code> 时，不将 status 降级为 partial，也不注入 "No tables found" 类 error；仅当 <code>table_dominant</code> 且 table_count 为 0 时，才设为 partial 并记录该 error。</li>
+<li>可选：在 PerceptionResult 或 diagnostics 中增加 <code>expect_tables: Optional[bool]</code>，由 PreAnalyzer 或 SceneDetector 写入，供上游判断。</li>
+</ul>
+<p><strong>D3.3 降级策略文档与可选实现</strong></p>
+<ul>
+<li>在 <code>docs/guide/configuration.md</code> 或新文档 <code>docs/guide/error-handling.md</code> 中明确：</li>
+<li>当前行为：PDF 主路径失败时返回失败结果；无自动「仅文本」或「仅图片」降级。</li>
+<li>可选策略（设计层）：支持配置项如 <code>fallback_on_full_failure: "text_only" | "none"</code>，在 Dispatcher 或 PDFAdapter 内，当主 pipeline 失败时尝试仅提取文本（如 fitz get_text）并返回 partial 结果；实现可放在后续迭代。</li>
+<li>代码中在关键路径（如 Orchestrator.run_pipeline、Dispatcher.process）将「已知业务异常」与「未知异常」区分：已知异常映射到错误码并设置 recoverable；未知异常记录为 <code>ORCHESTRATION_FAILURE</code> 或 <code>EXTRACTION_FAILED</code>，并记录 traceback 到日志，避免裸 <code>except Exception</code> 吞掉。</li>
+</ul>
+<h3 id="43">4.3 实现要点<a class="headerlink" href="#43" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>错误码模块</strong>：例如 <code>DocMirrorErrorCode</code> 枚举 + <code>ERROR_META: Dict[str, {recoverable, user_message_template}]</code>；<code>_build_failure</code> 与 Adapter 内统一使用该模块生成 <code>ErrorDetail</code>。</li>
+<li><strong>Orchestrator</strong>：在「无 table_blocks 且 status == success」的当前逻辑前，增加对 <code>pre_analysis.content_type</code> 或 <code>result.enhanced_data.get("expect_tables")</code> 的判断；仅当期望有表且无表时才降级并添加 error。</li>
+<li><strong>日志</strong>：对静默吞掉的异常，至少在使用 <code>logger.debug</code> 时包含 <code>exc_info=True</code> 一次（或使用 <code>logger.exception</code> 在 WARNING 级别），便于排查；同时保证不因日志量影响生产，可通过 <code>DOCMIRROR_LOG_LEVEL</code> 控制。</li>
+</ul>
+<h3 id="44">4.4 验收标准<a class="headerlink" href="#44" title="Permanent link">&para;</a></h3>
+<ul>
+<li>[ ] 存在统一错误码定义与 ErrorDetail 的 code/recoverable 使用规范；所有 <code>_build_failure</code> 及主要 Adapter 失败路径使用该规范。</li>
+<li>[ ] 「无表格」仅在 table_dominant 场景下导致 partial + error；纯文本文档无表时仍为 success。</li>
+<li>[ ] 文档中已说明当前失败行为与可选降级策略（含未来设计）；关键路径无裸 <code>except Exception</code> 静默吞掉（至少带 exc_info 或 exception 日志）。</li>
+</ul>
+<hr />
+<h2 id="5-g4">5. 性能与资源（G4）<a class="headerlink" href="#5-g4" title="Permanent link">&para;</a></h2>
+<h3 id="51">5.1 问题摘要<a class="headerlink" href="#51" title="Permanent link">&para;</a></h3>
+<ul>
+<li>页级并发默认 1，大文档无法利用多核；整本 PDF 加载到内存，超大文件存在 OOM 风险。</li>
+<li>RapidTable 约 10s/页，无按页数或质量跳过该层的配置。</li>
+</ul>
+<h3 id="52">5.2 设计决策<a class="headerlink" href="#52" title="Permanent link">&para;</a></h3>
+<p><strong>D4.1 页级并发与线程安全</strong></p>
+<ul>
+<li><strong>现状</strong>：<code>CoreExtractor</code> 使用共享 fitz/pdfplumber 文档，多线程写同一对象不安全，故 <code>max_page_concurrency=1</code>。</li>
+<li><strong>方向</strong>：在「每页独立读取」的前提下支持并发：即对每一页用 <code>fitz.open(path)[page_idx]</code> 或等价方式在 worker 内打开页面数据，避免共享同一 Document 对象写；或使用进程池（每进程独立 open）以隔离 GIL，代价为序列化与内存复制。优先方案为「线程池 + 每页按需 crop 或按页 open」的可行性验证；若依赖 pdfplumber 的 <code>pages[i]</code> 必须来自同一 <code>open()</code>，则文档中明确「当前设计为单线程页处理，大文档耗时随页数线性增长」。</li>
+<li><strong>配置</strong>：保留 <code>max_page_concurrency</code>，当 &gt;1 时仅在实现验证通过后启用；否则忽略并打 WARNING 日志，避免静默错误行为。</li>
+</ul>
+<p><strong>D4.2 大文件与内存</strong></p>
+<ul>
+<li><strong>短期</strong>：在文档与配置中明确 <code>max_file_size</code>（当前 500MB）的语义，并建议对超大 PDF 先做「页范围」或「页采样」预处理（业务侧）；在 Dispatcher 中对超过某阈值（如 50MB）的文件打 WARNING 日志，提示可能的高内存占用。</li>
+<li><strong>中期</strong>：设计「流式/按页加载」接口：例如 <code>perceive_document(path, page_range=(1, 10))</code> 或 <code>perceive_pages(path, page_indices=[0,1,2])</code>，仅打开指定页并返回该子集的 PerceptionResult；实现时需保证 fitz/pdfplumber 按页打开或按需加载，避免整本加载。</li>
+</ul>
+<p><strong>D4.3 RapidTable 与策略开关</strong></p>
+<ul>
+<li>在 <code>docmirror/configs/settings.py</code> 或表提取相关配置中增加：</li>
+<li><code>table_rapid_max_pages: Optional[int]</code>：当文档页数超过该值时，跳过 RapidTable 层（或仅对前 N 页启用）。</li>
+<li><code>table_rapid_min_confidence_threshold: float</code>：仅当上游 layer 返回的 confidence 低于该值时才尝试 RapidTable；默认 0.3。</li>
+<li>在 <code>extract_tables_layered</code> 中读取上述配置（或通过 <code>strategy_params</code> 传入），在进入 L2.5 前判断；若跳过，在 <code>_layer_timings_var</code> 或 metadata 中记录 <code>rapid_table_skipped: reason</code>。</li>
+</ul>
+<h3 id="53">5.3 实现要点<a class="headerlink" href="#53" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>配置项</strong>：在 <code>DocMirrorSettings</code> 或 table 专用配置中增加 <code>table_rapid_max_pages</code>、<code>table_rapid_min_confidence_threshold</code>；通过环境变量 <code>DOCMIRROR_TABLE_RAPID_MAX_PAGES</code> 等注入。</li>
+<li><strong>extract_tables_layered</strong>：在调用 <code>_extract_by_rapid_table</code> 前，若 <code>page_count &gt; table_rapid_max_pages</code> 或上游 <code>confidence &gt;= table_rapid_min_confidence_threshold</code>，则跳过并记录。</li>
+<li><strong>文档</strong>：在 configuration 中说明上述两个参数及「大文档建议」；在 architecture 或 performance 小节说明当前页处理为顺序模型及原因。</li>
+</ul>
+<h3 id="54">5.4 验收标准<a class="headerlink" href="#54" title="Permanent link">&para;</a></h3>
+<ul>
+<li>[ ] <code>table_rapid_max_pages</code> 与 <code>table_rapid_min_confidence_threshold</code> 已存在且生效；超过页数或高于置信度时 RapidTable 被跳过并有日志或 metadata 记录。</li>
+<li>[ ] 文档中已说明 <code>max_file_size</code>、大文件风险与可选「页范围」使用方式；若已实现 <code>page_range</code>/<code>page_indices</code>，则文档与 API 一致。</li>
+<li>[ ] 若页级并发已实现，CI 或文档中说明使用条件与限制；否则文档中明确当前为顺序页处理。</li>
+</ul>
+<hr />
+<h2 id="6-g5">6. 安全与隐私（G5）<a class="headerlink" href="#6-g5" title="Permanent link">&para;</a></h2>
+<h3 id="61">6.1 问题摘要<a class="headerlink" href="#61" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Redis 缓存 key 含 checksum，同一文件不同路径会共享缓存；缓存语义需在文档中说明。</li>
+<li>伪造检测元数据黑名单可能将正常导出判为可疑，需可配置或明确「仅供参考」的定位。</li>
+</ul>
+<h3 id="62">6.2 设计决策<a class="headerlink" href="#62" title="Permanent link">&para;</a></h3>
+<p><strong>D5.1 缓存语义与路径</strong></p>
+<ul>
+<li><strong>语义</strong>：缓存 key = <code>checksum + document_type</code>，即「内容相同则共享结果」，与文件路径无关。在 <code>docs/guide/configuration.md</code> 与 <code>docs/guide/architecture.md</code> 的缓存小节中明确写出：</li>
+<li>相同内容（SHA256）不同路径会命中同一缓存；</li>
+<li>若业务需要「同内容不同来源」区分，应在调用方使用不同的 <code>document_type</code> 或不在该场景使用缓存。</li>
+<li><strong>可选</strong>：在 <code>parse_cache.set/get</code> 的 key 中支持可选前缀（如 <code>prefix + checksum</code>），由调用方传入租户或来源标识；默认前缀为空，保持现有行为。</li>
+</ul>
+<p><strong>D5.2 伪造检测可配置与定位</strong></p>
+<ul>
+<li><strong>黑名单可配置</strong>：将 <code>forgery_detector</code> 中的 <code>_SUSPICIOUS_METADATA_LOWER</code> 改为从配置或环境变量加载（如 <code>DOCMIRROR_FORGERY_METADATA_BLACKLIST</code>，JSON 数组）；若未设置则使用当前默认列表；允许部署方覆盖或清空以降低误报。</li>
+<li><strong>文档定位</strong>：在 <code>docs/guide/configuration.md</code> 与 API 响应中说明：伪造检测结果为「辅助参考」，不构成法律或合规结论；并说明哪些元数据会触发、如何配置黑名单。</li>
+<li><strong>结果字段</strong>：保持 <code>is_forged</code>、<code>forgery_reasons</code>；在 Provenance 或 Validation 中可增加 <code>forgery_detection_note: Optional[str]</code>，用于放置「本结果仅供参考」等说明（可由配置注入）。</li>
+</ul>
+<h3 id="63">6.3 实现要点<a class="headerlink" href="#63" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>配置</strong>：在 <code>DocMirrorSettings</code> 或 security 专用配置中增加 <code>forgery_metadata_blacklist: List[str]</code>，从 env 的 JSON 字符串解析；<code>forgery_detector</code> 使用该列表而非硬编码常量。</li>
+<li><strong>文档</strong>：在 configuration 中新增「缓存」与「安全与伪造检测」小节；在 API 文档或 PerceptionResult 说明中注明 trust/validation 的用途与限制。</li>
+<li><strong>缓存 key</strong>：若实现前缀，在 <code>framework/cache.py</code> 的 <code>get/set</code> 签名中增加 <code>key_prefix: str = ""</code>，并文档化。</li>
+</ul>
+<h3 id="64">6.4 验收标准<a class="headerlink" href="#64" title="Permanent link">&para;</a></h3>
+<ul>
+<li>[ ] 缓存 key 语义（内容相同即共享、与路径无关）及可选前缀（若实现）已在文档中说明。</li>
+<li>[ ] 伪造检测元数据黑名单可配置；未配置时行为与当前一致。</li>
+<li>[ ] 文档与 API 中已明确伪造检测的「仅供参考」定位及配置方式。</li>
+</ul>
+<hr />
+<h2 id="7-api-g6">7. 文档与 API 一致性（G6）<a class="headerlink" href="#7-api-g6" title="Permanent link">&para;</a></h2>
+<h3 id="71">7.1 问题摘要<a class="headerlink" href="#71" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>enhance_mode</code> 的 <code>full</code> 与 <code>standard</code> 差异未在代码或文档中写清；Builder 通过 shim 导入，长期应统一入口。</li>
+</ul>
+<h3 id="72">7.2 设计决策<a class="headerlink" href="#72" title="Permanent link">&para;</a></h3>
+<p><strong>D6.1 enhance_mode 语义</strong></p>
+<ul>
+<li>在代码中确认并固定语义：</li>
+<li><code>raw</code>：仅 CoreExtractor，无中间件。</li>
+<li><code>standard</code>：SceneDetector + EntityExtractor + InstitutionDetector + Validator（及当前 pipeline_registry 中为该模式配置的其它中间件）。</li>
+<li><code>full</code>：若与 standard 当前实现相同，则文档中写「full 与 standard 当前等价，保留 full 供未来扩展（如更多中间件或 LLM 增强）」；若已有差异，在 <code>_build_middlewares</code> 或 <code>get_pipeline_config</code> 中明确列出 full 的额外中间件，并在文档中列出。</li>
+<li>在 <code>docs/guide/configuration.md</code> 中增加「增强模式」小节：表格列出 raw / standard / full 的差异（中间件列表、典型用途、性能影响）。</li>
+</ul>
+<p><strong>D6.2 Builder 与 PerceptionResult 导入</strong></p>
+<ul>
+<li>推荐统一从 <code>docmirror.models</code> 对外暴露：<code>from docmirror.models import PerceptionResult, PerceptionResultBuilder</code>（在 <code>models/__init__.py</code> 中从 <code>construction.builder</code> 再导出 <code>PerceptionResultBuilder</code>）。</li>
+<li>内部与 Adapter 逐步改为 <code>from docmirror.models import PerceptionResultBuilder</code> 或 <code>from docmirror.models.construction.builder import PerceptionResultBuilder</code>；弃用 <code>from docmirror.models.builder import ...</code> 的 shim，或在 deprecation 周期内保留并打 DeprecationWarning。</li>
+<li>在 contributing 或开发文档中说明「新代码请从 <code>docmirror.models</code> 导入模型与 Builder」。</li>
+</ul>
+<h3 id="73">7.3 实现要点<a class="headerlink" href="#73" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>pipeline_registry</strong>：检查 <code>get_pipeline_config(..., "full")</code> 与 <code>"standard"</code> 的返回值；若一致，在代码注释与文档中说明「full 目前等价 standard」。</li>
+<li><strong>models/<strong>init</strong>.py</strong>：添加 <code>PerceptionResultBuilder</code> 的导出；在 <code>docmirror/__init__.py</code> 中如需对外也可导出。</li>
+<li><strong>文档</strong>：configuration 中增加 enhance_mode 表格；API 或 architecture 中说明推荐导入路径。</li>
+</ul>
+<h3 id="74">7.4 验收标准<a class="headerlink" href="#74" title="Permanent link">&para;</a></h3>
+<ul>
+<li>[ ] 文档中明确列出 raw / standard / full 的差异（或声明 full 与 standard 当前等价）。</li>
+<li>[ ] <code>PerceptionResultBuilder</code> 可从 <code>docmirror.models</code> 导入；旧 <code>models.builder</code> 路径有弃用说明或 DeprecationWarning，并在文档中标注推荐导入方式。</li>
+</ul>
+<hr />
+<h2 id="8-g7">8. 类型与可维护性（G7）<a class="headerlink" href="#8-g7" title="Permanent link">&para;</a></h2>
+<h3 id="81">8.1 问题摘要<a class="headerlink" href="#81" title="Permanent link">&para;</a></h3>
+<ul>
+<li>mypy 使用 <code>ignore_missing_imports = true</code>，可选依赖与第三方缺少 stub，类型安全主要靠约定；domain 模型（dataclass）与 Pydantic（PerceptionResult）两套，演进时需同步 Builder。</li>
+</ul>
+<h3 id="82">8.2 设计决策<a class="headerlink" href="#82" title="Permanent link">&para;</a></h3>
+<p><strong>D7.1 类型与 mypy</strong></p>
+<ul>
+<li><strong>短期</strong>：对核心公共 API（如 <code>perceive_document</code>、<code>PerceptionResult</code>、<code>BaseParser.perceive</code>）保证类型注解完整；在 CI 中对 <code>docmirror/</code> 运行 mypy，仅对已标注模块严格（可先排除 <code>**/ocr/**</code> 等重度依赖可选包的路径）。</li>
+<li><strong>中期</strong>：为可选依赖（如 rapidocr、pdfplumber、fitz）在 <code>py.typed</code> 或 stub 目录中提供最小 stub（仅用到的签名），或使用 <code>types-*</code> 若存在；逐步将 <code>ignore_missing_imports</code> 改为按包或按目录关闭。</li>
+</ul>
+<p><strong>D7.2 模型演进与 Builder 同步</strong></p>
+<ul>
+<li>在 <code>docs/development/</code> 或 contributing 中增加「模型变更清单」：</li>
+<li>修改 <code>Block</code>、<code>PageLayout</code>、<code>BaseResult</code> 等 domain 模型时，必须同步检查 <code>PerceptionResultBuilder.build</code> 与 <code>_map_block</code> 及所有产出 <code>ContentBlock</code> 的路径。</li>
+<li>修改 <code>PerceptionResult</code>、<code>ContentBlock</code>、<code>DocumentContent</code> 等 Pydantic 模型时，必须同步检查 Builder 与 Dispatcher 的 <code>_build_failure</code>、cache 的序列化。</li>
+<li>在关键 Builder 函数上增加单元测试：给定最小 BaseResult + EnhancedResult，断言生成的 PerceptionResult 的 <code>content.blocks</code> 数量与类型、必要字段非空；domain 或 Pydantic 变更时跑该测试以发现断裂。</li>
+</ul>
+<h3 id="83">8.3 实现要点<a class="headerlink" href="#83" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>mypy</strong>：在 <code>pyproject.toml</code> 或 <code>mypy.ini</code> 中配置 <code>files = docmirror</code>，对指定子包不使用 <code>ignore_missing_imports</code>（或使用 <code>[[tool.mypy.overrides]]</code> 按路径区分）；CI 中增加 <code>mypy docmirror</code> 步骤。</li>
+<li><strong>文档</strong>：在 contributing 中增加「模型与 Builder 变更检查清单」；列出 Builder 单测文件，并说明新增 Block 类型或 ContentBlockType 时需更新的位置。</li>
+</ul>
+<h3 id="84">8.4 验收标准<a class="headerlink" href="#84" title="Permanent link">&para;</a></h3>
+<ul>
+<li>[ ] 至少对 <code>framework/</code>、<code>models/</code>、公共 <code>__init__.py</code> 运行 mypy 且无新增错误；可选依赖可仍 ignore，但需有清单说明。</li>
+<li>[ ] 存在「模型变更检查清单」文档；Builder 有单测覆盖 <code>_map_block</code> 或 <code>build</code> 的典型输入，且 CI 通过。</li>
+</ul>
+<hr />
+<h2 id="9">9. 实施路线图<a class="headerlink" href="#9" title="Permanent link">&para;</a></h2>
+<h3 id="91">9.1 阶段划分<a class="headerlink" href="#91" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>阶段</th>
+<th>目标</th>
+<th>建议周期</th>
+<th>主要交付</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Phase 0</strong></td>
+<td>风险与可观测性</td>
+<td>1～2 周</td>
+<td>错误码与「无表格」逻辑（§4）；enhance_mode 与缓存/伪造检测文档（§6、§7）；Builder 导入统一（§7）。</td>
+</tr>
+<tr>
+<td><strong>Phase 1</strong></td>
+<td>质量与测试基线</td>
+<td>2～3 周</td>
+<td>测试分层与单测补充（§3）；金标目录与 CI golden job（§3）；格式与 .doc 行为与文档（§2）。</td>
+</tr>
+<tr>
+<td><strong>Phase 2</strong></td>
+<td>性能与资源可控</td>
+<td>2 周</td>
+<td>RapidTable 开关与配置（§5）；大文件与缓存语义文档（§5、§6）；可选性能/并发 CI job（§3）。</td>
+</tr>
+<tr>
+<td><strong>Phase 3</strong></td>
+<td>长期可维护性</td>
+<td>持续</td>
+<td>mypy 严格化与模型变更清单（§8）；页级并发或 page_range 设计/实现（§5）；流式或按页加载的进一步设计。</td>
+</tr>
+</tbody>
+</table>
+<h3 id="92">9.2 依赖关系<a class="headerlink" href="#92" title="Permanent link">&para;</a></h3>
+<ul>
+<li>§4（错误处理）与 §7（enhance_mode/导入）无前置依赖，可立即开工。</li>
+<li>§3（测试）可为 §2、§4、§5 的改动提供回归保护，建议与 Phase 0 并行启动部分单测。</li>
+<li>§5 的 RapidTable 配置与 §3 的性能 job 可并行；§5 的页级并发或 page_range 依赖设计评审后再实现。</li>
+</ul>
+<h3 id="93">9.3 评审与迭代<a class="headerlink" href="#93" title="Permanent link">&para;</a></h3>
+<ul>
+<li>本设计文档应在每个 Phase 结束前做一次「实现 vs 设计」对照评审，更新验收状态与未决项。</li>
+<li>新发现的不足或风险可追加到本文档「不足与方案映射」表，并对应新增章节或修订现有章节。</li>
+</ul>
+<hr />
+<h2 id="10">10. 附录<a class="headerlink" href="#10" title="Permanent link">&para;</a></h2>
+<h3 id="a">A. 错误码建议列表（初版）<a class="headerlink" href="#a" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>recoverable</th>
+<th>典型场景</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>FILE_NOT_FOUND</code></td>
+<td>否</td>
+<td>路径不存在</td>
+</tr>
+<tr>
+<td><code>FILE_TOO_SMALL</code></td>
+<td>否</td>
+<td>小于 min_file_size</td>
+</tr>
+<tr>
+<td><code>FILE_TOO_LARGE</code></td>
+<td>否</td>
+<td>大于 max_file_size</td>
+</tr>
+<tr>
+<td><code>UNSUPPORTED_FORMAT</code></td>
+<td>否</td>
+<td>无法识别的格式</td>
+</tr>
+<tr>
+<td><code>FORMAT_REQUIRES_CONVERTER</code></td>
+<td>是</td>
+<td>.doc 需 LibreOffice</td>
+</tr>
+<tr>
+<td><code>EXTRACTION_FAILED</code></td>
+<td>视情况</td>
+<td>核心提取异常</td>
+</tr>
+<tr>
+<td><code>ORCHESTRATION_FAILURE</code></td>
+<td>否</td>
+<td>管道未捕获异常</td>
+</tr>
+<tr>
+<td><code>ENCRYPTED_PDF</code></td>
+<td>是</td>
+<td>需密码的 PDF</td>
+</tr>
+<tr>
+<td><code>TIMEOUT</code></td>
+<td>是</td>
+<td>超时（若未来支持）</td>
+</tr>
+</tbody>
+</table>
+<h3 id="b-expected-json">B. 金标 expected 最小结构示例（JSON）<a class="headerlink" href="#b-expected-json" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="p">{</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="nt">&quot;version&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span><span class="nt">&quot;assertions&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">    </span><span class="nt">&quot;status&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;success&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;partial&quot;</span><span class="p">],</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">    </span><span class="nt">&quot;table_count&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;min&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="p">},</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">    </span><span class="nt">&quot;tables&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">      </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;min_rows&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;header_contains_any&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;日期&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;交易日期&quot;</span><span class="p">]</span><span class="w"> </span><span class="p">}</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="w">    </span><span class="p">],</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">    </span><span class="nt">&quot;entities_required&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;account_holder&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;account_number&quot;</span><span class="p">]</span>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="w">  </span><span class="p">}</span>
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="p">}</span>
+</code></pre></div>
+<h3 id="c">C. 文档变更清单（随实现更新）<a class="headerlink" href="#c" title="Permanent link">&para;</a></h3>
+<ul>
+<li>[ ] <code>docs/guide/configuration.md</code>：增强模式、缓存、伪造检测、RapidTable/大文件相关配置。</li>
+<li>[ ] <code>docs/guide/formats.md</code>：.doc 支持条件、Office 能力矩阵与 Block 映射。</li>
+<li>[ ] <code>docs/guide/error-handling.md</code>（新建）：错误码、可恢复性、降级策略。</li>
+<li>[ ] <code>docs/guide/architecture.md</code>：缓存 key 语义、可选 key_prefix。</li>
+<li>[ ] <code>docs/getting-started/installation.md</code>：Legacy .doc 与 LibreOffice。</li>
+<li>[ ] <code>docs/development/testing.md</code>（新建）：测试分层、金标、性能测试说明。</li>
+<li>[ ] <code>docs/contributing.md</code> 或开发文档：模型变更清单、推荐导入路径、mypy 范围。</li>
+</ul>
+<hr />
+<p><em>文档版本：1.0 | 与《DocMirror 项目深度分析报告》不足与风险一一对应，可作为迭代与评审依据。</em></p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/valuemapglobal/docmirror" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.sections", "navigation.expand", "content.code.copy", "search.suggest", "search.highlight"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
