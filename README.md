@@ -17,6 +17,10 @@
 </p>
 
 <p align="center">
+  <b>English</b> | <a href="README_zh-CN.md">简体中文</a>
+</p>
+
+<p align="center">
   <a href="#-quick-start">Quick Start</a> •
   <a href="#-key-features">Key Features</a> •
   <a href="#-architecture">Architecture</a> •
@@ -196,7 +200,7 @@ DocMirror produces a standardized RESTful JSON envelope:
 ```json
 {"text": "2,970.00", "data_type": "currency"}
 {"text": "2025-03-27", "data_type": "date"}
-{"text": "重庆银行"}
+{"text": "Demo Bank"}
 ```
 
 ## 📋 Supported Formats
