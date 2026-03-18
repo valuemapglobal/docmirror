@@ -17,8 +17,8 @@ dependencies:
 Upstream code accesses low-level capabilities only through these Engine
 classes, making future library replacements straightforward.
 """
-from __future__ import annotations
 
+from __future__ import annotations
 
 import logging
 from pathlib import Path
@@ -30,6 +30,7 @@ logger = logging.getLogger(__name__)
 # ===============================================================================
 # PyMuPDF Engine
 # ===============================================================================
+
 
 class FitzEngine:
     """
@@ -45,6 +46,7 @@ class FitzEngine:
     def open(file_path: Path):
         """Open a PDF and return a fitz.Document."""
         import fitz
+
         return fitz.open(str(file_path))
 
     @staticmethod
@@ -66,9 +68,8 @@ class FitzEngine:
         """Extract full text from a single page."""
         return fitz_page.get_text()
 
-
     @staticmethod
-    def extract_page_blocks_with_style(fitz_page) -> List[Dict[str, Any]]:
+    def extract_page_blocks_with_style(fitz_page) -> list[dict[str, Any]]:
         """
         Extract text blocks from a single page with font/colour info.
 
@@ -89,29 +90,31 @@ class FitzEngine:
                 continue
             for line in block.get("lines", []):
                 for span in line.get("spans", []):
-                    result.append({
-                        "text": span.get("text", ""),
-                        "bbox": (
-                            span.get("bbox", (0, 0, 0, 0))[0],
-                            span.get("bbox", (0, 0, 0, 0))[1],
-                            span.get("bbox", (0, 0, 0, 0))[2],
-                            span.get("bbox", (0, 0, 0, 0))[3],
-                        ),
-                        "font_name": span.get("font", ""),
-                        "font_size": span.get("size", 0.0),
-                        "color": span.get("color", 0),
-                        "flags": span.get("flags", 0),
-                    })
+                    result.append(
+                        {
+                            "text": span.get("text", ""),
+                            "bbox": (
+                                span.get("bbox", (0, 0, 0, 0))[0],
+                                span.get("bbox", (0, 0, 0, 0))[1],
+                                span.get("bbox", (0, 0, 0, 0))[2],
+                                span.get("bbox", (0, 0, 0, 0))[3],
+                            ),
+                            "font_name": span.get("font", ""),
+                            "font_size": span.get("size", 0.0),
+                            "color": span.get("color", 0),
+                            "flags": span.get("flags", 0),
+                        }
+                    )
         return result
 
     @staticmethod
-    def get_page_dimensions(fitz_page) -> Tuple[float, float]:
+    def get_page_dimensions(fitz_page) -> tuple[float, float]:
         """Return page (width, height)."""
         rect = fitz_page.rect
         return rect.width, rect.height
 
     @staticmethod
-    def extract_raw_text_from_bbox(fitz_page, bbox: Tuple[float, float, float, float]) -> str:
+    def extract_raw_text_from_bbox(fitz_page, bbox: tuple[float, float, float, float]) -> str:
         """
         Extract 100% accurate low-level text within a bounding box.
 
@@ -119,8 +122,8 @@ class FitzEngine:
         to prevent digit/character hallucinations.
         """
         import fitz
+
         x0, y0, x1, y1 = bbox
         rect = fitz.Rect(x0, y0, x1, y1)
         # flags=0 extracts plain text in reading order
         return fitz_page.get_text("text", clip=rect).strip()
-

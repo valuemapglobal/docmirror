@@ -23,6 +23,7 @@ Usage::
     # After middleware pipeline: EnhancedResult → ParseResult
     parse_result = ParseResultBridge.from_enhanced_result(enhanced, **context)
 """
+
 from __future__ import annotations
 
 import logging
@@ -31,12 +32,13 @@ from typing import Any, Dict, List, Optional
 logger = logging.getLogger(__name__)
 
 
-def _infer_cell_value(text: str) -> "CellValue":
+def _infer_cell_value(text: str) -> CellValue:
     """Infer CellValue type from raw text string.
 
     Returns CellValue with proper data_type, numeric, and cleaned fields.
     """
     import re
+
     from docmirror.models.entities.parse_result import CellValue, DataType
 
     text = str(text).strip()
@@ -44,28 +46,28 @@ def _infer_cell_value(text: str) -> "CellValue":
         return CellValue(text=text, data_type=DataType.EMPTY)
 
     # Date patterns: 2025-03-27, 2025/03/27, 2025年03月27日
-    if re.match(r'^\d{4}[-/年]\d{1,2}[-/月]\d{1,2}日?$', text):
+    if re.match(r"^\d{4}[-/年]\d{1,2}[-/月]\d{1,2}日?$", text):
         return CellValue(text=text, data_type=DataType.DATE)
 
     # Time pattern: 14:21:48
-    if re.match(r'^\d{2}:\d{2}(:\d{2})?$', text):
+    if re.match(r"^\d{2}:\d{2}(:\d{2})?$", text):
         return CellValue(text=text, data_type=DataType.TEXT)
 
     # Currency/Number: try parsing
-    cleaned = text.replace(',', '').replace('，', '').replace(' ', '')
+    cleaned = text.replace(",", "").replace("，", "").replace(" ", "")
     # Remove currency symbols
-    cleaned = re.sub(r'^[¥$€£]', '', cleaned)
+    cleaned = re.sub(r"^[¥$€£]", "", cleaned)
 
     # Try numeric parse
     try:
-        numeric = float(cleaned)
+        float(cleaned)
         # Long digit-only strings (>10 chars, no decimal) are identifiers
         # (account numbers, ID numbers, invoice codes), not values
-        if re.match(r'^\d{10,}$', cleaned):
+        if re.match(r"^\d{10,}$", cleaned):
             return CellValue(text=text, data_type=DataType.TEXT)
         # Determine if currency (has comma formatting or decimal places typical of money)
-        has_comma = ',' in text or '，' in text
-        has_decimal = '.' in cleaned and len(cleaned.split('.')[-1]) == 2
+        has_comma = "," in text or "，" in text
+        has_decimal = "." in cleaned and len(cleaned.split(".")[-1]) == 2
         if has_comma or has_decimal:
             return CellValue(text=text, data_type=DataType.CURRENCY)
         else:
@@ -76,7 +78,7 @@ def _infer_cell_value(text: str) -> "CellValue":
     return CellValue(text=text, data_type=DataType.TEXT)
 
 
-def _blocks_to_pages(base: "BaseResult"):
+def _blocks_to_pages(base: BaseResult):
     """Convert BaseResult pages/blocks → List[PageContent] for ParseResult.
 
     Mapping:
@@ -85,8 +87,14 @@ def _blocks_to_pages(base: "BaseResult"):
         - Block(type=key_value, raw_content=dict) → KeyValuePair
     """
     from docmirror.models.entities.parse_result import (
-        PageContent, TableBlock, TableRow, CellValue, TextBlock, TextLevel,
-        KeyValuePair, RowType,
+        CellValue,
+        KeyValuePair,
+        PageContent,
+        RowType,
+        TableBlock,
+        TableRow,
+        TextBlock,
+        TextLevel,
     )
 
     pages = []
@@ -105,17 +113,21 @@ def _blocks_to_pages(base: "BaseResult"):
                     for row_data in raw[1:]:
                         if isinstance(row_data, list):
                             cells = [_infer_cell_value(v) for v in row_data]
-                            rows.append(TableRow(
-                                cells=cells,
-                                row_type=RowType.DATA,
-                                source_page=page_layout.page_number,
-                            ))
-                tables.append(TableBlock(
-                    table_id=f"page{page_layout.page_number}_table{len(tables)}",
-                    headers=headers,
-                    rows=rows,
-                    page=page_layout.page_number,
-                ))
+                            rows.append(
+                                TableRow(
+                                    cells=cells,
+                                    row_type=RowType.DATA,
+                                    source_page=page_layout.page_number,
+                                )
+                            )
+                tables.append(
+                    TableBlock(
+                        table_id=f"page{page_layout.page_number}_table{len(tables)}",
+                        headers=headers,
+                        rows=rows,
+                        page=page_layout.page_number,
+                    )
+                )
 
             elif block.block_type in ("text", "title") and isinstance(block.raw_content, str):
                 level = TextLevel.BODY
@@ -125,27 +137,33 @@ def _blocks_to_pages(base: "BaseResult"):
                     level = TextLevel.H2
                 elif block.heading_level == 3:
                     level = TextLevel.H3
-                texts.append(TextBlock(
-                    content=block.raw_content,
-                    level=level,
-                ))
+                texts.append(
+                    TextBlock(
+                        content=block.raw_content,
+                        level=level,
+                    )
+                )
 
             elif block.block_type == "key_value" and isinstance(block.raw_content, dict):
                 for k, v in block.raw_content.items():
                     key_values.append(KeyValuePair(key=str(k), value=str(v)))
 
             elif block.block_type == "footer" and isinstance(block.raw_content, str):
-                texts.append(TextBlock(
-                    content=block.raw_content,
-                    level=TextLevel.FOOTER,
-                ))
+                texts.append(
+                    TextBlock(
+                        content=block.raw_content,
+                        level=TextLevel.FOOTER,
+                    )
+                )
 
-        pages.append(PageContent(
-            page_number=page_layout.page_number,
-            tables=tables,
-            texts=texts,
-            key_values=key_values,
-        ))
+        pages.append(
+            PageContent(
+                page_number=page_layout.page_number,
+                tables=tables,
+                texts=texts,
+                key_values=key_values,
+            )
+        )
 
     return pages
 
@@ -164,7 +182,7 @@ class ParseResultBridge:
     # ══════════════════════════════════════════════════════════════════════
 
     @staticmethod
-    def from_base_result(base: "BaseResult") -> "ParseResult":
+    def from_base_result(base: BaseResult) -> ParseResult:
         """
         Convert BaseResult → ParseResult.
 
@@ -177,8 +195,10 @@ class ParseResultBridge:
             - Block(type=key_value) → KeyValuePair
         """
         from docmirror.models.entities.parse_result import (
-            ParseResult, ParserInfo,
+            ParseResult,
+            ParserInfo,
         )
+
         pages = _blocks_to_pages(base)
         return ParseResult(
             pages=pages,
@@ -189,7 +209,7 @@ class ParseResultBridge:
         )
 
     @staticmethod
-    def to_base_result(pr: "ParseResult") -> "BaseResult":
+    def to_base_result(pr: ParseResult) -> BaseResult:
         """
         Convert ParseResult → BaseResult for middleware pipeline consumption.
 
@@ -209,29 +229,38 @@ class ParseResultBridge:
 
             for text in page_content.texts:
                 from docmirror.models.entities.parse_result import TextLevel
+
                 block_type = "title" if text.level in (TextLevel.TITLE, TextLevel.H1) else "text"
-                blocks.append(Block(
-                    block_type=block_type,
-                    raw_content=text.content,
-                    page=page_content.page_number,
-                    reading_order=reading_order,
-                    heading_level=(
-                        1 if text.level == TextLevel.TITLE else
-                        1 if text.level == TextLevel.H1 else
-                        2 if text.level == TextLevel.H2 else
-                        3 if text.level == TextLevel.H3 else
-                        None
-                    ),
-                ))
+                blocks.append(
+                    Block(
+                        block_type=block_type,
+                        raw_content=text.content,
+                        page=page_content.page_number,
+                        reading_order=reading_order,
+                        heading_level=(
+                            1
+                            if text.level == TextLevel.TITLE
+                            else 1
+                            if text.level == TextLevel.H1
+                            else 2
+                            if text.level == TextLevel.H2
+                            else 3
+                            if text.level == TextLevel.H3
+                            else None
+                        ),
+                    )
+                )
                 reading_order += 1
 
             for kv in page_content.key_values:
-                blocks.append(Block(
-                    block_type="key_value",
-                    raw_content={kv.key: kv.value},
-                    page=page_content.page_number,
-                    reading_order=reading_order,
-                ))
+                blocks.append(
+                    Block(
+                        block_type="key_value",
+                        raw_content={kv.key: kv.value},
+                        page=page_content.page_number,
+                        reading_order=reading_order,
+                    )
+                )
                 reading_order += 1
 
             for table in page_content.tables:
@@ -242,24 +271,28 @@ class ParseResultBridge:
                 for row in table.rows:
                     raw_rows.append([c.text for c in row.cells])
 
-                blocks.append(Block(
-                    block_type="table",
-                    raw_content=raw_rows,
-                    page=page_content.page_number,
-                    reading_order=reading_order,
-                ))
+                blocks.append(
+                    Block(
+                        block_type="table",
+                        raw_content=raw_rows,
+                        page=page_content.page_number,
+                        reading_order=reading_order,
+                    )
+                )
                 reading_order += 1
 
-            pages.append(PageLayout(
-                page_number=page_content.page_number,
-                blocks=tuple(blocks),
-            ))
+            pages.append(
+                PageLayout(
+                    page_number=page_content.page_number,
+                    blocks=tuple(blocks),
+                )
+            )
 
         # Build full text from ParseResult
         full_text = pr.full_text
 
         # Build metadata from entities + parser_info
-        metadata: Dict[str, Any] = {
+        metadata: dict[str, Any] = {
             "source_format": pr.provenance.file_type if pr.provenance else "unknown",
         }
         # Carry entities into metadata for downstream middleware access
@@ -280,9 +313,9 @@ class ParseResultBridge:
 
     @staticmethod
     def from_enhanced_result(
-        enhanced: "EnhancedResult",
+        enhanced: EnhancedResult,
         **context: Any,
-    ) -> "ParseResult":
+    ) -> ParseResult:
         """
         Convert EnhancedResult → ParseResult after middleware pipeline.
 
@@ -296,10 +329,23 @@ class ParseResultBridge:
             - context (file_type, checksum, etc.) → provenance
         """
         from docmirror.models.entities.parse_result import (
-            ParseResult, PageContent, TableBlock, TableRow, CellValue,
-            TextBlock, KeyValuePair, DocumentEntities, ParserInfo,
-            TrustResult, ProvenanceInfo, ErrorDetail,
-            DataType, RowType, TextLevel, ExtractionMethod, ResultStatus,
+            CellValue,
+            DataType,
+            DocumentEntities,
+            ErrorDetail,
+            ExtractionMethod,
+            KeyValuePair,
+            PageContent,
+            ParseResult,
+            ParserInfo,
+            ProvenanceInfo,
+            ResultStatus,
+            RowType,
+            TableBlock,
+            TableRow,
+            TextBlock,
+            TextLevel,
+            TrustResult,
         )
 
         base = enhanced.base_result
@@ -319,7 +365,7 @@ class ParseResultBridge:
         # ── Build parser info ──
         meta = base.metadata or {}
         diag = meta.get("_diagnostics", {})
-        pre_analysis = meta.get("pre_analysis", {})
+        meta.get("pre_analysis", {})
 
         extraction_method = ExtractionMethod.DIGITAL
         method_str = diag.get("extraction_method", "").lower()
@@ -363,7 +409,11 @@ class ParseResultBridge:
 
         # ── Compute confidence ──
         validation = enhanced.enhanced_data.get("validation", {})
-        confidence = validation.get("trust_score", 1.0) / 100.0 if validation.get("trust_score", 0) > 1 else validation.get("trust_score", 1.0)
+        confidence = (
+            validation.get("trust_score", 1.0) / 100.0
+            if validation.get("trust_score", 0) > 1
+            else validation.get("trust_score", 1.0)
+        )
 
         return ParseResult(
             status=status,
@@ -381,10 +431,10 @@ class ParseResultBridge:
 
     @staticmethod
     def merge_enhanced_into(
-        pr: "ParseResult",
-        enhanced: "EnhancedResult",
+        pr: ParseResult,
+        enhanced: EnhancedResult,
         **context: Any,
-    ) -> "ParseResult":
+    ) -> ParseResult:
         """
         Merge middleware-enhanced data into an existing ParseResult.
 
@@ -407,8 +457,11 @@ class ParseResultBridge:
             - error (kept from original PR)
         """
         from docmirror.models.entities.parse_result import (
-            DocumentEntities, ParserInfo, TrustResult, ProvenanceInfo,
+            DocumentEntities,
             ExtractionMethod,
+            ParserInfo,
+            ProvenanceInfo,
+            TrustResult,
         )
 
         meta = (enhanced.base_result.metadata or {}) if enhanced.base_result else {}
@@ -465,11 +518,12 @@ class ParseResultBridge:
 
         # Build new ParseResult preserving original pages (Cell-level precision)
         from docmirror.models.entities.parse_result import ParseResult
+
         return ParseResult(
             status=pr.status,
             confidence=confidence,
             error=pr.error,
-            pages=pr.pages,     # ← preserved: typed CellValue precision intact
+            pages=pr.pages,  # ← preserved: typed CellValue precision intact
             entities=entities,
             parser_info=parser_info,
             trust=trust,

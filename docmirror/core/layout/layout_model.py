@@ -24,8 +24,8 @@ Requirements:
     - rapid-layout  (pip install rapid-layout)
     - onnxruntime   (already present as a RapidOCR dependency)
 """
-from __future__ import annotations
 
+from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
@@ -34,7 +34,8 @@ from typing import List, Tuple
 logger = logging.getLogger(__name__)
 
 try:
-    from rapid_layout import RapidLayout, RapidLayoutInput, ModelType
+    from rapid_layout import ModelType, RapidLayout, RapidLayoutInput
+
     HAS_RAPID_LAYOUT = True
 except ImportError:
     HAS_RAPID_LAYOUT = False
@@ -47,7 +48,7 @@ _CATEGORY_MAP = {
     "title": "title",
     "plain text": "text",
     "abandon": "abandon",
-    "figure": "data_table",           # figures are treated as standalone regions too
+    "figure": "data_table",  # figures are treated as standalone regions too
     "figure_caption": "text",
     "table": "data_table",
     "table_caption": "text",
@@ -90,8 +91,9 @@ class DetectedRegion:
         confidence:      Detection confidence score in [0, 1].
         raw_category_id: Original class name reported by the model.
     """
+
     category: str
-    bbox: Tuple[float, float, float, float]
+    bbox: tuple[float, float, float, float]
     confidence: float
     raw_category_id: str
 
@@ -136,7 +138,7 @@ class LayoutDetector:
         self,
         page_image,
         confidence_threshold: float = 0.5,
-    ) -> List[DetectedRegion]:
+    ) -> list[DetectedRegion]:
         """Detect layout regions in a page image.
 
         Args:
@@ -160,7 +162,7 @@ class LayoutDetector:
         if result.boxes is None or len(result.boxes) == 0:
             return []
 
-        regions: List[DetectedRegion] = []
+        regions: list[DetectedRegion] = []
         for box, cls_name, score in zip(result.boxes, result.class_names, result.scores):
             if score < confidence_threshold:
                 continue
@@ -178,17 +180,21 @@ class LayoutDetector:
             if area < 100:
                 continue
 
-            regions.append(DetectedRegion(
-                category=category,
-                bbox=bbox,
-                confidence=float(score),
-                raw_category_id=cls_name,
-            ))
+            regions.append(
+                DetectedRegion(
+                    category=category,
+                    bbox=bbox,
+                    confidence=float(score),
+                    raw_category_id=cls_name,
+                )
+            )
 
         # Sort by y-coordinate for natural reading order
         regions.sort(key=lambda r: r.bbox[1])
 
-        logger.info(f"[LayoutDetector] Detected {len(regions)} layout regions (confidence_threshold={confidence_threshold:.2f})")
+        logger.info(
+            f"[LayoutDetector] Detected {len(regions)} layout regions (confidence_threshold={confidence_threshold:.2f})"
+        )
         return regions
 
     @property

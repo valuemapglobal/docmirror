@@ -23,13 +23,13 @@ Configuration groups:
       are used instead.
     - **Pipeline strategy**: How to handle middleware failures (skip vs abort).
 """
+
 from __future__ import annotations
 
-
+import logging
 import os
 from dataclasses import dataclass, field
-from typing import Dict, Any, Optional
-import logging
+from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -48,9 +48,9 @@ class OCRHyperParams:
     # Rationale: RapidOCR's detection model (DBNet) is trained on 640×640 inputs.
     # Images below 500px on their shortest side produce feature maps too coarse
     # for the 3×3 convolution kernels to separate adjacent characters.
-    upscale_threshold_low: int = 500    # Below this → 4× upscale
-    upscale_threshold_mid: int = 1000   # Below this → 2× upscale
-    upscale_factor_low: float = 4.0     # Matches DBNet's receptive field requirement
+    upscale_threshold_low: int = 500  # Below this → 4× upscale
+    upscale_threshold_mid: int = 1000  # Below this → 2× upscale
+    upscale_factor_low: float = 4.0  # Matches DBNet's receptive field requirement
     upscale_factor_mid: float = 2.0
 
     # ── Gamma Correction ──
@@ -65,7 +65,7 @@ class OCRHyperParams:
     # dynamic range is compressed into ~10% of the [0,255] spectrum. Below
     # this, CLAHE alone cannot restore sufficient edge contrast.
     low_contrast_std_threshold: float = 25.0
-    histogram_percentile_lo: float = 1.0   # Clip darkest 1% — removes sensor noise
+    histogram_percentile_lo: float = 1.0  # Clip darkest 1% — removes sensor noise
     histogram_percentile_hi: float = 99.0  # Clip brightest 1% — removes highlights
 
     # ── Red Seal Removal (HSV bounds) ──
@@ -105,8 +105,8 @@ class OCRHyperParams:
     dpi_passes: tuple = (150, 200, 300)
 
     # ── Dynamic Color Slicing ──
-    kmeans_clusters: int = 3       # Background, Text, Overlay — 3 is sufficient for documents
-    hue_tolerance: int = 15        # ±15° in HSV hue space covers a single color family
+    kmeans_clusters: int = 3  # Background, Text, Overlay — 3 is sufficient for documents
+    hue_tolerance: int = 15  # ±15° in HSV hue space covers a single color family
 
 
 @dataclass
@@ -123,11 +123,11 @@ class DocMirrorSettings:
     default_enhance_mode: str = "standard"  # "raw" | "standard" | "full"
 
     # ── Performance limits ──
-    max_pages: int = 200       # Maximum pages to process per document
+    max_pages: int = 200  # Maximum pages to process per document
     max_page_concurrency: int = 1  # Page-level concurrency (1=sequential; >1 enables layout + extraction parallel)
-    ocr_dpi: int = 150         # Default DPI for rendering pages to images for OCR
-    ocr_retry_dpi: int = 300   # Higher DPI used when initial OCR produces poor results
-    ocr_language: str = "auto" # "auto" = auto-detect; or specify e.g. "zh", "en"
+    ocr_dpi: int = 150  # Default DPI for rendering pages to images for OCR
+    ocr_retry_dpi: int = 300  # Higher DPI used when initial OCR produces poor results
+    ocr_language: str = "auto"  # "auto" = auto-detect; or specify e.g. "zh", "en"
 
     # ── Validation thresholds ──
     validator_pass_threshold: float = 0.7  # Minimum score to consider parsing successful
@@ -140,9 +140,9 @@ class DocMirrorSettings:
 
     # ── Optional AI model file paths ──
     # When None, DocMirror uses rule-based fallbacks instead of AI models
-    layout_model_path: Optional[str] = None        # DocLayout-YOLO ONNX model path
-    reading_order_model_path: Optional[str] = None  # LayoutReader ONNX model path
-    formula_model_path: Optional[str] = None        # Pix2Tex / UniMERNet ONNX model path
+    layout_model_path: str | None = None  # DocLayout-YOLO ONNX model path
+    reading_order_model_path: str | None = None  # LayoutReader ONNX model path
+    formula_model_path: str | None = None  # Pix2Tex / UniMERNet ONNX model path
 
     # ── Model inference parameters ──
     model_render_dpi: int = 200  # DPI for rendering pages before DocLayout-YOLO inference
@@ -151,13 +151,13 @@ class DocMirrorSettings:
     ocr_params: OCRHyperParams = field(default_factory=OCRHyperParams)
 
     # ── Constructor Theory: Impossible Transformation Guards ──
-    min_file_size: int = 512          # Below 512 bytes, no document can contain meaningful content
+    min_file_size: int = 512  # Below 512 bytes, no document can contain meaningful content
     max_file_size: int = 500_000_000  # 500MB hard limit — prevents OOM
-    min_image_dimension: int = 50     # 50px — below this, OCR receptive fields cannot function
+    min_image_dimension: int = 50  # 50px — below this, OCR receptive fields cannot function
 
     # ── Table extraction: RapidTable layer (slow ~10s/page) ──
     # When document has more than this many pages, skip RapidTable entirely (G4).
-    table_rapid_max_pages: Optional[int] = None   # None = no limit
+    table_rapid_max_pages: int | None = None  # None = no limit
     # Only try RapidTable when upstream layer confidence is below this (0–1). Default 0.3.
     table_rapid_min_confidence_threshold: float = 0.3
 
@@ -167,7 +167,7 @@ class DocMirrorSettings:
     external_ocr_quality_threshold: int = 80
     # Optional: "module:callable" to invoke for external OCR (e.g. "myapp.ocr:call_cloud_ocr").
     # Callable(image_bgr, page_idx=0, dpi=200, **kwargs) -> list of (x0,y0,x1,y1,text,conf) or dict.
-    external_ocr_provider: Optional[str] = None
+    external_ocr_provider: str | None = None
 
     @classmethod
     def from_env(cls) -> DocMirrorSettings:
@@ -191,18 +191,12 @@ class DocMirrorSettings:
             validator_pass_threshold=float(os.getenv("DOCMIRROR_VALIDATOR_THRESHOLD", "0.7")),
             log_level=os.getenv("DOCMIRROR_LOG_LEVEL", "INFO"),
             fail_strategy=os.getenv("DOCMIRROR_FAIL_STRATEGY", "skip"),
-            table_rapid_max_pages=(
-                int(v) if (v := os.getenv("DOCMIRROR_TABLE_RAPID_MAX_PAGES", "").strip()) else None
-            ),
+            table_rapid_max_pages=(int(v) if (v := os.getenv("DOCMIRROR_TABLE_RAPID_MAX_PAGES", "").strip()) else None),
             table_rapid_min_confidence_threshold=float(
                 os.getenv("DOCMIRROR_TABLE_RAPID_MIN_CONFIDENCE_THRESHOLD", "0.3")
             ),
-            external_ocr_quality_threshold=int(
-                os.getenv("DOCMIRROR_EXTERNAL_OCR_QUALITY_THRESHOLD", "80")
-            ),
-            external_ocr_provider=(
-                (v := os.getenv("DOCMIRROR_EXTERNAL_OCR_PROVIDER", "").strip()) or None
-            ),
+            external_ocr_quality_threshold=int(os.getenv("DOCMIRROR_EXTERNAL_OCR_QUALITY_THRESHOLD", "80")),
+            external_ocr_provider=((v := os.getenv("DOCMIRROR_EXTERNAL_OCR_PROVIDER", "").strip()) or None),
         )
         logger.info(
             f"[Config] Initialized global settings: enhance_mode='{instance.default_enhance_mode}', "
@@ -210,7 +204,7 @@ class DocMirrorSettings:
         )
         return instance
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """
         Convert settings to a dict suitable for Orchestrator config injection.
 

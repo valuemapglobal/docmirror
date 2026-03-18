@@ -30,8 +30,8 @@ Self-contained, does not depend on any v1 code external to the MultiModal packag
   All historical public symbols are maintained backward compatible via re-export.
   Callers do not need to modify any import statements.
 """
-from __future__ import annotations
 
+from __future__ import annotations
 
 import logging
 import re
@@ -49,43 +49,89 @@ logger = logging.getLogger(__name__)
 # Mapping table: symbol_name -> (module_path, is_package_level)
 _LAZY_MAP = {}
 
+
 def _register_lazy(module: str, symbols: list):
     for s in symbols:
         _LAZY_MAP[s] = module
 
+
 # text_utils
-_register_lazy("..utils.text_utils", [
-    "_is_cjk_char", "_smart_join", "normalize_text", "normalize_table",
-    "headers_match", "parse_amount",
-])
+_register_lazy(
+    "..utils.text_utils",
+    [
+        "_is_cjk_char",
+        "_smart_join",
+        "normalize_text",
+        "normalize_table",
+        "headers_match",
+        "parse_amount",
+    ],
+)
 # vocabulary & row classifiers
-_register_lazy("..utils.vocabulary", [
-    "VOCAB_BY_CATEGORY", "KNOWN_HEADER_WORDS", "PIPE_CHARS", "HLINE_CHARS",
-    "_ALL_BORDER_CHARS", "_RE_IS_DATE", "_RE_IS_AMOUNT", "_RE_VALID_DATE",
-    "_normalize_for_vocab", "_score_header_by_vocabulary", "_is_header_cell",
-    "_is_header_row", "_is_junk_row", "_is_data_row",
-])
+_register_lazy(
+    "..utils.vocabulary",
+    [
+        "VOCAB_BY_CATEGORY",
+        "KNOWN_HEADER_WORDS",
+        "PIPE_CHARS",
+        "HLINE_CHARS",
+        "_ALL_BORDER_CHARS",
+        "_RE_IS_DATE",
+        "_RE_IS_AMOUNT",
+        "_RE_VALID_DATE",
+        "_normalize_for_vocab",
+        "_score_header_by_vocabulary",
+        "_is_header_cell",
+        "_is_header_row",
+        "_is_junk_row",
+        "_is_data_row",
+    ],
+)
 # table postprocess
-_register_lazy("..table.postprocess", [
-    "_extract_preamble_kv", "_strip_preamble", "post_process_table",
-    "_find_vocab_words_in_string", "_fix_header_by_vocabulary", "_clean_cell",
-    "_merge_split_rows", "_extract_summary_entities",
-])
+_register_lazy(
+    "..table.postprocess",
+    [
+        "_extract_preamble_kv",
+        "_strip_preamble",
+        "post_process_table",
+        "_find_vocab_words_in_string",
+        "_fix_header_by_vocabulary",
+        "_clean_cell",
+        "_merge_split_rows",
+        "_extract_summary_entities",
+    ],
+)
 # watermark & preprocessing
-_register_lazy("..utils.watermark", [
-    "preprocess_document", "is_watermark_char", "filter_watermark_page",
-    "_dedup_overlapping_chars",
-])
+_register_lazy(
+    "..utils.watermark",
+    [
+        "preprocess_document",
+        "is_watermark_char",
+        "filter_watermark_page",
+        "_dedup_overlapping_chars",
+    ],
+)
 # table extraction
-_register_lazy("..table.extraction", [
-    "extract_tables_layered", "get_last_layer_timings", "_quick_classify",
-    "_compute_table_confidence", "_tables_look_valid", "_cell_is_stuffed",
-    "_recover_header_from_zone", "_extract_by_pipe_delimited",
-    "_extract_by_hline_columns", "_extract_by_rect_columns",
-    "detect_columns_by_header_anchors", "detect_columns_by_whitespace_projection",
-    "detect_columns_by_clustering", "detect_columns_by_word_anchors",
-    "detect_columns_by_data_voting",
-])
+_register_lazy(
+    "..table.extraction",
+    [
+        "extract_tables_layered",
+        "get_last_layer_timings",
+        "_quick_classify",
+        "_compute_table_confidence",
+        "_tables_look_valid",
+        "_cell_is_stuffed",
+        "_recover_header_from_zone",
+        "_extract_by_pipe_delimited",
+        "_extract_by_hline_columns",
+        "_extract_by_rect_columns",
+        "detect_columns_by_header_anchors",
+        "detect_columns_by_whitespace_projection",
+        "detect_columns_by_clustering",
+        "detect_columns_by_word_anchors",
+        "detect_columns_by_data_voting",
+    ],
+)
 # OCR fallback
 _register_lazy("..ocr.fallback", ["analyze_scanned_page"])
 
@@ -94,6 +140,7 @@ def __getattr__(name):
     """Lazy loader for re-exported symbols — triggered only on first access."""
     if name in _LAZY_MAP:
         import importlib
+
         mod = importlib.import_module(_LAZY_MAP[name], package=__package__)
         val = getattr(mod, name)
         globals()[name] = val  # cache for subsequent accesses
@@ -105,11 +152,13 @@ def __getattr__(name):
 # Module 1: Layout Analyzer
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 @dataclass
 class ContentRegion:
     """A content region on the page."""
+
     type: str  # "text" | "table" | "image"
-    bbox: Tuple[float, float, float, float]
+    bbox: tuple[float, float, float, float]
     page: int
     text_preview: str = ""
     area: float = 0.0
@@ -122,10 +171,11 @@ class ContentRegion:
 @dataclass
 class ALPageLayout:
     """Single page layout analysis result."""
+
     page_index: int
     width: float
     height: float
-    regions: List[ContentRegion] = field(default_factory=list)
+    regions: list[ContentRegion] = field(default_factory=list)
     has_table: bool = False
     table_count: int = 0
     image_count: int = 0
@@ -151,18 +201,21 @@ def _detect_borderless_table(text_dict: dict, page_height: float) -> bool:
                 if not text:
                     continue
                 bbox = span["bbox"]
-                spans.append({
-                    "x0": bbox[0], "x1": bbox[2],
-                    "y_mid": (bbox[1] + bbox[3]) / 2,
-                    "text": text,
-                })
+                spans.append(
+                    {
+                        "x0": bbox[0],
+                        "x1": bbox[2],
+                        "y_mid": (bbox[1] + bbox[3]) / 2,
+                        "text": text,
+                    }
+                )
 
     if len(spans) < 6:
         return False
 
     spans.sort(key=lambda s: s["y_mid"])
-    rows: List[List[dict]] = []
-    current_row: List[dict] = [spans[0]]
+    rows: list[list[dict]] = []
+    current_row: list[dict] = [spans[0]]
     for s in spans[1:]:
         if abs(s["y_mid"] - current_row[-1]["y_mid"]) <= 3.0:
             current_row.append(s)
@@ -204,18 +257,20 @@ def analyze_page_layout(page, page_idx: int) -> ALPageLayout:
                 preview += span.get("text", "")
         preview = preview.strip()[:80]
         if preview:
-            layout.regions.append(ContentRegion(
-                type="text", bbox=bbox, page=page_idx, text_preview=preview
-            ))
+            layout.regions.append(ContentRegion(type="text", bbox=bbox, page=page_idx, text_preview=preview))
 
     layout.text_region_count = len([r for r in layout.regions if r.type == "text"])
 
     for b in image_blocks:
         bbox = (b["bbox"][0], b["bbox"][1], b["bbox"][2], b["bbox"][3])
-        layout.regions.append(ContentRegion(
-            type="image", bbox=bbox, page=page_idx,
-            text_preview=f"image_{b.get('width', 0)}x{b.get('height', 0)}",
-        ))
+        layout.regions.append(
+            ContentRegion(
+                type="image",
+                bbox=bbox,
+                page=page_idx,
+                text_preview=f"image_{b.get('width', 0)}x{b.get('height', 0)}",
+            )
+        )
     layout.image_count = len(image_blocks)
 
     # ── Fast table detection: line-count heuristic (~1ms vs ~2000ms) ──
@@ -251,10 +306,7 @@ def analyze_page_layout(page, page_idx: int) -> ALPageLayout:
             layout.has_table = True
 
     total_chars = sum(
-        len(span.get("text", ""))
-        for b in text_blocks
-        for line in b.get("lines", [])
-        for span in line.get("spans", [])
+        len(span.get("text", "")) for b in text_blocks for line in b.get("lines", []) for span in line.get("spans", [])
     )
     if total_chars < 50 and layout.image_count > 0:
         page_area = rect.width * rect.height
@@ -273,12 +325,10 @@ def analyze_page_layout(page, page_idx: int) -> ALPageLayout:
             table_top = min(r.bbox[1] for r in table_regions)
             table_bottom = max(r.bbox[3] for r in table_regions)
             layout.header_text = " | ".join(
-                r.text_preview for r in layout.regions
-                if r.type == "text" and r.bbox[3] <= table_top + 5
+                r.text_preview for r in layout.regions if r.type == "text" and r.bbox[3] <= table_top + 5
             )
             layout.footer_text = " | ".join(
-                r.text_preview for r in layout.regions
-                if r.type == "text" and r.bbox[1] >= table_bottom - 5
+                r.text_preview for r in layout.regions if r.type == "text" and r.bbox[1] >= table_bottom - 5
             )
 
     if layout.has_table:
@@ -286,18 +336,14 @@ def analyze_page_layout(page, page_idx: int) -> ALPageLayout:
         if table_regions:
             earliest_table_top = min(r.bbox[1] for r in table_regions)
             above_table_text = sum(
-                1 for r in layout.regions
-                if r.type == "text" and r.bbox[3] <= earliest_table_top + 5
+                1 for r in layout.regions if r.type == "text" and r.bbox[3] <= earliest_table_top + 5
             )
-            layout.is_continuation = (
-                earliest_table_top < rect.height * 0.15
-                and above_table_text <= 2
-            )
+            layout.is_continuation = earliest_table_top < rect.height * 0.15 and above_table_text <= 2
 
     return layout
 
 
-def analyze_document_layout(fitz_doc) -> List[ALPageLayout]:
+def analyze_document_layout(fitz_doc) -> list[ALPageLayout]:
     """Analyze the layout structure of the entire document."""
     layouts = []
     for page_idx in range(len(fitz_doc)):
@@ -309,7 +355,7 @@ def analyze_document_layout(fitz_doc) -> List[ALPageLayout]:
     logger.info(
         f"{len(layouts)} pages: "
         + " | ".join(
-            f"P{l.page_index+1}({'cont' if l.is_continuation else 'new'}:"
+            f"P{l.page_index + 1}({'cont' if l.is_continuation else 'new'}:"
             f"T{l.table_count}/I{l.image_count}/Txt{l.text_region_count})"
             for l in layouts
         )
@@ -317,13 +363,14 @@ def analyze_document_layout(fitz_doc) -> List[ALPageLayout]:
     return layouts
 
 
-def _analyze_page_layout_worker(args: Tuple[str, int]) -> Tuple[int, ALPageLayout]:
+def _analyze_page_layout_worker(args: tuple[str, int]) -> tuple[int, ALPageLayout]:
     """
     Worker for process-pool layout analysis: open PDF at path, analyze one page, return (page_idx, ALPageLayout).
     Must be a top-level function for pickle; used by analyze_document_layout_parallel.
     """
     path, page_idx = args
     import fitz
+
     doc = fitz.open(path)
     try:
         page = doc[page_idx]
@@ -337,7 +384,7 @@ def analyze_document_layout_parallel(
     path: str,
     num_pages: int,
     max_workers: int = 4,
-) -> List[ALPageLayout]:
+) -> list[ALPageLayout]:
     """
     Analyze document layout in parallel across pages using a process pool.
     Each process opens the PDF at path and runs analyze_page_layout for one page.
@@ -351,6 +398,7 @@ def analyze_document_layout_parallel(
     if workers <= 1 or num_pages <= 1:
         # Fallback to sequential in caller by not using this path, or we could open and run here
         import fitz
+
         doc = fitz.open(path)
         try:
             layouts = [analyze_page_layout(doc[i], i) for i in range(num_pages)]
@@ -368,7 +416,7 @@ def analyze_document_layout_parallel(
     logger.info(
         f"{len(layouts)} pages (parallel workers={workers}): "
         + " | ".join(
-            f"P{l.page_index+1}({'cont' if l.is_continuation else 'new'}:"
+            f"P{l.page_index + 1}({'cont' if l.is_continuation else 'new'}:"
             f"T{l.table_count}/I{l.image_count}/Txt{l.text_region_count})"
             for l in layouts
         )
@@ -379,6 +427,7 @@ def analyze_document_layout_parallel(
 # ═══════════════════════════════════════════════════════════════════════════════
 # Module 1b: Spatial Partitioning
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 def _reconstruct_rows_from_chars(chars, col_gap: float = 8.0):
     """Fallback: Reconstruct table rows directly from chars."""
@@ -392,8 +441,10 @@ def _reconstruct_rows_from_chars(chars, col_gap: float = 8.0):
     rows = []
     for y_key in sorted(y_groups.keys()):
         row_chars = sorted(y_groups[y_key], key=lambda c: c["x0"])
+
         def _chars_to_cell(cell_chars):
-            if not cell_chars: return ""
+            if not cell_chars:
+                return ""
             out = cell_chars[0]["text"]
             for j in range(1, len(cell_chars)):
                 gap = cell_chars[j]["x0"] - cell_chars[j - 1]["x1"]
@@ -419,8 +470,9 @@ def _reconstruct_rows_from_chars(chars, col_gap: float = 8.0):
 @dataclass(slots=True)
 class Zone:
     """A large zone on the page (3~5 zones/page)."""
+
     type: str  # "title" | "summary" | "data_table" | "footer" | "formula" | "unknown"
-    bbox: Tuple[float, float, float, float]
+    bbox: tuple[float, float, float, float]
     page: int = 0
     chars: list = field(default_factory=list)
     rects: list = field(default_factory=list)
@@ -428,7 +480,7 @@ class Zone:
     confidence: float = 1.0  # Model Detection Confidence, rule method default 1.0
 
 
-def _isolate_formula_components(chars: List[dict], page_w: float, page_h: float) -> Tuple[List[dict], List[Zone]]:
+def _isolate_formula_components(chars: list[dict], page_w: float, page_h: float) -> tuple[list[dict], list[Zone]]:
     """
     Isolates formula regions using Union-Find connected component clustering
     of character bounding boxes. No cv2/numpy dependency required.
@@ -475,15 +527,23 @@ def _isolate_formula_components(chars: List[dict], page_w: float, page_h: float)
         cx0, cy0 = c.get("x0", 0), c.get("top", 0)
         cx1, cy1 = c.get("x1", 0), c.get("bottom", 0)
         if i in math_seed_set:
-            aabbs.append((
-                cx0 - SEED_EXPAND_X, cy0 - SEED_EXPAND_Y,
-                cx1 + SEED_EXPAND_X, cy1 + SEED_EXPAND_Y,
-            ))
+            aabbs.append(
+                (
+                    cx0 - SEED_EXPAND_X,
+                    cy0 - SEED_EXPAND_Y,
+                    cx1 + SEED_EXPAND_X,
+                    cy1 + SEED_EXPAND_Y,
+                )
+            )
         else:
-            aabbs.append((
-                cx0 - CLOSE_EXPAND_X, cy0 - CLOSE_EXPAND_Y,
-                cx1 + CLOSE_EXPAND_X, cy1 + CLOSE_EXPAND_Y,
-            ))
+            aabbs.append(
+                (
+                    cx0 - CLOSE_EXPAND_X,
+                    cy0 - CLOSE_EXPAND_Y,
+                    cx1 + CLOSE_EXPAND_X,
+                    cy1 + CLOSE_EXPAND_Y,
+                )
+            )
 
     # ── Step 3: Union-Find with sweep-line AABB overlap ──
     n = len(chars)
@@ -529,7 +589,7 @@ def _isolate_formula_components(chars: List[dict], page_w: float, page_h: float)
         active.append(idx)
 
     # ── Step 4: Extract connected components with math seeds ──
-    components: Dict[int, list] = defaultdict(list)
+    components: dict[int, list] = defaultdict(list)
     for i in range(n):
         components[_find(i)].append(i)
 
@@ -557,30 +617,30 @@ def _isolate_formula_components(chars: List[dict], page_w: float, page_h: float)
             continue
 
         used_char_indices.update(member_indices)
-        ftext = "".join(
-            c["text"] for c in sorted(comp_chars, key=lambda c: (c["top"], c["x0"]))
+        ftext = "".join(c["text"] for c in sorted(comp_chars, key=lambda c: (c["top"], c["x0"])))
+        formula_zones.append(
+            Zone(
+                type="formula",
+                bbox=(fx0, fy0, fx1, fy1),
+                chars=comp_chars,
+                text=ftext.strip(),
+                confidence=0.9,
+            )
         )
-        formula_zones.append(Zone(
-            type="formula",
-            bbox=(fx0, fy0, fx1, fy1),
-            chars=comp_chars,
-            text=ftext.strip(),
-            confidence=0.9,
-        ))
 
     remaining_chars = [c for i, c in enumerate(chars) if i not in used_char_indices]
     return remaining_chars, formula_zones
 
 
 def _column_consensus(
-    chars: List[dict],
+    chars: list[dict],
     page_w: float,
     page_h: float,
     min_cols: int = 3,
     min_rows: int = 3,
     cell_gap: float = 8.0,
     y_bin: float | None = None,
-) -> "tuple | None":
+) -> tuple | None:
     """Column Consensus: detect table extent by structural repetition.
 
     Human visual pattern: a table is N rows where each row has M text
@@ -617,7 +677,7 @@ def _column_consensus(
     # y_bin default: 3pt (proven for standard 12pt fonts).
     # Adaptive mode passes median_height * 0.4 for abnormal font sizes.
     _y_bin = y_bin if y_bin is not None else 3.0
-    y_groups: Dict[int, list] = defaultdict(list)
+    y_groups: dict[int, list] = defaultdict(list)
     for c in chars:
         y_mid = (c.get("top", 0) + c.get("bottom", 0)) / 2
         y_key = round(y_mid / _y_bin) * _y_bin
@@ -625,14 +685,13 @@ def _column_consensus(
 
     # ── Step 2: Split each row into cells by x-gap ──
     # Adaptive cell_gap based on median character width
-    char_widths = [c.get("x1", 0) - c.get("x0", 0) for c in chars
-                   if c.get("x1", 0) > c.get("x0", 0)]
+    char_widths = [c.get("x1", 0) - c.get("x0", 0) for c in chars if c.get("x1", 0) > c.get("x0", 0)]
     if char_widths:
         sorted_w = sorted(char_widths)
         median_w = sorted_w[len(sorted_w) // 2]
         cell_gap = max(cell_gap, median_w * 1.5)
 
-    row_cell_starts: Dict[int, list] = {}  # y_key → [raw x_start, ...]
+    row_cell_starts: dict[int, list] = {}  # y_key → [raw x_start, ...]
 
     for y_key in sorted(y_groups.keys()):
         row_chars = sorted(y_groups[y_key], key=lambda c: c.get("x0", 0))
@@ -673,7 +732,7 @@ def _column_consensus(
     # within-cluster variation are column boundaries.
     cluster_threshold = max(median_inter_gap * 3, 15.0)
 
-    clusters: List[list] = [[all_x[0]]]
+    clusters: list[list] = [[all_x[0]]]
     for i in range(1, len(all_x)):
         if all_x[i] - all_x[i - 1] > cluster_threshold:
             clusters.append([all_x[i]])
@@ -699,19 +758,18 @@ def _column_consensus(
         """Map cell starts to closest column clusters → column ID tuple."""
         col_ids = []
         for x in cell_starts:
-            best_col = min(range(len(col_centers)),
-                           key=lambda i: abs(x - col_centers[i]))
+            best_col = min(range(len(col_centers)), key=lambda i: abs(x - col_centers[i]))
             col_ids.append(best_col)
         return tuple(col_ids)
 
-    row_col_ids: Dict[int, tuple] = {}
+    row_col_ids: dict[int, tuple] = {}
     for y_key, starts in row_cell_starts.items():
         col_ids = _map_to_cols(starts)
         row_col_ids[y_key] = col_ids
 
     # ── Step 5: Find consensus — best signature ──
     # A "signature" is now the tuple of column IDs the row's cells belong to.
-    sig_counter: Dict[tuple, list] = defaultdict(list)
+    sig_counter: dict[tuple, list] = defaultdict(list)
     for y_key, col_ids in row_col_ids.items():
         sig_counter[col_ids].append(y_key)
 
@@ -725,7 +783,7 @@ def _column_consensus(
                 continue
             on = len(other_sig)
             other_set = set(other_sig)
-            
+
             # Fewer cols: subset wrap. Every col in other MUST be in candidate.
             if on < cn and on >= min_cols:
                 if other_set.issubset(cand_set):
@@ -738,8 +796,7 @@ def _column_consensus(
 
     # Best signature: most absorbable rows weighted by column count
     # Deterministic tie-breaker: (score, ncols, signature_tuple)
-    best_sig = max(sig_counter.keys(),
-                   key=lambda s: (_count_absorbable(s) * len(s), len(s), s))
+    best_sig = max(sig_counter.keys(), key=lambda s: (_count_absorbable(s) * len(s), len(s), s))
     best_rows = list(sig_counter[best_sig])
     best_ncols = len(best_sig)
     best_set = set(best_sig)
@@ -819,8 +876,8 @@ def _column_consensus(
 
 def _refine_by_lines(
     table_extent: tuple,
-    lines: "list | None",
-    rects: "list | None" = None,
+    lines: list | None,
+    rects: list | None = None,
 ) -> tuple:
     """Refine table extent using drawing lines (Tier 2).
 
@@ -865,13 +922,13 @@ def _refine_by_lines(
 
 
 def _build_zones_from_extent(
-    chars: List[dict],
+    chars: list[dict],
     rects: list,
     table_extent: tuple,
     page_w: float,
     page_h: float,
     page_idx: int,
-) -> List[Zone]:
+) -> list[Zone]:
     """Derive all zones from a precise table extent.
 
     Zones:
@@ -884,8 +941,7 @@ def _build_zones_from_extent(
 
     # Partition chars into above / table / below
     above_chars = [c for c in chars if c.get("bottom", 0) <= y_top + 3]
-    table_chars = [c for c in chars
-                   if c.get("top", 0) >= y_top - 3 and c.get("bottom", 0) <= y_bottom + 3]
+    table_chars = [c for c in chars if c.get("top", 0) >= y_top - 3 and c.get("bottom", 0) <= y_bottom + 3]
     below_chars = [c for c in chars if c.get("top", 0) >= y_bottom - 3]
 
     # Remove overlap: a char should be in exactly one group
@@ -897,7 +953,7 @@ def _build_zones_from_extent(
     if above_chars:
         # Split above chars into title (large/centered) and summary (has "：")
         # Group by y-bands first
-        above_y_groups: Dict[int, list] = defaultdict(list)
+        above_y_groups: dict[int, list] = defaultdict(list)
         for c in above_chars:
             yk = round(c["top"] / 3) * 3
             above_y_groups[yk].append(c)
@@ -908,7 +964,7 @@ def _build_zones_from_extent(
             band = above_y_groups[yk]
             band_text = "".join(c["text"] for c in sorted(band, key=lambda c: c["x0"]))
             # title: no "：" and generally a heading
-            if re.search(r'[\u4e00-\u9fff][：:]', band_text):
+            if re.search(r"[\u4e00-\u9fff][：:]", band_text):
                 summary_chars.extend(band)
             elif not title_chars and len(band_text.strip()) < 80:
                 # First non-KV band is the title
@@ -922,10 +978,15 @@ def _build_zones_from_extent(
             y0 = min(c["top"] for c in title_chars)
             y1 = max(c["bottom"] for c in title_chars)
             text = "".join(c["text"] for c in sorted(title_chars, key=lambda c: (c["top"], c["x0"])))
-            zones.append(Zone(
-                type="title", bbox=(x0, y0, x1, y1), page=page_idx,
-                chars=title_chars, text=text.strip(),
-            ))
+            zones.append(
+                Zone(
+                    type="title",
+                    bbox=(x0, y0, x1, y1),
+                    page=page_idx,
+                    chars=title_chars,
+                    text=text.strip(),
+                )
+            )
 
         if summary_chars:
             x0 = min(c["x0"] for c in summary_chars)
@@ -933,22 +994,32 @@ def _build_zones_from_extent(
             y0 = min(c["top"] for c in summary_chars)
             y1 = max(c["bottom"] for c in summary_chars)
             text = "".join(c["text"] for c in sorted(summary_chars, key=lambda c: (c["top"], c["x0"])))
-            zones.append(Zone(
-                type="summary", bbox=(x0, y0, x1, y1), page=page_idx,
-                chars=summary_chars, text=text.strip(),
-            ))
+            zones.append(
+                Zone(
+                    type="summary",
+                    bbox=(x0, y0, x1, y1),
+                    page=page_idx,
+                    chars=summary_chars,
+                    text=text.strip(),
+                )
+            )
 
     # ── Table zone ──
     if table_chars:
         x0 = min(c["x0"] for c in table_chars)
         x1 = max(c["x1"] for c in table_chars)
-        table_rects = [r for r in rects
-                       if r.get("top", 0) >= y_top - 3 and r.get("top", 0) <= y_bottom + 3]
+        table_rects = [r for r in rects if r.get("top", 0) >= y_top - 3 and r.get("top", 0) <= y_bottom + 3]
         text = "".join(c["text"] for c in sorted(table_chars, key=lambda c: (c["top"], c["x0"])))
-        zones.append(Zone(
-            type="data_table", bbox=(x0, y_top, x1, y_bottom), page=page_idx,
-            chars=table_chars, rects=table_rects, text=text.strip(),
-        ))
+        zones.append(
+            Zone(
+                type="data_table",
+                bbox=(x0, y_top, x1, y_bottom),
+                page=page_idx,
+                chars=table_chars,
+                rects=table_rects,
+                text=text.strip(),
+            )
+        )
 
     # ── Below table → footer ──
     if below_chars:
@@ -957,22 +1028,27 @@ def _build_zones_from_extent(
         y0 = min(c["top"] for c in below_chars)
         y1 = max(c["bottom"] for c in below_chars)
         text = "".join(c["text"] for c in sorted(below_chars, key=lambda c: (c["top"], c["x0"])))
-        zones.append(Zone(
-            type="footer", bbox=(x0, y0, x1, y1), page=page_idx,
-            chars=below_chars, text=text.strip(),
-        ))
+        zones.append(
+            Zone(
+                type="footer",
+                bbox=(x0, y0, x1, y1),
+                page=page_idx,
+                chars=below_chars,
+                text=text.strip(),
+            )
+        )
 
     return zones
 
 
 def _legacy_y_band_zones(
-    chars: List[dict],
+    chars: list[dict],
     rects: list,
     page_w: float,
     page_h: float,
     page_idx: int,
     gap_threshold: float = 15.0,
-) -> List[Zone]:
+) -> list[Zone]:
     """Legacy Y-band splitting fallback.
 
     Used when Column Consensus finds no table pattern.
@@ -987,8 +1063,7 @@ def _legacy_y_band_zones(
         _KNOWN_HEADER_WORDS = __getattr__("KNOWN_HEADER_WORDS")
 
     # Dynamic gap_threshold
-    char_heights = [c["bottom"] - c["top"] for c in chars
-                    if c.get("bottom", 0) > c.get("top", 0)]
+    char_heights = [c["bottom"] - c["top"] for c in chars if c.get("bottom", 0) > c.get("top", 0)]
     if char_heights:
         sorted_h = sorted(char_heights)
         median_h = sorted_h[len(sorted_h) // 2]
@@ -997,7 +1072,7 @@ def _legacy_y_band_zones(
     row_ys = sorted(set(round(c["top"] / 3) * 3 for c in chars))
 
     # Font-size change boundaries
-    row_font_sizes: Dict[int, float] = {}
+    row_font_sizes: dict[int, float] = {}
     for y_key in row_ys:
         row_chars = [c for c in chars if round(c["top"] / 3) * 3 == y_key]
         sizes = [c.get("size", 0) for c in row_chars if c.get("size", 0) > 0]
@@ -1010,12 +1085,11 @@ def _legacy_y_band_zones(
     if _HLINE_CHARS is None:
         _HLINE_CHARS = __getattr__("HLINE_CHARS")
 
-    row_border_counts: Dict[int, int] = {}
+    row_border_counts: dict[int, int] = {}
     for y_key in row_ys:
         row_chars = [c for c in chars if round(c["top"] / 3) * 3 == y_key]
         row_border_counts[y_key] = sum(
-            1 for c in row_chars
-            if c.get("text", "") in _PIPE_CHARS or c.get("text", "") in _HLINE_CHARS
+            1 for c in row_chars if c.get("text", "") in _PIPE_CHARS or c.get("text", "") in _HLINE_CHARS
         )
 
     cuts = [row_ys[0]]
@@ -1031,7 +1105,7 @@ def _legacy_y_band_zones(
         if not is_gap and not is_structural_cut and row_ys[i] in row_font_sizes and row_ys[i - 1] in row_font_sizes:
             if abs(row_font_sizes[row_ys[i]] - row_font_sizes[row_ys[i - 1]]) > 2.0:
                 is_gap = True
-                
+
         if is_gap or is_structural_cut:
             cuts.append(row_ys[i - 1])
             cuts.append(row_ys[i])
@@ -1064,15 +1138,21 @@ def _legacy_y_band_zones(
         x1 = max(c["x1"] for c in band_chars)
         text = "".join(c["text"] for c in sorted(band_chars, key=lambda c: (c["top"], c["x0"])))
         zone = Zone(
-            type="unknown", bbox=(x0, y_start, x1, y_end), page=page_idx,
-            chars=band_chars, rects=band_rects, text=text.strip(),
+            type="unknown",
+            bbox=(x0, y_start, x1, y_end),
+            page=page_idx,
+            chars=band_chars,
+            rects=band_rects,
+            text=text.strip(),
         )
         _zone_border_count = sum(
-            1 for c in zone.chars
-            if c.get("text", "") in _PIPE_CHARS or c.get("text", "") in _HLINE_CHARS
+            1 for c in zone.chars if c.get("text", "") in _PIPE_CHARS or c.get("text", "") in _HLINE_CHARS
         )
         zone.type = _classify_zone_legacy(
-            zone, page_h, _PIPE_CHARS, _KNOWN_HEADER_WORDS,
+            zone,
+            page_h,
+            _PIPE_CHARS,
+            _KNOWN_HEADER_WORDS,
             is_border_zone=(_zone_border_count >= 10),
             has_structural_context=bool(structural_cut_ys),
         )
@@ -1081,11 +1161,9 @@ def _legacy_y_band_zones(
     # Merge adjacent data_table zones ONLY if not separated by a structural cut
     merged = []
     for z in zones:
-        if (merged and z.type == "data_table" and merged[-1].type == "data_table"
-                and z.bbox[1] not in structural_cut_ys):
+        if merged and z.type == "data_table" and merged[-1].type == "data_table" and z.bbox[1] not in structural_cut_ys:
             prev = merged[-1]
-            prev.bbox = (min(prev.bbox[0], z.bbox[0]), prev.bbox[1],
-                         max(prev.bbox[2], z.bbox[2]), z.bbox[3])
+            prev.bbox = (min(prev.bbox[0], z.bbox[0]), prev.bbox[1], max(prev.bbox[2], z.bbox[2]), z.bbox[3])
             prev.chars.extend(z.chars)
             prev.rects.extend(z.rects)
             prev.text += z.text
@@ -1094,12 +1172,16 @@ def _legacy_y_band_zones(
     return merged
 
 
-def _classify_zone_legacy(zone: Zone, page_h: float,
-                          pipe_chars: set, known_header_words: set,
-                          is_border_zone: bool = False,
-                          has_structural_context: bool = False) -> str:
+def _classify_zone_legacy(
+    zone: Zone,
+    page_h: float,
+    pipe_chars: set,
+    known_header_words: set,
+    is_border_zone: bool = False,
+    has_structural_context: bool = False,
+) -> str:
     """Legacy zone classifier — used only by _legacy_y_band_zones fallback.
-    
+
     Args:
         is_border_zone: True if this zone contains ≥10 structural border chars.
         has_structural_context: True when structural cuts exist on this page,
@@ -1119,23 +1201,24 @@ def _classify_zone_legacy(zone: Zone, page_h: float,
 
     # Non-bordered zone adjacent to a bordered table → metadata, not table
     if has_structural_context and not is_border_zone:
-        if re.search(r'[\u4e00-\u9fff][：:]', text):
+        if re.search(r"[\u4e00-\u9fff][：:]", text):
             return "summary"
         return "summary"
 
     pipe_count = sum(1 for c in zone.chars if c.get("text") in pipe_chars)
     if pipe_count >= 10:
         return "data_table"
-    if bool(re.search(r'\d{8}|\d{4}[-/.]\d{1,2}[-/.]\d{1,2}', text)) and \
-       bool(re.search(r'(?:RMB|USD|CNY)\s*[\d,.]+|\d+\.\d{2}', text)):
+    if bool(re.search(r"\d{8}|\d{4}[-/.]\d{1,2}[-/.]\d{1,2}", text)) and bool(
+        re.search(r"(?:RMB|USD|CNY)\s*[\d,.]+|\d+\.\d{2}", text)
+    ):
         return "data_table"
     _vocab_hits = sum(1 for w in known_header_words if w in text)
     if _vocab_hits >= 3:
         return "data_table"
     if y_ratio < 0.15 and char_count < 80:
-        if not re.search(r'[\u4e00-\u9fff][：:]', text):
+        if not re.search(r"[\u4e00-\u9fff][：:]", text):
             return "title"
-    if char_count < 300 and re.search(r'[\u4e00-\u9fff][：:]', text):
+    if char_count < 300 and re.search(r"[\u4e00-\u9fff][：:]", text):
         return "summary"
     row_ys = sorted(set(round(c["top"] / 3) * 3 for c in zone.chars))
     if len(row_ys) < 2 and not any(ch.isdigit() for ch in text):
@@ -1151,8 +1234,10 @@ def _classify_zone_legacy(zone: Zone, page_h: float,
 
 
 def segment_page_into_zones(
-    page_plum, page_idx: int, gap_threshold: float = 15.0,
-) -> List[Zone]:
+    page_plum,
+    page_idx: int,
+    gap_threshold: float = 15.0,
+) -> list[Zone]:
     """Spatial partitioning: Column Consensus architecture.
 
     Primary path: detect table extent by structural column alignment
@@ -1176,9 +1261,7 @@ def segment_page_into_zones(
     table_extent = _column_consensus(chars, page_w, page_h)
     if table_extent is None:
         char_heights = [
-            c.get("bottom", 0) - c.get("top", 0)
-            for c in chars
-            if (c.get("bottom", 0) - c.get("top", 0)) > 0
+            c.get("bottom", 0) - c.get("top", 0) for c in chars if (c.get("bottom", 0) - c.get("top", 0)) > 0
         ]
         if char_heights:
             sorted_h = sorted(char_heights)
@@ -1186,13 +1269,10 @@ def segment_page_into_zones(
             adaptive_bin = max(2.0, median_h * 0.4)
             # Only retry if adaptive bin differs meaningfully from default 3pt
             if abs(adaptive_bin - 3.0) > 0.5:
-                table_extent = _column_consensus(
-                    chars, page_w, page_h, y_bin=adaptive_bin
-                )
+                table_extent = _column_consensus(chars, page_w, page_h, y_bin=adaptive_bin)
                 if table_extent is not None:
                     logger.debug(
-                        f"column_consensus: adaptive y_bin={adaptive_bin:.1f}pt "
-                        f"succeeded (median_h={median_h:.1f}pt)"
+                        f"column_consensus: adaptive y_bin={adaptive_bin:.1f}pt succeeded (median_h={median_h:.1f}pt)"
                     )
 
     # ── Step 2: Line enhancement (Tier 2) ──
@@ -1256,12 +1336,11 @@ def segment_page_into_zones(
         else:
             zones = []
         zones.extend(formula_zones)
-        logger.debug(
-            f"segment_page_into_zones: Legacy fallback → {len(zones)} zones"
-        )
+        logger.debug(f"segment_page_into_zones: Legacy fallback → {len(zones)} zones")
 
     # ── Step 4: GraphRouter reading order (preserved) ──
     from .graph_router import GraphRouter
+
     router = GraphRouter(page_width=page_w, page_height=page_h)
     causal_zones = router.build_flow(zones)
 
@@ -1272,6 +1351,7 @@ def segment_page_into_zones(
 # Perf #9: Zone Template Reuse for Layout-Homogeneous Documents
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 @dataclass
 class ZoneTemplate:
     """Cached zone layout template from a reference page.
@@ -1279,13 +1359,14 @@ class ZoneTemplate:
     Stores normalized (0-1) bbox ratios so the template can be applied
     to pages of any DPI/dimension.
     """
+
     zones: list  # List of (zone_type, bbox_ratio, confidence)
     # bbox_ratio = (x0/page_w, y0/page_h, x1/page_w, y1/page_h)
     source_page: int = 0
     zone_count: int = 0
 
 
-def build_zone_template(zones: List[Zone], page_w: float, page_h: float, page_idx: int = 0) -> ZoneTemplate:
+def build_zone_template(zones: list[Zone], page_w: float, page_h: float, page_idx: int = 0) -> ZoneTemplate:
     """Build a reusable zone template from a fully-segmented page.
 
     Captures the zone types and their normalized bbox positions.
@@ -1322,7 +1403,7 @@ def apply_zone_template(
     template: ZoneTemplate,
     page_plum,
     page_idx: int,
-) -> "List[Zone] | None":
+) -> list[Zone] | None:
     """Apply a cached zone template to a new page, skipping full segmentation.
 
     Maps the template's normalized bboxes onto the new page dimensions,
@@ -1357,13 +1438,15 @@ def apply_zone_template(
             rx1 * page_w,
             ry1 * page_h,
         )
-        projected_zones.append({
-            "type": zone_type,
-            "bbox": bbox,
-            "confidence": confidence,
-            "chars": [],
-            "rects": [],
-        })
+        projected_zones.append(
+            {
+                "type": zone_type,
+                "bbox": bbox,
+                "confidence": confidence,
+                "chars": [],
+                "rects": [],
+            }
+        )
 
     # Assign each char to the closest containing zone
     assigned_count = 0

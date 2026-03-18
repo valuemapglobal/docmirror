@@ -34,8 +34,8 @@ Usage Guide:
     - Resumable Error: Caught in try/except and add_error(), does not terminate Pipeline
     - Non-resumable Error: Thrown, processing method determined by the fail_strategy
 """
-from __future__ import annotations
 
+from __future__ import annotations
 
 
 class MultiModalError(Exception):
@@ -48,57 +48,69 @@ class MultiModalError(Exception):
 
 # ── Layer 0: Input Validation (Constructor Theory Guards) ──
 
+
 class InputValidationError(MultiModalError):
     """File is outside the system's capability boundary."""
+
     pass
 
 
 class FileTooSmallError(InputValidationError):
     """Document is below minimum parseable size."""
+
     pass
 
 
 class FileTooLargeError(InputValidationError):
     """Document exceeds maximum allowed size."""
+
     pass
 
 
 class ResolutionTooLowError(InputValidationError):
     """Image resolution is below OCR minimum."""
+
     pass
 
 
 class UnsupportedFormatError(InputValidationError):
     """File format is not supported by any registered adapter."""
+
     pass
 
 
 # ── Layer 1: Extraction ──
+
 
 class ExtractionError(MultiModalError):
     """Error during CoreExtractor physical extraction.
 
     Examples: PDF open failed, pdfplumber parse failed, page limit exceeded, etc.
     """
+
     pass
 
 
 class OCREngineError(ExtractionError):
     """OCR engine failed or is unavailable."""
+
     pass
 
 
 class TableExtractionError(ExtractionError):
     """Table detection or reconstruction failed."""
+
     pass
 
 
 class LayoutAnalysisError(MultiModalError):
     """Error in Layout Analysis / Zone Partitioning / Table Extraction layer."""
+
     pass
 
 
 # ── Layer 2: Enhancement / Middleware ──
+
 
 class MiddlewareError(MultiModalError):
     """Error during Middleware processing.
@@ -121,11 +133,14 @@ class ValidationError(MultiModalError):
 
     Examples: Inconsistent table column count, low date coverage rate.
     """
+
     pass
 
 
 # ── Layer 3: Serialization ──
 
+
 class SerializationError(MultiModalError):
     """Failed to serialize or deserialize a result."""
+
     pass

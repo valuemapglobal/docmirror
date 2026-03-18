@@ -22,8 +22,8 @@ Processing logic:
 Metadata includes:
     - parser_name: "WebAdapter"
 """
-from __future__ import annotations
 
+from __future__ import annotations
 
 import logging
 from pathlib import Path
@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
 class WebAdapter(BaseParser):
     """HTML/Web content format adapter — structured extraction with readability + BeautifulSoup."""
 
-    async def to_parse_result(self, file_path: Path, **kwargs) -> "ParseResult":
+    async def to_parse_result(self, file_path: Path, **kwargs) -> ParseResult:
         """
         Read an HTML file and return its clean extracted content as a ParseResult.
 
@@ -45,18 +45,22 @@ class WebAdapter(BaseParser):
         Falls back to raw text if libraries are not available.
         """
         from docmirror.models.entities.parse_result import (
-            ParseResult, PageContent, TextBlock, TextLevel, ParserInfo,
+            PageContent,
+            ParseResult,
+            ParserInfo,
+            TextBlock,
+            TextLevel,
         )
 
         logger.info(f"[WebAdapter] Starting extraction for HTML: {file_path}")
-        with open(file_path, "r", encoding="utf-8") as f:
+        with open(file_path, encoding="utf-8") as f:
             content = f.read()
 
-        texts: List[TextBlock] = []
+        texts: list[TextBlock] = []
 
         try:
-            from readability import Document
             from bs4 import BeautifulSoup
+            from readability import Document
 
             # 1. Strip noise via readability-lxml
             doc = Document(content)
@@ -71,11 +75,15 @@ class WebAdapter(BaseParser):
             soup = BeautifulSoup(clean_html, "html.parser")
 
             level_map = {
-                'h1': TextLevel.H1, 'h2': TextLevel.H2, 'h3': TextLevel.H3,
-                'h4': TextLevel.H3, 'h5': TextLevel.H3, 'h6': TextLevel.H3,
+                "h1": TextLevel.H1,
+                "h2": TextLevel.H2,
+                "h3": TextLevel.H3,
+                "h4": TextLevel.H3,
+                "h5": TextLevel.H3,
+                "h6": TextLevel.H3,
             }
 
-            allowed_tags = ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li']
+            allowed_tags = ["p", "h1", "h2", "h3", "h4", "h5", "h6", "li"]
             for elem in soup.find_all(allowed_tags):
                 text = elem.get_text(separator=" ", strip=True)
                 if not text:

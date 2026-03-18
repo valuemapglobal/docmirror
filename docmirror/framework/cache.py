@@ -27,6 +27,7 @@ Usage::
     # Write cache
     await parse_cache.set(checksum, doc_type, result_json)
 """
+
 from __future__ import annotations
 
 import logging
@@ -73,6 +74,7 @@ class ParseCache:
 
         try:
             import redis.asyncio as aioredis
+
             self._redis = aioredis.from_url(
                 url,
                 socket_timeout=3.0,
@@ -92,9 +94,7 @@ class ParseCache:
             _consecutive_failures += 1
             if _consecutive_failures >= _FAILURE_THRESHOLD:
                 _circuit_open_until = time.time() + _CIRCUIT_COOLDOWN_SECONDS
-                logger.warning(
-                    f"[ParseCache] Circuit breaker OPEN — skipping Redis for {_CIRCUIT_COOLDOWN_SECONDS}s"
-                )
+                logger.warning(f"[ParseCache] Circuit breaker OPEN — skipping Redis for {_CIRCUIT_COOLDOWN_SECONDS}s")
             return None
 
     @staticmethod
@@ -103,7 +103,7 @@ class ParseCache:
         suffix = f":{doc_type}" if doc_type else ""
         return f"parse:{checksum}{suffix}"
 
-    async def get(self, checksum: str, doc_type: str = "") -> Optional[str]:
+    async def get(self, checksum: str, doc_type: str = "") -> str | None:
         """Lookup cache. Returns the cached JSON string or None on miss."""
         r = await self._get_redis()
         if not r:
@@ -118,9 +118,7 @@ class ParseCache:
             logger.debug(f"[ParseCache] GET error: {e}")
             return None
 
-    async def set(
-        self, checksum: str, doc_type: str, json_str: str, ttl: int = _DEFAULT_TTL
-    ) -> bool:
+    async def set(self, checksum: str, doc_type: str, json_str: str, ttl: int = _DEFAULT_TTL) -> bool:
         """Write a JSON string to the cache with an expiration."""
         r = await self._get_redis()
         if not r:

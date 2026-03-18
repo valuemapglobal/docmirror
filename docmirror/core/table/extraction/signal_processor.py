@@ -18,6 +18,7 @@ Replaces 4 parallel char-level extraction methods with a single-pass
 All algorithms are O(n) in character count, CPU-only, no external
 dependencies beyond the Python standard library.
 """
+
 from __future__ import annotations
 
 import bisect
@@ -28,10 +29,10 @@ from typing import Dict, List, Optional, Tuple
 
 from ...utils.text_utils import _is_cjk_char, _smart_join
 from ...utils.vocabulary import (
+    _RE_IS_AMOUNT,
+    _RE_IS_DATE,
     _is_header_cell,
     _score_header_by_vocabulary,
-    _RE_IS_DATE,
-    _RE_IS_AMOUNT,
 )
 from ...utils.watermark import is_watermark_char
 
@@ -42,13 +43,14 @@ logger = logging.getLogger(__name__)
 # 1. Dual-Axis Projection
 # ═════════════════════════════════════════════════════════════════════
 
+
 def project_chars_to_axes(
-    chars: List[dict],
+    chars: list[dict],
     page_w: float,
     page_h: float,
     resolution: float = 1.0,
-    global_tensor_x: Optional[List[float]] = None,
-) -> Tuple[List[int], List[int]]:
+    global_tensor_x: list[float] | None = None,
+) -> tuple[list[int], list[int]]:
     """Project characters onto X and Y axes as 1D density signals.
 
     Each character's bounding box ``[x0, x1]`` increments the X-axis
@@ -101,12 +103,13 @@ def project_chars_to_axes(
 # 2. Valley Detection
 # ═════════════════════════════════════════════════════════════════════
 
+
 def detect_valleys(
-    signal: List[int],
+    signal: list[int],
     min_width: float = 2.0,
     threshold_ratio: float = 0.10,
     resolution: float = 1.0,
-) -> List[Tuple[float, float, float]]:
+) -> list[tuple[float, float, float]]:
     """Detect valleys (low-density bands) in a 1D signal.
 
     A valley is a contiguous region where the signal value is below
@@ -167,11 +170,12 @@ def detect_valleys(
 # 3. Grid Assembly
 # ═════════════════════════════════════════════════════════════════════
 
+
 def build_grid(
-    row_boundaries: List[float],
-    col_boundaries: List[float],
-    chars: List[dict],
-) -> List[List[str]]:
+    row_boundaries: list[float],
+    col_boundaries: list[float],
+    chars: list[dict],
+) -> list[list[str]]:
     """Assemble characters into a 2D grid using row/column boundaries.
 
     Uses ``bisect.bisect_right`` for O(log c) column lookup per character,
@@ -198,7 +202,7 @@ def build_grid(
     sorted_chars = sorted(chars, key=lambda c: (c.get("top", 0), c.get("x0", 0)))
 
     # Group chars into rows first using bisect
-    row_bins: Dict[int, List[dict]] = defaultdict(list)
+    row_bins: dict[int, list[dict]] = defaultdict(list)
     for c in sorted_chars:
         cy = (c.get("top", 0) + c.get("bottom", 0)) / 2
         ri = bisect.bisect_right(row_boundaries, cy)
@@ -229,7 +233,7 @@ def build_grid(
     return [[cell.strip() for cell in row] for row in grid]
 
 
-def _merge_chars_to_words(sorted_chars: List[dict]) -> List[dict]:
+def _merge_chars_to_words(sorted_chars: list[dict]) -> list[dict]:
     """Merge adjacent characters into words based on gap distance."""
     if not sorted_chars:
         return []
@@ -266,13 +270,14 @@ def _merge_chars_to_words(sorted_chars: List[dict]) -> List[dict]:
 # 4. Unified Entry Point
 # ═════════════════════════════════════════════════════════════════════
 
+
 def extract_table_by_signal(
     page_plum,
     min_cols: int = 3,
     min_rows: int = 3,
-    global_tensor_x: Optional[List[float]] = None,
+    global_tensor_x: list[float] | None = None,
     pid_resample: bool = False,
-) -> Optional[List[List[str]]]:
+) -> list[list[str]] | None:
     """Extract a table using dual-axis 1D signal processing.
 
     Single-pass algorithm:
@@ -304,29 +309,26 @@ def extract_table_by_signal(
         return None
 
     # ── Step 1: Dual-axis projection ──
-    D_x, D_y = project_chars_to_axes(
-        text_chars, page_w, page_h, global_tensor_x=global_tensor_x
-    )
+    D_x, D_y = project_chars_to_axes(text_chars, page_w, page_h, global_tensor_x=global_tensor_x)
 
     # ── Step 2: Column detection (X-axis valleys) ──
     # Use adaptive gap width based on average character width
-    char_widths = [
-        c.get("x1", 0) - c.get("x0", 0)
-        for c in text_chars
-        if c.get("x1", 0) > c.get("x0", 0)
-    ]
+    char_widths = [c.get("x1", 0) - c.get("x0", 0) for c in text_chars if c.get("x1", 0) > c.get("x0", 0)]
     avg_char_w = sum(char_widths) / len(char_widths) if char_widths else 6.0
     min_col_gap = max(2.0, avg_char_w * 0.5)
     threshold_ratio = 0.10
 
     # ── PID Loop Resampling Degradation ──
-    # If this is a retry due to low confidence, tighten the threshold 
+    # If this is a retry due to low confidence, tighten the threshold
     # and lower the gap requirement to forcefully expose swallowed columns
     if pid_resample:
         threshold_ratio = 0.05
         min_col_gap = max(1.0, min_col_gap / 1.5)
         import logging
-        logging.getLogger(__name__).debug(f"PID Resample Triggered: tightening threshold_ratio to {threshold_ratio} and min_col_gap to {min_col_gap:.1f}")
+
+        logging.getLogger(__name__).debug(
+            f"PID Resample Triggered: tightening threshold_ratio to {threshold_ratio} and min_col_gap to {min_col_gap:.1f}"
+        )
 
     x_valleys = detect_valleys(D_x, min_width=min_col_gap, threshold_ratio=threshold_ratio)
 
@@ -338,11 +340,7 @@ def extract_table_by_signal(
 
     # ── Step 3: Row detection (Y-axis valleys) ──
     # Row gaps are typically narrower than column gaps
-    char_heights = [
-        c.get("bottom", 0) - c.get("top", 0)
-        for c in text_chars
-        if c.get("bottom", 0) > c.get("top", 0)
-    ]
+    char_heights = [c.get("bottom", 0) - c.get("top", 0) for c in text_chars if c.get("bottom", 0) > c.get("top", 0)]
     if not char_heights:
         return None
     sorted_h = sorted(char_heights)
@@ -368,18 +366,12 @@ def extract_table_by_signal(
         return None
 
     # ── Step 5: Trim fully empty columns ──
-    non_empty_cols = [
-        ci for ci in range(n_cols)
-        if any(row[ci].strip() for row in table if ci < len(row))
-    ]
+    non_empty_cols = [ci for ci in range(n_cols) if any(row[ci].strip() for row in table if ci < len(row))]
     if len(non_empty_cols) < min_cols:
         return None
 
     if len(non_empty_cols) < n_cols:
-        table = [
-            [row[ci] for ci in non_empty_cols]
-            for row in table
-        ]
+        table = [[row[ci] for ci in non_empty_cols] for row in table]
 
     # ── Step 6: Trim fully empty rows ──
     table = [row for row in table if any(cell.strip() for cell in row)]

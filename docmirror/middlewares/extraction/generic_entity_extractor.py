@@ -11,13 +11,13 @@ GenericEntityExtractor — Universal Entity Extraction Middleware
 Extracts entities from KV pairs across any document format.
 Writes to ParseResult.entities.domain_specific.
 """
-from __future__ import annotations
 
+from __future__ import annotations
 
 import logging
 
-from ..base import BaseMiddleware
 from ...models.entities.parse_result import ParseResult
+from ..base import BaseMiddleware
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +36,10 @@ class GenericEntityExtractor(BaseMiddleware):
         result.entities.domain_specific["extracted_entities"] = existing
 
         result.record_mutation(
-            self.name, "doc", "entities", {},
+            self.name,
+            "doc",
+            "entities",
+            {},
             {k: str(v)[:50] for k, v in entities.items()},
             reason=f"Extracted {len(entities)} entities from KV blocks",
         )

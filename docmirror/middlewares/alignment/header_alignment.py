@@ -8,15 +8,15 @@
 Header-Data Alignment Verification
 ====================================
 
-Handles content-type-based inference 
+Handles content-type-based inference
 and structural alignment verification.
 
 Core Capabilities:
   - ``infer_column_type()``: Samples data columns to infer expected datatype distributions (date/amount/seq/text).
   - ``verify_header_data_alignment()``: Detects and automatically corrects systematic alignment offsets occurring between headers and data rows.
 """
-from __future__ import annotations
 
+from __future__ import annotations
 
 import logging
 import re
@@ -27,20 +27,22 @@ logger = logging.getLogger(__name__)
 
 # Date Regex Patterns (Lenient, capturing YYYYMMDD / YYYY-MM-DD / YYYY.MM.DD / YYYY/MM/DD etc.)
 _RE_COL_DATE = re.compile(
-    r'^\d{8}(\s*\d{1,2}:\d{2}(:\d{2})?)?$|'
-    r'^\d{4}[-/.年]\d{1,2}[-/.月]\d{1,2}日?'
-    r'(\s*\d{1,2}:\d{2}(:\d{2})?)?$|'
-    r'^\d{2}[-/]\d{2}[-/]\d{4}$'
+    r"^\d{8}(\s*\d{1,2}:\d{2}(:\d{2})?)?$|"
+    r"^\d{4}[-/.年]\d{1,2}[-/.月]\d{1,2}日?"
+    r"(\s*\d{1,2}:\d{2}(:\d{2})?)?$|"
+    r"^\d{2}[-/]\d{2}[-/]\d{4}$"
 )
 # Numeric Amount Regex (Supports comma-separated inputs)
-_RE_COL_AMOUNT = re.compile(r'^[+-]?\d[\d,]*\.\d{1,4}$')
+_RE_COL_AMOUNT = re.compile(r"^[+-]?\d[\d,]*\.\d{1,4}$")
 # Sequence/Index Number Regex (Pure integers, 1~8 digits)
-_RE_COL_SEQ = re.compile(r'^\d{1,8}$')
+_RE_COL_SEQ = re.compile(r"^\d{1,8}$")
 
 
 def infer_column_type(
-    data_rows: List[List[str]], col_idx: int, sample_size: int = 30,
-) -> Dict[str, float]:
+    data_rows: list[list[str]],
+    col_idx: int,
+    sample_size: int = 30,
+) -> dict[str, float]:
     """Infers the dominant data type distribution of a target column.
 
     Returns:
@@ -71,13 +73,13 @@ def infer_column_type(
 
 
 def verify_header_data_alignment(
-    headers: List[str],
-    data_rows: List[List[str]],
-    header_type_expectations: Dict[str, str],
+    headers: list[str],
+    data_rows: list[list[str]],
+    header_type_expectations: dict[str, str],
     mutation_recorder=None,
     middleware_name: str = "HeaderAlignment",
-) -> List[str]:
-    """Validates alignment between headers and corresponding data columns, 
+) -> list[str]:
+    """Validates alignment between headers and corresponding data columns,
     detecting and repairing systematic offsets.
 
     Args:
@@ -95,7 +97,7 @@ def verify_header_data_alignment(
         return headers
 
     # \u2500\u2500\u2500 Step 1: Collect structural anchor columns \u2500\u2500\u2500
-    anchors: List[Dict] = []
+    anchors: list[dict] = []
     for i, h in enumerate(headers):
         h_clean = h.strip()
         if not h_clean:
@@ -107,17 +109,19 @@ def verify_header_data_alignment(
                     expected = typ
                     break
         if expected:
-            anchors.append({
-                "header_idx": i,
-                "expected_type": expected,
-                "header_name": h_clean,
-            })
+            anchors.append(
+                {
+                    "header_idx": i,
+                    "expected_type": expected,
+                    "header_name": h_clean,
+                }
+            )
 
     if len(anchors) < 2:
         return headers
 
     # \u2500\u2500\u2500 Step 2: Validate column-level alignment against anchors \u2500\u2500\u2500
-    offsets: List[Dict] = []
+    offsets: list[dict] = []
     for anchor in anchors:
         hi = anchor["header_idx"]
         et = anchor["expected_type"]
@@ -172,19 +176,13 @@ def verify_header_data_alignment(
     if dominant_offset > 0:
         # Padded insertion shifting headers rightward natively
         for _ in range(abs(dominant_offset)):
-            first_shift_idx = min(
-                o["anchor"]["header_idx"] for o in non_zero
-                if o["offset"] == dominant_offset
-            )
+            first_shift_idx = min(o["anchor"]["header_idx"] for o in non_zero if o["offset"] == dominant_offset)
             new_headers.insert(first_shift_idx, "")
         new_headers = new_headers[:n_cols]
     elif dominant_offset < 0:
         # Deletion strategy shifting headers incrementally structural leftward
         for _ in range(abs(dominant_offset)):
-            first_shift_idx = min(
-                o["anchor"]["header_idx"] for o in non_zero
-                if o["offset"] == dominant_offset
-            )
+            first_shift_idx = min(o["anchor"]["header_idx"] for o in non_zero if o["offset"] == dominant_offset)
             remove_idx = None
             for ri in range(first_shift_idx, -1, -1):
                 if not new_headers[ri].strip():

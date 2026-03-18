@@ -18,15 +18,15 @@ Also supplies `to_parser_output()` bridging back to legacy `ParserOutput`
 ensuring absolute backwards compatibility with existing `ParserDispatcher`
 and `PerceptionResult` configurations smoothly.
 """
-from __future__ import annotations
 
+from __future__ import annotations
 
 import dataclasses
 import logging
 from typing import Any, Dict, List, Literal, Optional
 
-from .domain import BaseResult
 from ..tracking.mutation import Mutation
+from .domain import BaseResult
 
 logger = logging.getLogger(__name__)
 
@@ -42,15 +42,16 @@ class EnhancedResult:
         - mutations logs an audit trail of all transformation actions.
         - status reflects Pipeline execution health dynamically.
     """
+
     document_id: str = ""
-    base_result: Optional[BaseResult] = None
-    enhanced_data: Dict[str, Any] = dataclasses.field(default_factory=dict)
+    base_result: BaseResult | None = None
+    enhanced_data: dict[str, Any] = dataclasses.field(default_factory=dict)
     scene: str = "unknown"
-    institution: Optional[str] = None  # L2 institution id, e.g., ccb / citic
-    mutations: List[Mutation] = dataclasses.field(default_factory=list)
+    institution: str | None = None  # L2 institution id, e.g., ccb / citic
+    mutations: list[Mutation] = dataclasses.field(default_factory=list)
     status: Literal["success", "partial", "failed"] = "success"
     processing_time: float = 0.0
-    errors: List[str] = dataclasses.field(default_factory=list)
+    errors: list[str] = dataclasses.field(default_factory=list)
 
     # \u2500\u2500 Middleware Helper Methods \u2500\u2500
 
@@ -89,9 +90,8 @@ class EnhancedResult:
 
     # \u2500\u2500 Access Convenience Properties \u2500\u2500
 
-
     @property
-    def validation_result(self) -> Optional[Dict[str, Any]]:
+    def validation_result(self) -> dict[str, Any] | None:
         """Fetch analytical validation results."""
         return self.enhanced_data.get("validation")
 
@@ -100,13 +100,12 @@ class EnhancedResult:
         return len(self.mutations)
 
     @property
-    def mutation_summary(self) -> Dict[str, int]:
+    def mutation_summary(self) -> dict[str, int]:
         """Summarize active mutations metrics bounded per middleware origin."""
-        summary: Dict[str, int] = {}
+        summary: dict[str, int] = {}
         for m in self.mutations:
             summary[m.middleware_name] = summary.get(m.middleware_name, 0) + 1
         return summary
-
 
     @classmethod
     def from_base_result(cls, base_result: BaseResult) -> EnhancedResult:

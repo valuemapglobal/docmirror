@@ -32,8 +32,8 @@ Usage::
         # re-extract at higher DPI
         ...
 """
-from __future__ import annotations
 
+from __future__ import annotations
 
 import dataclasses
 import logging
@@ -90,7 +90,7 @@ class AdaptiveQualityRouter:
     # Zone types that can be safely skipped for speed in homogeneous docs
     _SKIPPABLE_FOOTER_TYPES = frozenset({"footer"})
 
-    def __init__(self, strategy_params: Optional[Dict[str, Any]] = None):
+    def __init__(self, strategy_params: dict[str, Any] | None = None):
         self._params = strategy_params or {}
 
         # Pre-compute thresholds from strategy_params with safe defaults
@@ -98,9 +98,7 @@ class AdaptiveQualityRouter:
         self._high_dpi = max(self._ocr_dpis) if self._ocr_dpis else 200
         self._standard_dpi = self._ocr_dpis[0] if self._ocr_dpis else 200
         self._skip_watermark = self._params.get("skip_watermark_filter", False)
-        self._reuse_structure = self._params.get(
-            "reuse_first_page_structure", False
-        )
+        self._reuse_structure = self._params.get("reuse_first_page_structure", False)
 
     def recommend(
         self,
@@ -128,12 +126,7 @@ class AdaptiveQualityRouter:
         confidence = getattr(zone, "confidence", 1.0)
 
         # ── Fast path: high-confidence text zone on digital page ──
-        if (
-            page_has_text
-            and not is_scanned_page
-            and zone_type not in self._DENSE_ZONE_TYPES
-            and confidence >= 0.8
-        ):
+        if page_has_text and not is_scanned_page and zone_type not in self._DENSE_ZONE_TYPES and confidence >= 0.8:
             return ZoneStrategy(
                 extract_method="rule",
                 reason=f"digital page, high-confidence {zone_type} zone",
@@ -145,10 +138,7 @@ class AdaptiveQualityRouter:
                 return ZoneStrategy(
                     extract_method="ocr_enhanced",
                     ocr_dpi=self._high_dpi,
-                    reason=(
-                        f"{zone_type} zone with low confidence "
-                        f"({confidence:.2f}) or quality ({page_quality})"
-                    ),
+                    reason=(f"{zone_type} zone with low confidence ({confidence:.2f}) or quality ({page_quality})"),
                 )
             # Even on digital pages, tables still go through the normal
             # layered extraction — no change from current behavior.
@@ -177,10 +167,7 @@ class AdaptiveQualityRouter:
             # Watermark separation for scanned pages when not explicitly
             # skipped and quality is in the mid-range (watermarks degrade
             # OCR most when image quality is borderline).
-            enable_wm = (
-                not self._skip_watermark
-                and 40 <= page_quality <= 85
-            )
+            enable_wm = not self._skip_watermark and 40 <= page_quality <= 85
 
             return ZoneStrategy(
                 extract_method=method,
@@ -195,9 +182,7 @@ class AdaptiveQualityRouter:
             reason="default (no special routing needed)",
         )
 
-    def should_enhance_table(
-        self, table_data: list, extraction_confidence: float
-    ) -> bool:
+    def should_enhance_table(self, table_data: list, extraction_confidence: float) -> bool:
         """Determine if a table should be re-extracted at higher DPI.
 
         Called after initial table extraction to decide whether the
@@ -215,11 +200,7 @@ class AdaptiveQualityRouter:
 
         # Check for signs of poor extraction
         total_cells = sum(len(row) for row in table_data)
-        empty_cells = sum(
-            1 for row in table_data
-            for cell in row
-            if not (cell or "").strip()
-        )
+        empty_cells = sum(1 for row in table_data for cell in row if not (cell or "").strip())
         if total_cells == 0:
             return False
 

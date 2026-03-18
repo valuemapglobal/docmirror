@@ -22,21 +22,27 @@ Exception Downgrade Strategy:
     - If a middleware fails, the pipeline skips it and continues.
     - Guarantees a valid payload even under catastrophic halts.
 """
-from __future__ import annotations
 
+from __future__ import annotations
 
 import logging
 import time
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Literal, Optional, Type
+from typing import Any, Dict, List, Literal, Optional, Type
 
+from ..configs.settings import DocMirrorSettings
 from ..middlewares import (
-    BaseMiddleware, MiddlewarePipeline,
-    SceneDetector, InstitutionDetector, EntityExtractor, Validator,
-    LanguageDetector, GenericEntityExtractor,
+    BaseMiddleware,
+    EntityExtractor,
+    GenericEntityExtractor,
+    InstitutionDetector,
+    LanguageDetector,
+    MiddlewarePipeline,
+    SceneDetector,
+    Validator,
 )
 from ..models.entities.parse_result import ParseResult, ResultStatus
-from ..configs.settings import DocMirrorSettings
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +51,7 @@ logger = logging.getLogger(__name__)
 # Middleware Registry — Open/Closed Principle
 # ═══════════════════════════════════════════════════════════════════════════════
 
-MIDDLEWARE_REGISTRY: Dict[str, Type[BaseMiddleware]] = {
+MIDDLEWARE_REGISTRY: dict[str, type[BaseMiddleware]] = {
     "SceneDetector": SceneDetector,
     "EntityExtractor": EntityExtractor,
     "InstitutionDetector": InstitutionDetector,
@@ -68,16 +74,14 @@ class Orchestrator:
 
     def __init__(
         self,
-        settings: Optional[DocMirrorSettings] = None,
-        config: Optional[Dict[str, Any]] = None,
-        fail_strategy: Optional[str] = None,
-        seal_detector_fn: Optional[Callable] = None,
+        settings: DocMirrorSettings | None = None,
+        config: dict[str, Any] | None = None,
+        fail_strategy: str | None = None,
+        seal_detector_fn: Callable | None = None,
     ):
         self.settings = settings or DocMirrorSettings.from_env()
         self.config = config or self.settings.to_dict()
-        self.pipeline = MiddlewarePipeline(
-            fail_strategy=fail_strategy or self.settings.fail_strategy
-        )
+        self.pipeline = MiddlewarePipeline(fail_strategy=fail_strategy or self.settings.fail_strategy)
 
     async def enhance(
         self,
@@ -101,9 +105,7 @@ class Orchestrator:
         t0 = time.time()
 
         logger.info(
-            f"[Orchestrator] Pipeline ▶ "
-            f"mode={enhance_mode} | file_type={file_type} | "
-            f"pages={result.page_count}"
+            f"[Orchestrator] Pipeline ▶ mode={enhance_mode} | file_type={file_type} | pages={result.page_count}"
         )
 
         # ═══ Step 1: Validate extraction baseline ═══
@@ -131,6 +133,7 @@ class Orchestrator:
         if result.mutations:
             try:
                 from ..middlewares import MutationAnalyzer
+
                 analyzer = MutationAnalyzer()
                 analysis = analyzer.analyze(result.mutations)
                 result.entities.domain_specific["mutation_analysis"] = analysis.to_dict()
@@ -153,7 +156,7 @@ class Orchestrator:
         enhance_mode: Literal["raw", "standard", "full"] = "standard",
         file_type: str = "pdf",
         *,
-        pre_extracted: Optional[Any] = None,
+        pre_extracted: Any | None = None,
         **kwargs,
     ) -> ParseResult:
         """Legacy wrapper — delegates to enhance()."""
@@ -162,21 +165,27 @@ class Orchestrator:
         # If pre_extracted is a BaseResult, convert first
         if pre_extracted is not None:
             from ..models.construction.parse_result_bridge import ParseResultBridge
+
             pr = ParseResultBridge.from_base_result(pre_extracted)
             return await self.enhance(pr, enhance_mode, file_type)
         # Fallback: extract from file
         from ..core.extraction.extractor import CoreExtractor
+
         extractor = CoreExtractor()
         base_result = await extractor.extract(file_path)
         from ..models.construction.parse_result_bridge import ParseResultBridge
+
         pr = ParseResultBridge.from_base_result(base_result)
         return await self.enhance(pr, enhance_mode, file_type)
 
     def _build_middlewares(
-        self, enhance_mode: str, file_type: str = "pdf",
-    ) -> List[BaseMiddleware]:
+        self,
+        enhance_mode: str,
+        file_type: str = "pdf",
+    ) -> list[BaseMiddleware]:
         """Build middleware list from pipeline config."""
         from ..configs.pipeline_registry import get_pipeline_config
+
         middleware_names = get_pipeline_config(file_type, enhance_mode)
         middlewares = []
 

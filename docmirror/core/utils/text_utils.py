@@ -19,26 +19,28 @@ Contents:
       (thousands separators, currency symbols, parenthesised negatives,
       CR/DR suffixes).
 """
-from __future__ import annotations
 
+from __future__ import annotations
 
 import re
 import unicodedata
 from typing import List
 
-
 # ═══════════════════════════════════════════════════════════════════════════════
 # CJK helper functions
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 def _is_cjk_char(ch: str) -> bool:
     """Return ``True`` if *ch* is a CJK Unified Ideograph."""
     if not ch:
         return False
     cp = ord(ch[0])
-    return (0x4E00 <= cp <= 0x9FFF       # CJK Unified Ideographs
-            or 0x3400 <= cp <= 0x4DBF    # CJK Extension A
-            or 0xF900 <= cp <= 0xFAFF)   # CJK Compatibility Ideographs
+    return (
+        0x4E00 <= cp <= 0x9FFF  # CJK Unified Ideographs
+        or 0x3400 <= cp <= 0x4DBF  # CJK Extension A
+        or 0xF900 <= cp <= 0xFAFF
+    )  # CJK Compatibility Ideographs
 
 
 def _smart_join(left: str, right: str) -> str:
@@ -71,7 +73,7 @@ def normalize_text(text: str) -> str:
     """
     if not text:
         return text
-    
+
     text = unicodedata.normalize("NFKC", text)
     text = text.replace("\u3000", " ").replace("\xa0", " ")
 
@@ -81,36 +83,35 @@ def normalize_text(text: str) -> str:
     # Process all newline characters with CJK-awareness
     while "\n" in text:
         idx = text.find("\n")
-        left_cjk = idx > 0 and _is_cjk_char(text[idx-1])
-        right_cjk = idx < len(text) - 1 and _is_cjk_char(text[idx+1])
+        left_cjk = idx > 0 and _is_cjk_char(text[idx - 1])
+        right_cjk = idx < len(text) - 1 and _is_cjk_char(text[idx + 1])
 
-        if left_cjk and right_cjk: # Both sides are CJK — remove the newline
-            text = text[:idx] + text[idx+1:]
-        else: # Otherwise replace with a space
-            text = text[:idx] + " " + text[idx+1:]
+        if left_cjk and right_cjk:  # Both sides are CJK — remove the newline
+            text = text[:idx] + text[idx + 1 :]
+        else:  # Otherwise replace with a space
+            text = text[:idx] + " " + text[idx + 1 :]
 
     text = re.sub(r"[ \t]+", " ", text)
     return text.strip()
 
 
-def normalize_table(table: List[List[str]]) -> List[List[str]]:
+def normalize_table(table: list[list[str]]) -> list[list[str]]:
     """Apply ``normalize_text`` to every cell in a 2-D table."""
-    return [
-        [normalize_text(cell) if cell else "" for cell in row]
-        for row in table
-    ]
+    return [[normalize_text(cell) if cell else "" for cell in row] for row in table]
 
 
-def headers_match(base: List[str], candidate: List[str], threshold: float = 0.6) -> bool:
+def headers_match(base: list[str], candidate: list[str], threshold: float = 0.6) -> bool:
     """Check whether two header rows match by measuring the overlap ratio
     of their non-empty cells.  Returns ``True`` when the overlap is at
     least *threshold* (default 60 %).
     """
     if not base or not candidate:
         return False
+
     # Inline NFKC normalisation (avoids circular dependency on vocabulary.py)
     def _norm(s: str) -> str:
         return unicodedata.normalize("NFKC", s).strip()
+
     base_set = {_norm(str(h)) for h in base if str(h).strip()}
     cand_set = {_norm(str(h)) for h in candidate if str(h).strip()}
     if not base_set:
@@ -150,7 +151,7 @@ def parse_amount(s: str) -> str:
     s = s.replace(",", "").replace("\u00a5", "").replace("\uffe5", "").replace("$", "").replace(" ", "")
     # Strip trailing non-numeric chars that leaked from adjacent columns
     # (e.g. '76513.47園' → '76513.47', '1234.00店' → '1234.00')
-    s = re.sub(r'[^\d.eE+-]+$', '', s)
+    s = re.sub(r"[^\d.eE+-]+$", "", s)
     try:
         val = float(s)
         if neg:

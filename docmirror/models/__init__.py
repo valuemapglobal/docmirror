@@ -13,13 +13,16 @@ Core Trinity:
     - enhanced.py: EnhancedResult      \u2014 Final Enhanced Output
 """
 
-from .entities.domain import Style, TextSpan, Block, PageLayout, BaseResult
-from .tracking.mutation import Mutation
+from .entities.domain import BaseResult, Block, PageLayout, Style, TextSpan
 from .entities.enhanced import EnhancedResult
+from .tracking.mutation import Mutation
 
 __all__ = [
-    "Style", "TextSpan", "Block", "PageLayout", "BaseResult",
-    "Mutation", "EnhancedResult",
+    "Style",
+    "TextSpan",
+    "Block",
+    "PageLayout",
+    "BaseResult",
+    "Mutation",
+    "EnhancedResult",
 ]
-
-

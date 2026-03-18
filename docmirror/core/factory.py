@@ -7,24 +7,28 @@
 """
 MultiModal Perception Factory
 """
+
 from __future__ import annotations
 
 import logging
 import threading
 from pathlib import Path
-from typing import Union, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional, Union
+
 from docmirror.framework.dispatcher import ParserDispatcher
 from docmirror.models.entities.document_types import DocumentType
 
 if TYPE_CHECKING:
     from docmirror.models.entities.parse_result import ParseResult
 
+
 class PerceptionFactory:
     """
     Perception factory that auto-dispatches parsing tasks by file type.
     ParserDispatcher is managed as a class-level cached singleton to avoid re-initialization.
     """
-    _dispatcher: Optional[ParserDispatcher] = None
+
+    _dispatcher: ParserDispatcher | None = None
     _lock = threading.Lock()
 
     @classmethod
@@ -44,14 +48,16 @@ class PerceptionFactory:
         with cls._lock:
             cls._dispatcher = None
 
+
 logger = logging.getLogger(__name__)
+
 
 # Convenience entry point
 async def perceive_document(
-    file_path: Union[str, Path],
+    file_path: str | Path,
     document_type: DocumentType = DocumentType.OTHER,
     skip_cache: bool = False,
-) -> "ParseResult":
+) -> ParseResult:
     logger.info(f"[PerceptionFactory] ▶ perceive_document | file_path={file_path} | document_type={document_type}")
     dispatcher = PerceptionFactory.get_dispatcher()
     return await dispatcher.process(str(file_path), document_type=document_type, skip_cache=skip_cache)

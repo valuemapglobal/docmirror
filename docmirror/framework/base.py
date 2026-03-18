@@ -12,6 +12,7 @@ Core Components:
 1. ParserStatus: Parsing lifecycle status enumeration.
 2. BaseParser: Abstract base class — all adapters implement to_parse_result().
 """
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
@@ -21,6 +22,7 @@ from pathlib import Path
 
 class ParserStatus(str, Enum):
     """Parsing status enumeration."""
+
     SUCCESS = "success"
     PARTIAL_SUCCESS = "partial_success"
     FAILURE = "failure"
@@ -35,7 +37,7 @@ class BaseParser(ABC):
     """
 
     @abstractmethod
-    async def to_parse_result(self, file_path: Path, **kwargs) -> "ParseResult":
+    async def to_parse_result(self, file_path: Path, **kwargs) -> ParseResult:
         """
         Extract the file into a ParseResult.
 
@@ -44,7 +46,7 @@ class BaseParser(ABC):
         """
         ...
 
-    async def perceive(self, file_path: Path, **context) -> "ParseResult":
+    async def perceive(self, file_path: Path, **context) -> ParseResult:
         """
         Unified pipeline: file → ParseResult → middleware → enhanced ParseResult.
 
@@ -61,7 +63,9 @@ class BaseParser(ABC):
         if pr.provenance is None:
             import hashlib
             import mimetypes
+
             from docmirror.models.entities.parse_result import ProvenanceInfo
+
             file_stat = file_path.stat()
             with open(file_path, "rb") as f:
                 checksum = hashlib.sha256(f.read()).hexdigest()
@@ -77,6 +81,7 @@ class BaseParser(ABC):
         # ── Fill parser_version if empty ──
         if not pr.parser_info.parser_version:
             import docmirror
+
             pr.parser_info.parser_version = getattr(docmirror, "__version__", "2.1.0")
 
         orchestrator = Orchestrator()
@@ -84,5 +89,7 @@ class BaseParser(ABC):
         enhance_mode = context.get("enhance_mode", "standard")
 
         return await orchestrator.enhance(
-            pr, enhance_mode=enhance_mode, file_type=file_type,
+            pr,
+            enhance_mode=enhance_mode,
+            file_type=file_type,
         )

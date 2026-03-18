@@ -22,8 +22,8 @@ Metadata includes:
     - parser_name: "PPTAdapter"
     - page_count: total number of slides
 """
-from __future__ import annotations
 
+from __future__ import annotations
 
 import logging
 from pathlib import Path
@@ -44,7 +44,7 @@ class PPTAdapter(BaseParser):
            then processed through the standard PDF pipeline.
     """
 
-    async def to_parse_result(self, file_path: Path, **kwargs) -> "ParseResult":
+    async def to_parse_result(self, file_path: Path, **kwargs) -> ParseResult:
         """
         Parse a .pptx file into a ParseResult.
 
@@ -52,26 +52,36 @@ class PPTAdapter(BaseParser):
         text shapes become BODY TextBlocks, and table shapes become TableBlocks.
         """
         from pptx import Presentation
+
         from docmirror.models.entities.parse_result import (
-            ParseResult, PageContent, TableBlock, TableRow, CellValue,
-            TextBlock, TextLevel, ParserInfo, DataType,
+            CellValue,
+            DataType,
+            PageContent,
+            ParseResult,
+            ParserInfo,
+            TableBlock,
+            TableRow,
+            TextBlock,
+            TextLevel,
         )
 
         logger.info(f"[PPTAdapter] Starting native extraction for presentation: {file_path}")
         prs = Presentation(str(file_path))
 
-        pages: List[PageContent] = []
+        pages: list[PageContent] = []
 
         for i, slide in enumerate(prs.slides):
-            texts: List[TextBlock] = []
-            tables: List[TableBlock] = []
+            texts: list[TextBlock] = []
+            tables: list[TableBlock] = []
 
             # Extract slide title (if present)
             if slide.shapes.title and slide.shapes.title.text:
-                texts.append(TextBlock(
-                    content=slide.shapes.title.text,
-                    level=TextLevel.H2,
-                ))
+                texts.append(
+                    TextBlock(
+                        content=slide.shapes.title.text,
+                        level=TextLevel.H2,
+                    )
+                )
 
             # Extract content from all other shapes (skip the title shape)
             for shape in slide.shapes:
@@ -85,14 +95,11 @@ class PPTAdapter(BaseParser):
                 # Table content — typed CellValue
                 if shape.has_table:
                     first_row = True
-                    headers: List[str] = []
-                    data_rows: List[TableRow] = []
+                    headers: list[str] = []
+                    data_rows: list[TableRow] = []
 
                     for row in shape.table.rows:
-                        cells = [
-                            CellValue(text=cell.text.strip(), data_type=DataType.TEXT)
-                            for cell in row.cells
-                        ]
+                        cells = [CellValue(text=cell.text.strip(), data_type=DataType.TEXT) for cell in row.cells]
                         if first_row:
                             headers = [c.text for c in cells]
                             first_row = False
@@ -101,12 +108,14 @@ class PPTAdapter(BaseParser):
                                 data_rows.append(TableRow(cells=cells, source_page=i))
 
                     if headers or data_rows:
-                        tables.append(TableBlock(
-                            table_id=f"slide{i}_table{len(tables)}",
-                            headers=headers,
-                            rows=data_rows,
-                            page=i,
-                        ))
+                        tables.append(
+                            TableBlock(
+                                table_id=f"slide{i}_table{len(tables)}",
+                                headers=headers,
+                                rows=data_rows,
+                                page=i,
+                            )
+                        )
 
             pages.append(PageContent(page_number=i, texts=texts, tables=tables))
 

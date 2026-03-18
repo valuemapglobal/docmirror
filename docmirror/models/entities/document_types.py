@@ -7,6 +7,7 @@
 """
 MultiModal Document Certificates and Struct Schema Definitions
 """
+
 from __future__ import annotations
 
 from enum import Enum
@@ -15,6 +16,7 @@ from typing import Dict
 
 class DocumentType(str, Enum):
     """Document Type Enumeration"""
+
     FINANCIAL_REPORT = "financial_report"
     INVOICE = "invoice"
     CONTRACT = "contract"
@@ -26,7 +28,7 @@ class DocumentType(str, Enum):
 
 
 # Target field schemas for each DocumentType definition
-DOCUMENT_FIELD_SCHEMAS: Dict[DocumentType, Dict[str, str]] = {
+DOCUMENT_FIELD_SCHEMAS: dict[DocumentType, dict[str, str]] = {
     DocumentType.FINANCIAL_REPORT: {
         "company_name": "Company name",
         "report_period": "Report period",

@@ -13,8 +13,8 @@ Usage::
     engine = get_rapid_table_engine()
     result = engine(img_np)  # -> RapidTableOutput
 """
-from __future__ import annotations
 
+from __future__ import annotations
 
 import logging
 import threading
@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 
 try:
     from rapid_table import RapidTable, RapidTableInput, RapidTableOutput
+
     HAS_RAPID_TABLE = True
 except ImportError:
     HAS_RAPID_TABLE = False
@@ -36,7 +37,7 @@ class RapidTableEngine:
     calls reuse the same instance.
     """
 
-    _instance: Optional["RapidTableEngine"] = None
+    _instance: RapidTableEngine | None = None
     _lock = threading.Lock()
 
     def __init__(self) -> None:
@@ -44,7 +45,7 @@ class RapidTableEngine:
         self._available = HAS_RAPID_TABLE
 
     @classmethod
-    def get_instance(cls) -> "RapidTableEngine":
+    def get_instance(cls) -> RapidTableEngine:
         if cls._instance is None:
             with cls._lock:
                 if cls._instance is None:
@@ -70,7 +71,7 @@ class RapidTableEngine:
                 self._available = False
                 return False
 
-    def __call__(self, img) -> Optional["RapidTableOutput"]:
+    def __call__(self, img) -> RapidTableOutput | None:
         """Run table structure recognition.
 
         Args:

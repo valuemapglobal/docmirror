@@ -20,16 +20,19 @@ cannot be recognised by standard OCR.  Uses ``cv2.warpPolar`` for
 polar-coordinate transformation to "straighten" the curved text into
 a horizontal image strip.
 """
+
 from __future__ import annotations
 
 import logging
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
+
 import numpy as np
 
 logger = logging.getLogger(__name__)
 
 try:
     import cv2
+
     _CV2_AVAILABLE = True
 except ImportError:
     _CV2_AVAILABLE = False
@@ -50,9 +53,7 @@ class SealDetector:
     # ─────────────────────────────────────────────────────────────────────────
     # Public API
     # ─────────────────────────────────────────────────────────────────────────
-    def detect_seal(
-        self, image_bgr: np.ndarray
-    ) -> Dict[str, Any]:
+    def detect_seal(self, image_bgr: np.ndarray) -> dict[str, Any]:
         """Detect a seal and return detection metadata (no polar unwarping).
 
         Returns:
@@ -75,7 +76,7 @@ class SealDetector:
         # 2. Fallback to greyscale (B&W scan) seal detection
         return self._detect_gray_seal(image_bgr)
 
-    def unwarp_circular_seal(self, image_bgr: np.ndarray) -> Optional[np.ndarray]:
+    def unwarp_circular_seal(self, image_bgr: np.ndarray) -> np.ndarray | None:
         """Extract the seal from the image and flatten it via polar-coordinate
         transformation into a horizontal text strip."""
         info = self.detect_seal(image_bgr)
@@ -102,7 +103,7 @@ class SealDetector:
                 dsize=(radius, circumference),
                 center=local_center,
                 maxRadius=radius,
-                flags=cv2.WARP_POLAR_LINEAR | cv2.INTER_LINEAR
+                flags=cv2.WARP_POLAR_LINEAR | cv2.INTER_LINEAR,
             )
             unwarped = cv2.rotate(unwarped, cv2.ROTATE_90_COUNTERCLOCKWISE)
             return unwarped
@@ -114,7 +115,7 @@ class SealDetector:
     # ─────────────────────────────────────────────────────────────────────────
     # Colour seal detection (red HSV)
     # ─────────────────────────────────────────────────────────────────────────
-    def _detect_color_seal(self, image_bgr: np.ndarray) -> Dict[str, Any]:
+    def _detect_color_seal(self, image_bgr: np.ndarray) -> dict[str, Any]:
         """Detect a colour seal via HSV red-channel segmentation."""
         empty = {"has_seal": False, "center": None, "radius": None, "bbox": None, "mode": None}
         try:
@@ -152,7 +153,7 @@ class SealDetector:
     # ─────────────────────────────────────────────────────────────────────────
     # Greyscale seal detection (for B&W scans)
     # ─────────────────────────────────────────────────────────────────────────
-    def _detect_gray_seal(self, image_bgr: np.ndarray) -> Dict[str, Any]:
+    def _detect_gray_seal(self, image_bgr: np.ndarray) -> dict[str, Any]:
         """Greyscale circular-contour detection.
 
         Algorithm:
@@ -192,7 +193,7 @@ class SealDetector:
             # Find the contour with the highest circularity and sufficient area
             best = None
             best_score = 0
-            min_area = 2000                # Minimum area threshold
+            min_area = 2000  # Minimum area threshold
             min_circularity = 0.3
 
             for cnt in contours:
@@ -243,7 +244,8 @@ class SealDetector:
 
 
 # Singleton accessor
-_default_seal_detector: Optional[SealDetector] = None
+_default_seal_detector: SealDetector | None = None
+
 
 def get_seal_detector() -> SealDetector:
     global _default_seal_detector

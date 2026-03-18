@@ -35,11 +35,12 @@ Usage::
         parser_info=ParserInfo(parser_name="docmirror"),
     )
 """
+
 from __future__ import annotations
 
 import time
 from enum import Enum
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -51,8 +52,10 @@ if TYPE_CHECKING:
 # Enumerations
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 class DataType(str, Enum):
     """Cell data type classification."""
+
     TEXT = "text"
     NUMBER = "number"
     DATE = "date"
@@ -63,6 +66,7 @@ class DataType(str, Enum):
 
 class RowType(str, Enum):
     """Table row semantic role."""
+
     HEADER = "header"
     DATA = "data"
     SUMMARY = "summary"
@@ -72,6 +76,7 @@ class RowType(str, Enum):
 
 class TextLevel(str, Enum):
     """Text hierarchy level."""
+
     TITLE = "title"
     H1 = "h1"
     H2 = "h2"
@@ -83,6 +88,7 @@ class TextLevel(str, Enum):
 
 class ExtractionMethod(str, Enum):
     """Document extraction method."""
+
     DIGITAL = "digital"
     OCR = "ocr"
     HYBRID = "hybrid"
@@ -91,6 +97,7 @@ class ExtractionMethod(str, Enum):
 
 class ResultStatus(str, Enum):
     """Parse result status."""
+
     SUCCESS = "success"
     PARTIAL = "partial"
     FAILURE = "failure"
@@ -99,6 +106,7 @@ class ResultStatus(str, Enum):
 # ══════════════════════════════════════════════════════════════════════════════
 # Zone 1: Content — "What I saw"
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 class CellValue(BaseModel):
     """
@@ -109,11 +117,12 @@ class CellValue(BaseModel):
     - ``numeric``: Parsed numeric value (if applicable).
     - ``confidence``: Extraction/OCR confidence [0.0, 1.0].
     """
+
     text: str = ""
-    cleaned: Optional[str] = None
-    numeric: Optional[float] = None
+    cleaned: str | None = None
+    numeric: float | None = None
     confidence: float = 1.0
-    bbox: Optional[List[float]] = None
+    bbox: list[float] | None = None
     data_type: DataType = DataType.TEXT
 
     class Config:
@@ -141,13 +150,14 @@ class TableRow(BaseModel):
         - ``separator``: Divider/empty row.
         - ``subheader``: Sub-group title (e.g. "2024年7月").
     """
-    cells: List[CellValue] = Field(default_factory=list)
+
+    cells: list[CellValue] = Field(default_factory=list)
     row_type: RowType = RowType.DATA
     confidence: float = 1.0
     source_page: int = 0
 
     @property
-    def cell_texts(self) -> List[str]:
+    def cell_texts(self) -> list[str]:
         """Convenience: list of all cell text values."""
         return [c.text for c in self.cells]
 
@@ -159,22 +169,23 @@ class TableBlock(BaseModel):
     ``headers`` may be empty if the parser cannot determine the header row.
     ``rows`` contain all rows (data + summary + separators).
     """
+
     table_id: str = ""
-    headers: List[str] = Field(default_factory=list)
-    rows: List[TableRow] = Field(default_factory=list)
+    headers: list[str] = Field(default_factory=list)
+    rows: list[TableRow] = Field(default_factory=list)
     page: int = 1
     page_span: int = 1
-    bbox: Optional[List[float]] = None
+    bbox: list[float] | None = None
     confidence: float = 1.0
-    caption: Optional[str] = None
+    caption: str | None = None
 
     @property
-    def data_rows(self) -> List[TableRow]:
+    def data_rows(self) -> list[TableRow]:
         """Only data rows (excluding headers, summaries, separators)."""
         return [r for r in self.rows if r.row_type == RowType.DATA]
 
     @property
-    def summary_rows(self) -> List[TableRow]:
+    def summary_rows(self) -> list[TableRow]:
         """Only summary/aggregation rows."""
         return [r for r in self.rows if r.row_type == RowType.SUMMARY]
 
@@ -183,7 +194,7 @@ class TableBlock(BaseModel):
         """Number of data rows."""
         return len(self.data_rows)
 
-    def to_dicts(self) -> List[Dict[str, str]]:
+    def to_dicts(self) -> list[dict[str, str]]:
         """
         Flatten data rows to ``[{column_name: cell_value}]``.
 
@@ -192,11 +203,7 @@ class TableBlock(BaseModel):
         if not self.headers:
             return []
         return [
-            {
-                self.headers[i]: (c.cleaned or c.text)
-                for i, c in enumerate(row.cells)
-                if i < len(self.headers)
-            }
+            {self.headers[i]: (c.cleaned or c.text) for i, c in enumerate(row.cells) if i < len(self.headers)}
             for row in self.data_rows
         ]
 
@@ -224,10 +231,11 @@ class TableBlock(BaseModel):
 
 class TextBlock(BaseModel):
     """A text paragraph or heading with hierarchy level."""
+
     content: str = ""
     level: TextLevel = TextLevel.BODY
     confidence: float = 1.0
-    bbox: Optional[List[float]] = None
+    bbox: list[float] | None = None
 
 
 class KeyValuePair(BaseModel):
@@ -236,10 +244,11 @@ class KeyValuePair(BaseModel):
 
     Examples: "开户行: 建设银行", "纳税人识别号: 91110..."
     """
+
     key: str = ""
     value: str = ""
     confidence: float = 1.0
-    bbox: Optional[List[float]] = None
+    bbox: list[float] | None = None
 
 
 class PageContent(BaseModel):
@@ -248,18 +257,20 @@ class PageContent(BaseModel):
 
     Each page contains typed collections of tables, text blocks, and KV pairs.
     """
+
     page_number: int = 1
-    tables: List[TableBlock] = Field(default_factory=list)
-    texts: List[TextBlock] = Field(default_factory=list)
-    key_values: List[KeyValuePair] = Field(default_factory=list)
+    tables: list[TableBlock] = Field(default_factory=list)
+    texts: list[TextBlock] = Field(default_factory=list)
+    key_values: list[KeyValuePair] = Field(default_factory=list)
     page_confidence: float = 1.0
-    width: Optional[int] = None
-    height: Optional[int] = None
+    width: int | None = None
+    height: int | None = None
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Zone 2: Entities — "What I recognized"
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 class DocumentEntities(BaseModel):
     """
@@ -269,15 +280,16 @@ class DocumentEntities(BaseModel):
         1. Universal fields — applicable to all document types.
         2. ``domain_specific`` — populated per document_type for domain-specific data.
     """
-    document_type: str = "unknown"
-    organization: Optional[str] = None
-    subject_name: Optional[str] = None
-    subject_id: Optional[str] = None
-    document_date: Optional[str] = None
-    period_start: Optional[str] = None
-    period_end: Optional[str] = None
 
-    domain_specific: Dict[str, Any] = Field(
+    document_type: str = "unknown"
+    organization: str | None = None
+    subject_name: str | None = None
+    subject_id: str | None = None
+    document_date: str | None = None
+    period_start: str | None = None
+    period_end: str | None = None
+
+    domain_specific: dict[str, Any] = Field(
         default_factory=dict,
         description="Domain-specific fields populated by document type",
     )
@@ -308,6 +320,7 @@ class DocumentEntities(BaseModel):
 # Zone 3: Meta — "How I did it"
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 class ParserInfo(BaseModel):
     """
     Parser self-description metadata.
@@ -317,17 +330,18 @@ class ParserInfo(BaseModel):
         - ``overall_confidence < 0.7`` → trigger re-parse or degradation
         - ``table_engine="camelot"`` → skip table re-detection
     """
+
     parser_name: str = ""
     parser_version: str = ""
     elapsed_ms: float = 0
     page_count: int = 0
 
     extraction_method: ExtractionMethod = ExtractionMethod.DIGITAL
-    ocr_engine: Optional[str] = None
-    table_engine: Optional[str] = None
+    ocr_engine: str | None = None
+    table_engine: str | None = None
 
     overall_confidence: float = 1.0
-    warnings: List[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -335,19 +349,21 @@ class ParserInfo(BaseModel):
 # (Absorbed from PerceptionResult.provenance.validation)
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 class TrustResult(BaseModel):
     """
     Trust and validation assessment of the parsed content.
 
     Populated by the Validator middleware after the enhancement pipeline.
     """
+
     validation_score: float = 0.0
     validation_passed: bool = False
     trust_score: float = 0.0
-    is_forged: Optional[bool] = None
-    forgery_reasons: List[str] = Field(default_factory=list)
+    is_forged: bool | None = None
+    forgery_reasons: list[str] = Field(default_factory=list)
 
-    details: Dict[str, Any] = Field(
+    details: dict[str, Any] = Field(
         default_factory=dict,
         description="Per-check validation breakdown (e.g. balance_continuity, date_order)",
     )
@@ -358,13 +374,15 @@ class TrustResult(BaseModel):
 # (Absorbed from PerceptionResult.provenance.source)
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 class ProvenanceInfo(BaseModel):
     """Source file provenance for audit trail."""
+
     file_type: str = ""
     file_size: int = 0
     checksum: str = ""
     mime_type: str = ""
-    document_properties: Dict[str, Any] = Field(
+    document_properties: dict[str, Any] = Field(
         default_factory=dict,
         description="PDF metadata, EXIF data, etc.",
     )
@@ -374,16 +392,19 @@ class ProvenanceInfo(BaseModel):
 # Envelope — Error handling
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 class ErrorDetail(BaseModel):
     """Structured error information for failed parses."""
+
     code: str = ""
     message: str = ""
-    details: Optional[str] = None
+    details: str | None = None
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Top-Level: ParseResult
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 class ParseResult(BaseModel):
     """
@@ -416,10 +437,10 @@ class ParseResult(BaseModel):
     # ── Envelope ──
     status: ResultStatus = ResultStatus.SUCCESS
     confidence: float = 1.0
-    error: Optional[ErrorDetail] = None
+    error: ErrorDetail | None = None
 
     # ── Zone 1: Content ──
-    pages: List[PageContent] = Field(default_factory=list)
+    pages: list[PageContent] = Field(default_factory=list)
 
     # ── Zone 2: Entities ──
     entities: DocumentEntities = Field(default_factory=DocumentEntities)
@@ -428,15 +449,15 @@ class ParseResult(BaseModel):
     parser_info: ParserInfo = Field(default_factory=ParserInfo)
 
     # ── Zone 4: Trust ──
-    trust: Optional[TrustResult] = None
+    trust: TrustResult | None = None
 
     # ── Zone 5: Provenance ──
-    provenance: Optional[ProvenanceInfo] = None
+    provenance: ProvenanceInfo | None = None
 
     # ── Pipeline state (populated by middleware) ──
-    mutations: List[Any] = Field(default_factory=list, exclude=True)
+    mutations: list[Any] = Field(default_factory=list, exclude=True)
     processing_time: float = Field(default=0.0, exclude=True)
-    errors: List[str] = Field(default_factory=list, exclude=True)
+    errors: list[str] = Field(default_factory=list, exclude=True)
 
     # ── Computed properties ──
 
@@ -465,12 +486,12 @@ class ParseResult(BaseModel):
         """Reconstruct full text from all pages (texts + table markdown)."""
         return self._build_full_text()
 
-    def all_tables(self) -> List[TableBlock]:
+    def all_tables(self) -> list[TableBlock]:
         """Collect all tables across pages."""
         return [t for p in self.pages for t in p.tables]
 
     @property
-    def kv_entities(self) -> Dict[str, str]:
+    def kv_entities(self) -> dict[str, str]:
         """Key-value entities from all pages (for SceneDetector/EntityExtractor)."""
         return self.all_key_values()
 
@@ -479,9 +500,9 @@ class ParseResult(BaseModel):
         return len(self.mutations)
 
     @property
-    def mutation_summary(self) -> Dict[str, int]:
+    def mutation_summary(self) -> dict[str, int]:
         """Summarize mutations per middleware."""
-        summary: Dict[str, int] = {}
+        summary: dict[str, int] = {}
         for m in self.mutations:
             summary[m.middleware_name] = summary.get(m.middleware_name, 0) + 1
         return summary
@@ -500,6 +521,7 @@ class ParseResult(BaseModel):
     ) -> None:
         """Create and attach a Mutation audit record."""
         from docmirror.models.tracking.mutation import Mutation
+
         self.mutations.append(
             Mutation.create(
                 middleware_name=middleware_name,
@@ -522,20 +544,20 @@ class ParseResult(BaseModel):
         if self.status == ResultStatus.SUCCESS:
             self.status = ResultStatus.PARTIAL
 
-    def flatten_rows(self) -> List[Dict[str, str]]:
+    def flatten_rows(self) -> list[dict[str, str]]:
         """
         Flatten all data rows into ``[{column_name: cell_value}]``.
 
         This is the direct data source for downstream structured consumers.
         """
-        rows: List[Dict[str, str]] = []
+        rows: list[dict[str, str]] = []
         for table in self.all_tables():
             rows.extend(table.to_dicts())
         return rows
 
-    def all_key_values(self) -> Dict[str, str]:
+    def all_key_values(self) -> dict[str, str]:
         """Collect all key-value pairs across pages into a single dict."""
-        result: Dict[str, str] = {}
+        result: dict[str, str] = {}
         for page in self.pages:
             for kv in page.key_values:
                 if kv.key:
@@ -549,7 +571,7 @@ class ParseResult(BaseModel):
         *,
         include_text: bool = False,
         request_id: str = "",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Serialize to RESTful API dict per ``parser_interface.md`` v1.0.
 
         Structure::
@@ -583,7 +605,7 @@ class ParseResult(BaseModel):
 
         # ── data.document ──
         # properties: flat dict from entities (exclude document_type + domain_specific)
-        properties: Dict[str, Any] = {}
+        properties: dict[str, Any] = {}
         if self.entities.organization:
             properties["organization"] = self.entities.organization
         if self.entities.subject_name:
@@ -601,7 +623,7 @@ class ParseResult(BaseModel):
             if k not in ("extracted_entities", "step_timings", "mutation_analysis"):
                 properties[k] = v
 
-        document: Dict[str, Any] = {
+        document: dict[str, Any] = {
             "type": self.entities.document_type,
             "properties": properties,
             "pages": self._build_api_pages(),
@@ -612,7 +634,7 @@ class ParseResult(BaseModel):
             document["text_format"] = "markdown"
 
         # ── data.quality ──
-        quality: Dict[str, Any] = {
+        quality: dict[str, Any] = {
             "confidence": self.confidence,
         }
         if self.trust:
@@ -625,7 +647,7 @@ class ParseResult(BaseModel):
             quality["issues"] = []
 
         # ── meta ──
-        meta: Dict[str, Any] = {
+        meta: dict[str, Any] = {
             "parser": self.parser_info.parser_name or "DocMirror",
             "version": self.parser_info.parser_version,
             "elapsed_ms": round(self.parser_info.elapsed_ms, 1),
@@ -675,17 +697,17 @@ class ParseResult(BaseModel):
     # ── Legacy bridge ──
 
     @classmethod
-    def from_legacy_parser_output(cls, output: Any) -> "ParseResult":
+    def from_legacy_parser_output(cls, output: Any) -> ParseResult:
         """
         Bridge from legacy ``ParserOutput`` — for gradual migration.
 
         Converts the old ``document_structure`` list and ``key_entities``
         dict into the typed ParseResult structure.
         """
-        pages: List[PageContent] = []
+        pages: list[PageContent] = []
         current_page = PageContent(page_number=1)
 
-        for item in (getattr(output, "document_structure", None) or []):
+        for item in getattr(output, "document_structure", None) or []:
             if not isinstance(item, dict):
                 continue
 
@@ -711,10 +733,7 @@ class ParseResult(BaseModel):
                     page=page_num,
                 )
                 for r in raw_rows:
-                    cells = [
-                        CellValue(text=str(v))
-                        for v in (r if isinstance(r, list) else [])
-                    ]
+                    cells = [CellValue(text=str(v)) for v in (r if isinstance(r, list) else [])]
                     table.rows.append(TableRow(cells=cells))
                 current_page.tables.append(table)
 
@@ -723,15 +742,11 @@ class ParseResult(BaseModel):
                     "title": TextLevel.TITLE,
                     "heading": TextLevel.H1,
                 }.get(block_type, TextLevel.BODY)
-                current_page.texts.append(
-                    TextBlock(content=item.get("content", ""), level=level)
-                )
+                current_page.texts.append(TextBlock(content=item.get("content", ""), level=level))
 
             elif block_type == "key_value":
                 for k, v in (item.get("pairs") or {}).items():
-                    current_page.key_values.append(
-                        KeyValuePair(key=k, value=str(v))
-                    )
+                    current_page.key_values.append(KeyValuePair(key=k, value=str(v)))
 
         pages.append(current_page)
 
@@ -755,7 +770,7 @@ class ParseResult(BaseModel):
 
     def _build_full_text(self) -> str:
         """Reconstruct full document text from page content."""
-        parts: List[str] = []
+        parts: list[str] = []
         for page in self.pages:
             for text in page.texts:
                 if text.content.strip():
@@ -786,14 +801,14 @@ class ParseResult(BaseModel):
             # Pad to header count
             while len(cells) < len(table.headers):
                 cells.append("")
-            lines.append("| " + " | ".join(cells[:len(table.headers)]) + " |")
+            lines.append("| " + " | ".join(cells[: len(table.headers)]) + " |")
         return "\n".join(lines)
 
-    def _build_api_pages(self) -> List[Dict[str, Any]]:
+    def _build_api_pages(self) -> list[dict[str, Any]]:
         """Build API pages structure with full CellValue serialization."""
-        api_pages: List[Dict[str, Any]] = []
+        api_pages: list[dict[str, Any]] = []
         for page in self.pages:
-            api_page: Dict[str, Any] = {
+            api_page: dict[str, Any] = {
                 "page_number": page.page_number,
             }
 
@@ -801,24 +816,24 @@ class ParseResult(BaseModel):
             if page.tables:
                 api_page["tables"] = []
                 for table in page.tables:
-                    api_page["tables"].append({
-                        "table_id": table.table_id,
-                        "headers": table.headers,
-                        "rows": [
-                            {
-                                "cells": [
-                                    self._serialize_cell(c) for c in row.cells
-                                ],
-                                "row_type": row.row_type.value,
-                                "confidence": row.confidence,
-                                "source_page": row.source_page,
-                            }
-                            for row in table.rows
-                        ],
-                        "page": table.page,
-                        "row_count": table.row_count,
-                        "confidence": table.confidence,
-                    })
+                    api_page["tables"].append(
+                        {
+                            "table_id": table.table_id,
+                            "headers": table.headers,
+                            "rows": [
+                                {
+                                    "cells": [self._serialize_cell(c) for c in row.cells],
+                                    "row_type": row.row_type.value,
+                                    "confidence": row.confidence,
+                                    "source_page": row.source_page,
+                                }
+                                for row in table.rows
+                            ],
+                            "page": table.page,
+                            "row_count": table.row_count,
+                            "confidence": table.confidence,
+                        }
+                    )
 
             # Text blocks with level
             if page.texts:
@@ -846,13 +861,13 @@ class ParseResult(BaseModel):
         return api_pages
 
     @staticmethod
-    def _serialize_cell(cell: "CellValue") -> Dict[str, Any]:
+    def _serialize_cell(cell: CellValue) -> dict[str, Any]:
         """Serialize CellValue to API dict — minimal output.
 
         Only ``text`` (always) and ``data_type`` (when not default "text").
         Consumer parses text according to data_type hint.
         """
-        d: Dict[str, Any] = {"text": cell.text}
+        d: dict[str, Any] = {"text": cell.text}
         if cell.data_type.value != "text":
             d["data_type"] = cell.data_type.value
         return d

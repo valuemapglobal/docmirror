@@ -9,8 +9,8 @@ Table pre-classification, confidence scoring, and validation gates.
 
 Split from ``table_extraction.py``.
 """
-from __future__ import annotations
 
+from __future__ import annotations
 
 import contextvars
 import logging
@@ -36,12 +36,10 @@ TABLE_SETTINGS_LINES = {
 }
 
 # ── contextvars: thread-safe / async-safe layer timings ──
-_layer_timings_var: contextvars.ContextVar[Dict[str, float]] = contextvars.ContextVar(
-    'layer_timings', default={}
-)
+_layer_timings_var: contextvars.ContextVar[dict[str, float]] = contextvars.ContextVar("layer_timings", default={})
 
 
-def get_last_layer_timings() -> Dict[str, float]:
+def get_last_layer_timings() -> dict[str, float]:
     """Return per-layer timing (ms) from the most recent ``extract_tables_layered``
     call in the current context."""
     return dict(_layer_timings_var.get({}))
@@ -77,15 +75,15 @@ def _quick_classify(work_page) -> str:
     if chars:
         x_positions = set(round(c["x0"] / 10) * 10 for c in chars)
         if len(x_positions) >= 5:  # Dispersed x → possibly a borderless table
-            if total_lines >= 3:    # Some horizontal lines → text strategy may work better
+            if total_lines >= 3:  # Some horizontal lines → text strategy may work better
                 return "text"
-            return "char"          # No lines → go directly to char-level
+            return "char"  # No lines → go directly to char-level
 
     return "pipe"  # Default: start from the beginning
 
 
 def _compute_table_confidence(
-    tables: List[List[List[str]]],
+    tables: list[list[list[str]]],
     layer: str,
 ) -> float:
     """Compute an extraction confidence score (0.0–1.0) for a table result.
@@ -122,20 +120,28 @@ def _compute_table_confidence(
 
     # 4. layer_bonus (earlier layers are inherently more trustworthy)
     _LAYER_BONUS = {
-        "pipe_delimited": 0.15, "lines": 0.15, "hline_columns": 0.10,
-        "rect_columns": 0.10, "text": 0.10, "docling_tableformer": 0.10,
+        "pipe_delimited": 0.15,
+        "lines": 0.15,
+        "hline_columns": 0.10,
+        "rect_columns": 0.10,
+        "text": 0.10,
+        "docling_tableformer": 0.10,
         "rapid_table": 0.12,  # Vision model: ranked above char-level strategies
         "signal_processor": 0.08,  # Dual-axis signal: above char-level, below pdfplumber
         "pymupdf_native": 0.12,
-        "header_anchors": 0.05, "word_anchors": 0.05,
-        "data_voting": 0.05, "whitespace_projection": 0.05,
-        "x_clustering": 0.0, "fallback": -0.10,
+        "header_anchors": 0.05,
+        "word_anchors": 0.05,
+        "data_voting": 0.05,
+        "whitespace_projection": 0.05,
+        "x_clustering": 0.0,
+        "fallback": -0.10,
     }
     bonus = _LAYER_BONUS.get(layer, 0.0)
 
     # Weighted sum
     confidence = (vocab_norm * 0.40 + row_norm * 0.20 + col_norm * 0.25) + bonus
     return round(max(0.0, min(1.0, confidence)), 3)
+
 
 def _cell_is_stuffed(cell: str) -> bool:
     """Detect whether a cell has had multiple rows of data stuffed into it
@@ -157,18 +163,18 @@ def _cell_is_stuffed(cell: str) -> bool:
     """
     if not cell or len(cell) < 10:
         return False
-        
+
     # Ignore preamble common text containing dates
     if "至" in cell and re.search(r"时间|期限|Period", cell):
         return False
 
     # Condition 1: >= 2 dates in a single cell
     # Note: (?:19|20)\d{6} matches only 8-digit dates starting with 19/20
-    dates = re.findall(r'\d{4}[-/]\d{1,2}[-/]\d{1,2}|(?<!\d)(?:19|20)\d{6}(?!\d)', cell)
+    dates = re.findall(r"\d{4}[-/]\d{1,2}[-/]\d{1,2}|(?<!\d)(?:19|20)\d{6}(?!\d)", cell)
     if len(dates) >= 2:
         return True
     # Condition 2: >= 4 amounts in a single cell (word-boundary match)
-    amounts = re.findall(r'(?<!\d)\d[\d,]*\.\d{2}(?!\d)', cell)
+    amounts = re.findall(r"(?<!\d)\d[\d,]*\.\d{2}(?!\d)", cell)
     if len(amounts) >= 4:
         return True
     return False
@@ -191,14 +197,11 @@ def _tables_look_valid(tables: list, min_rows: int = 2, has_borders: bool = Fals
             if 2 <= col_count <= 30:
                 # ── Check 1: abnormal average row character count ──
                 # (all lines merged into one row causes character count to spike)
-                total_chars = sum(
-                    len(str(c or "")) for row in tbl for c in row
-                )
+                total_chars = sum(len(str(c or "")) for row in tbl for c in row)
                 avg_chars_per_row = total_chars / len(tbl)
                 if avg_chars_per_row > 500:
                     logger.warning(
-                        f"table rejected: avg {avg_chars_per_row:.0f} "
-                        f"chars/row > 500 → fallback to char-level"
+                        f"table rejected: avg {avg_chars_per_row:.0f} chars/row > 500 → fallback to char-level"
                     )
                     return False
                 # ── F-1: enhanced sampling check (first 4 + middle 2 + last 2) ──

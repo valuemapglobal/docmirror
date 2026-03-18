@@ -13,6 +13,7 @@ Used by Dispatcher._build_failure, Adapters, and API responses.
 
 See docs/design/solution-design.md §4 (G3).
 """
+
 from __future__ import annotations
 
 import time
@@ -20,13 +21,16 @@ from enum import Enum
 from typing import Any, Dict, List, Optional
 
 # Re-export for callers that need to build PerceptionResult
-_ERROR_META: Dict[str, Dict[str, Any]] = {
+_ERROR_META: dict[str, dict[str, Any]] = {
     "FILE_NOT_FOUND": {"recoverable": False, "user_message": "File not found."},
     "FILE_TOO_SMALL": {"recoverable": False, "user_message": "File is too small to contain a valid document."},
     "FILE_TOO_LARGE": {"recoverable": False, "user_message": "File exceeds maximum allowed size."},
     "FILE_EMPTY": {"recoverable": False, "user_message": "File is empty."},
     "UNSUPPORTED_FORMAT": {"recoverable": False, "user_message": "File format is not supported."},
-    "FORMAT_REQUIRES_CONVERTER": {"recoverable": True, "user_message": "This format requires LibreOffice (soffice) to be installed for conversion."},
+    "FORMAT_REQUIRES_CONVERTER": {
+        "recoverable": True,
+        "user_message": "This format requires LibreOffice (soffice) to be installed for conversion.",
+    },
     "EXTRACTION_FAILED": {"recoverable": False, "user_message": "Document extraction failed."},
     "ORCHESTRATION_FAILURE": {"recoverable": False, "user_message": "Parsing pipeline failed."},
     "ENCRYPTED_PDF": {"recoverable": True, "user_message": "PDF is password-protected."},
@@ -37,6 +41,7 @@ _ERROR_META: Dict[str, Dict[str, Any]] = {
 
 class DocMirrorErrorCode(str, Enum):
     """Canonical error codes for DocMirror failures."""
+
     FILE_NOT_FOUND = "FILE_NOT_FOUND"
     FILE_TOO_SMALL = "FILE_TOO_SMALL"
     FILE_TOO_LARGE = "FILE_TOO_LARGE"
@@ -50,14 +55,15 @@ class DocMirrorErrorCode(str, Enum):
     UNKNOWN = "unknown"
 
 
-def get_error_meta(code: str) -> Dict[str, Any]:
+def get_error_meta(code: str) -> dict[str, Any]:
     """Return recoverable and user_message for a given code."""
     return _ERROR_META.get(code, _ERROR_META["unknown"]).copy()
 
 
-def make_error_detail(code: str, message: str = "") -> "ErrorDetail":
+def make_error_detail(code: str, message: str = "") -> ErrorDetail:
     """Build ErrorDetail with code and message from canonical meta."""
     from docmirror.models.entities.parse_result import ErrorDetail
+
     meta = get_error_meta(code)
     return ErrorDetail(
         code=code,
@@ -70,15 +76,20 @@ def build_failure_result(
     message: str,
     file_path: str = "",
     file_type: str = "",
-    is_forged: Optional[bool] = None,
-    forgery_reasons: Optional[List[str]] = None,
-    t0: Optional[float] = None,
-) -> "ParseResult":
+    is_forged: bool | None = None,
+    forgery_reasons: list[str] | None = None,
+    t0: float | None = None,
+) -> ParseResult:
     """Build a failure ParseResult with unified error code. Used by Dispatcher and Adapters."""
     from docmirror.models.entities.parse_result import (
-        ParseResult, ResultStatus, ParserInfo, ProvenanceInfo,
-        TrustResult, ErrorDetail,
+        ErrorDetail,
+        ParseResult,
+        ParserInfo,
+        ProvenanceInfo,
+        ResultStatus,
+        TrustResult,
     )
+
     elapsed = (time.time() - t0) * 1000 if t0 is not None else 0.0
 
     trust = None

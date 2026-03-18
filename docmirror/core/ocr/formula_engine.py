@@ -23,8 +23,8 @@ Relationship with CoreExtractor:
     - ``CoreExtractor._recognize_formula()`` delegates to this engine.
     - This engine is self-contained and can be used / tested independently.
 """
-from __future__ import annotations
 
+from __future__ import annotations
 
 import logging
 import re
@@ -45,7 +45,7 @@ class FormulaEngine:
     All backends share the same interface: ``image_bytes → LaTeX string``.
     """
 
-    def __init__(self, model_path: Optional[str] = None):
+    def __init__(self, model_path: str | None = None):
         """
         Args:
             model_path: Path to a UniMERNet ONNX model file.
@@ -70,6 +70,7 @@ class FormulaEngine:
             if path.exists():
                 try:
                     import onnxruntime as ort
+
                     self._onnx_session = ort.InferenceSession(
                         str(path),
                         providers=["CPUExecutionProvider"],
@@ -85,6 +86,7 @@ class FormulaEngine:
         # Strategy 2: rapid_latex_ocr
         try:
             from rapid_latex_ocr import LaTeXOCR
+
             self._rapid_ocr = LaTeXOCR()
             self._backend = "rapid_latex_ocr"
             logger.info("[FormulaEngine] Using rapid_latex_ocr")
@@ -177,8 +179,7 @@ class FormulaEngine:
         latex = _apply_ocr_corrections(latex)
 
         # ── Step 3: remove redundant display-style commands ──
-        for cmd in (r"\displaystyle", r"\textstyle", r"\scriptstyle",
-                    r"\scriptscriptstyle"):
+        for cmd in (r"\displaystyle", r"\textstyle", r"\scriptstyle", r"\scriptscriptstyle"):
             latex = latex.replace(cmd, "")
 
         # Remove invisible delimiters from \left. / \right.
@@ -186,10 +187,7 @@ class FormulaEngine:
         latex = latex.replace(r"\left.", r"\left").replace(r"\right.", r"\right")
 
         # ── Step 4: inline \text{} / \mathrm{} / \mathit{} content ──
-        latex = re.sub(
-            r"\\(?:text|mathrm|mathit|mbox|hbox)\{([^{}]*)\}",
-            r"\1", latex
-        )
+        latex = re.sub(r"\\(?:text|mathrm|mathit|mbox|hbox)\{([^{}]*)\}", r"\1", latex)
 
         # ── Step 5: bracket balancing ──
         latex = _balance_brackets(latex)
@@ -222,7 +220,7 @@ class FormulaEngine:
 _OCR_CORRECTIONS = {
     # Greek letters
     r"\Iambda": r"\lambda",
-    r"\Gamma": r"\Gamma",   # already correct — kept for completeness
+    r"\Gamma": r"\Gamma",  # already correct — kept for completeness
     r"\aIpha": r"\alpha",
     r"\bata": r"\beta",
     r"\epsiIon": r"\epsilon",
@@ -278,7 +276,7 @@ def _balance_brackets(latex: str) -> str:
                 count -= 1
 
         if count > 0:
-            latex += close_ch * count       # Missing closing brackets
+            latex += close_ch * count  # Missing closing brackets
         elif count < 0:
             latex = open_ch * (-count) + latex  # Missing opening brackets
 
@@ -305,8 +303,9 @@ def _preprocess_formula_image(image_bytes: bytes) -> bytes:
 
     try:
         from io import BytesIO
-        from PIL import Image, ImageFilter, ImageOps
+
         import numpy as np
+        from PIL import Image, ImageFilter, ImageOps
 
         img = Image.open(BytesIO(image_bytes)).convert("RGB")
         w, h = img.size
@@ -328,6 +327,7 @@ def _preprocess_formula_image(image_bytes: bytes) -> bytes:
         # Step 3: CLAHE contrast enhancement
         try:
             import cv2
+
             img_np = np.array(img)
             gray = cv2.cvtColor(img_np, cv2.COLOR_RGB2GRAY)
             clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))

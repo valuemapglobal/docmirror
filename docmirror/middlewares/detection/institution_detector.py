@@ -11,27 +11,28 @@ L2 Institution Identification Middleware
 When scene=bank_statement, identifies the specific banking institution.
 Reads from ParseResult.full_text, writes to ParseResult.entities.organization.
 """
-from __future__ import annotations
 
+from __future__ import annotations
 
 import logging
 import unicodedata
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from ..base import BaseMiddleware
 from ...models.entities.parse_result import ParseResult
+from ..base import BaseMiddleware
 
 logger = logging.getLogger(__name__)
 
 
-def _load_registry() -> Dict[str, Dict[str, Any]]:
+def _load_registry() -> dict[str, dict[str, Any]]:
     """Load the institution yaml configuration registry."""
     try:
         import yaml
+
         registry_path = Path(__file__).parent.parent.parent / "configs" / "institution_registry.yaml"
         if registry_path.exists():
-            with open(registry_path, "r", encoding="utf-8") as f:
+            with open(registry_path, encoding="utf-8") as f:
                 data = yaml.safe_load(f) or {}
             return data.get("institutions", {})
     except Exception as e:
@@ -42,8 +43,13 @@ def _load_registry() -> Dict[str, Dict[str, Any]]:
 def _extract_header_area(full_text: str, max_chars: int = 5000) -> str:
     """Isolate the title/header area before transaction column keywords."""
     column_keywords = [
-        "Transaction date", "凭证Type", "交易时间", "序号",
-        "交易明细", "记账Date", "交易Type",
+        "Transaction date",
+        "凭证Type",
+        "交易时间",
+        "序号",
+        "交易明细",
+        "记账Date",
+        "交易Type",
     ]
     cut_pos = len(full_text)
     for kw in column_keywords:
@@ -53,7 +59,7 @@ def _extract_header_area(full_text: str, max_chars: int = 5000) -> str:
     return full_text[: min(cut_pos, max_chars)]
 
 
-def detect_institution(full_text: str, registry: Dict[str, Dict[str, Any]]) -> Optional[str]:
+def detect_institution(full_text: str, registry: dict[str, dict[str, Any]]) -> str | None:
     """Execute L2 Institution Identification."""
     if not full_text or not registry:
         return None
@@ -68,6 +74,7 @@ def detect_institution(full_text: str, registry: Dict[str, Dict[str, Any]]) -> O
 
     # Pass 1.5: Generic regional bank regex
     import re
+
     _BANK_CONTEXT_KEYWORDS = ("流水", "对账单", "交易明细", "银行", "账号", "账户")
     _has_bank_context = any(kw in header_text for kw in _BANK_CONTEXT_KEYWORDS)
     if _has_bank_context:
@@ -105,11 +112,11 @@ def detect_institution(full_text: str, registry: Dict[str, Dict[str, Any]]) -> O
 class InstitutionDetector(BaseMiddleware):
     """L2 Institution Identification Middleware — writes to result.entities.organization."""
 
-    def __init__(self, config: Optional[Dict[str, Any]] = None):
+    def __init__(self, config: dict[str, Any] | None = None):
         super().__init__(config)
-        self._registry: Optional[Dict[str, Dict[str, Any]]] = None
+        self._registry: dict[str, dict[str, Any]] | None = None
 
-    def _get_registry(self) -> Dict[str, Dict[str, Any]]:
+    def _get_registry(self) -> dict[str, dict[str, Any]]:
         if self._registry is None:
             self._registry = _load_registry()
         return self._registry

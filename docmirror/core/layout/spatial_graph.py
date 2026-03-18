@@ -20,6 +20,7 @@ Three core algorithms:
 All algorithms are CPU-only, use no GPU or VLM, and require only SciPy
 (already a project dependency via pre_analyzer.py).
 """
+
 from __future__ import annotations
 
 import heapq
@@ -31,10 +32,10 @@ logger = logging.getLogger(__name__)
 
 
 def build_delaunay_adjacency(
-    zones: List[Any],
+    zones: list[Any],
     page_width: float,
     page_height: float,
-) -> Dict[int, Set[int]]:
+) -> dict[int, set[int]]:
     """Build a spatial adjacency graph using Delaunay triangulation.
 
     Each zone is represented by its bounding-box centre point.  The Delaunay
@@ -52,7 +53,7 @@ def build_delaunay_adjacency(
         Undirected adjacency dict ``{zone_idx: set(neighbor_indices)}``.
     """
     n = len(zones)
-    adj: Dict[int, Set[int]] = defaultdict(set)
+    adj: dict[int, set[int]] = defaultdict(set)
 
     if n <= 1:
         return adj
@@ -70,8 +71,8 @@ def build_delaunay_adjacency(
         points.append(((x0 + x1) / 2, (y0 + y1) / 2))
 
     try:
-        from scipy.spatial import Delaunay
         import numpy as np
+        from scipy.spatial import Delaunay
 
         pts = np.array(points)
 
@@ -100,9 +101,9 @@ def build_delaunay_adjacency(
 
 
 def detect_columns_geometric(
-    zones: List[Any],
+    zones: list[Any],
     page_width: float,
-) -> List[int]:
+) -> list[int]:
     """Detect column structure using 1D X-axis projection and peak finding.
 
     Clusters zone centre X-coordinates into columns by finding natural
@@ -171,14 +172,14 @@ def detect_columns_geometric(
 
 
 def compute_reading_order(
-    zones: List[Any],
+    zones: list[Any],
     page_width: float,
     page_height: float,
     *,
-    adj: Dict[int, Set[int]] | None = None,
-    columns: List[int] | None = None,
+    adj: dict[int, set[int]] | None = None,
+    columns: list[int] | None = None,
     syntactic_bridger: Any = None,
-) -> List[int]:
+) -> list[int]:
     """Compute reading order via topological sort over a directed acyclic graph.
 
     Converts the undirected Delaunay adjacency graph into a DAG by applying
@@ -215,20 +216,23 @@ def compute_reading_order(
         columns = detect_columns_geometric(zones, page_width)
 
     # ── Convert undirected → directed (DAG) ──
-    dag: Dict[int, Set[int]] = defaultdict(set)
+    dag: dict[int, set[int]] = defaultdict(set)
 
     # Pre-compute zone attributes
     _ZONE_ORDER = {
-        "title": 0, "summary": 1, "data_table": 2,
-        "formula": 2, "unknown": 3, "footer": 4,
+        "title": 0,
+        "summary": 1,
+        "data_table": 2,
+        "formula": 2,
+        "unknown": 3,
+        "footer": 4,
     }
 
     def _is_sidebar(bbox):
         x0, y0, x1, y1 = bbox
         w = x1 - x0
         cx = (x0 + x1) / 2
-        return (w < page_width * 0.15 and
-                (cx < page_width * 0.15 or cx > page_width * 0.85))
+        return w < page_width * 0.15 and (cx < page_width * 0.15 or cx > page_width * 0.85)
 
     is_sidebar = [_is_sidebar(z.bbox) for z in zones]
 

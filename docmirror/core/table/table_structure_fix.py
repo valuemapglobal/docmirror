@@ -30,8 +30,8 @@ Design principles:
     - Every fix performs a safety check; uncertain cases are left unmodified.
     - Empty / single-row tables are returned as-is.
 """
-from __future__ import annotations
 
+from __future__ import annotations
 
 import logging
 import re
@@ -60,7 +60,7 @@ def _smart_join(s1: str, s2: str) -> str:
     return f"{s1} {s2}"
 
 
-def merge_split_rows(table: List[List[str]]) -> List[List[str]]:
+def merge_split_rows(table: list[list[str]]) -> list[list[str]]:
     """Merge records that were split across multiple rows using Unsupervised Anchor Folding (Phase 3)."""
     try:
         if len(table) < 2:
@@ -69,7 +69,7 @@ def merge_split_rows(table: List[List[str]]) -> List[List[str]]:
         header = table[0]
         data = table[1:]
         col_count = len(header)
-        
+
         if not data:
             return table
 
@@ -78,7 +78,7 @@ def merge_split_rows(table: List[List[str]]) -> List[List[str]]:
         # Primary anchors are Date columns and Amount columns.
         date_col = -1
         amount_col = -1
-        
+
         # Scan header to find potential anchor columns
         for c, h_text in enumerate(header):
             h_norm = (h_text or "").strip().lower()
@@ -86,7 +86,7 @@ def merge_split_rows(table: List[List[str]]) -> List[List[str]]:
                 date_col = c
             if any(kw in h_norm for kw in ["发生额", "金额", "支出", "存入", "余额", "amount", "balance"]):
                 amount_col = c
-                
+
         # If header search failed, scan the first 5 data rows
         if date_col == -1 or amount_col == -1:
             for c in range(min(10, col_count)):
@@ -101,7 +101,7 @@ def merge_split_rows(table: List[List[str]]) -> List[List[str]]:
                         clean_cell = cell.replace(",", "").replace("¥", "").replace("$", "")
                         if re.match(r"^-?\d+\.\d{2}$", clean_cell):
                             amount_score += 1
-                
+
                 if date_score > 0 and date_col == -1:
                     date_col = c
                 if amount_score > 0 and amount_col == -1:
@@ -125,33 +125,29 @@ def merge_split_rows(table: List[List[str]]) -> List[List[str]]:
 
             # Semantic Anchor Detection for the current row
             is_anchor_row = False
-            
+
             # Condition 1: Has a valid date in the date column
             if date_col != -1 and date_col < len(row):
                 cell = (row[date_col] or "").strip()
                 if _DATE_RE.match(cell):
                     is_anchor_row = True
-                    
+
             # Condition 2: Has a valid amount in the amount column
             if not is_anchor_row and amount_col != -1 and amount_col < len(row):
                 cell = (row[amount_col] or "").strip().replace(",", "").replace("¥", "")
                 if re.match(r"^-?\d+\.\d{2}$", cell):
                     is_anchor_row = True
-                    
+
             # Fallback Pattern 1: Any sequence number at column 0 (e.g. "123")
             if not is_anchor_row and len(row) > 0:
                 cell = (row[0] or "").strip()
                 if re.match(r"^\d{1,6}$", cell):
                     is_anchor_row = True
 
-            # Fallback Pattern 2: Time-Only continuation 
+            # Fallback Pattern 2: Time-Only continuation
             # (Special case: time is split from date onto the next line)
             first_cell = (row[0] or "").strip()
-            if (
-                current_record 
-                and _TIME_ONLY_RE.match(first_cell)
-                and _DATE_RE.match((current_record[0] or "").strip())
-            ):
+            if current_record and _TIME_ONLY_RE.match(first_cell) and _DATE_RE.match((current_record[0] or "").strip()):
                 current_record[0] = f"{current_record[0].strip()} {first_cell}"
                 for j in range(1, col_count):
                     v = (row[j] or "").strip()
@@ -168,7 +164,9 @@ def merge_split_rows(table: List[List[str]]) -> List[List[str]]:
             else:
                 # ── Fragment Row: Merge into the current open record ──
                 if current_record:
-                    logger.info("[TableFix] Merging split fragment row into anchor record (Unsupervised Anchor Folding)")
+                    logger.info(
+                        "[TableFix] Merging split fragment row into anchor record (Unsupervised Anchor Folding)"
+                    )
                     # Semantic Closure: Append to existing record
                     for i in range(col_count):
                         v = (row[i] or "").strip()
@@ -191,17 +189,26 @@ def merge_split_rows(table: List[List[str]]) -> List[List[str]]:
 
         return result
     except Exception as e:
-        import traceback
         import sys
+        import traceback
+
         print(f"CRASH IN MERGE_SPLIT_ROWS: {e}", file=sys.stderr)
         traceback.print_exc()
         return table
 
 
-def _is_summary_row(row: List[str]) -> bool:
+def _is_summary_row(row: list[str]) -> bool:
     """Detect summary rows (should not be merged)."""
     text = "".join(str(c) for c in row)
-    summary_keywords = ["\u603b\u6536\u5165", "\u603b\u652f\u51fa", "\u5408\u8ba1", "\u603b\u8ba1", "\u5c0f\u8ba1", "\u672c\u9875", "\u7d2f\u8ba1"]
+    summary_keywords = [
+        "\u603b\u6536\u5165",
+        "\u603b\u652f\u51fa",
+        "\u5408\u8ba1",
+        "\u603b\u8ba1",
+        "\u5c0f\u8ba1",
+        "\u672c\u9875",
+        "\u7d2f\u8ba1",
+    ]
     return any(kw in text for kw in summary_keywords)
 
 
@@ -210,9 +217,7 @@ def _is_summary_row(row: List[str]) -> bool:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 # Spaces between CJK characters (should be removed)
-_CJK_SPACE_RE = re.compile(
-    r"([\u4e00-\u9fff\u3400-\u4dbf])\s+([\u4e00-\u9fff\u3400-\u4dbf])"
-)
+_CJK_SPACE_RE = re.compile(r"([\u4e00-\u9fff\u3400-\u4dbf])\s+([\u4e00-\u9fff\u3400-\u4dbf])")
 
 
 def clean_cell_text(text: str) -> str:
@@ -238,12 +243,9 @@ def clean_cell_text(text: str) -> str:
     return text.strip()
 
 
-def clean_table_cells(table: List[List[str]]) -> List[List[str]]:
+def clean_table_cells(table: list[list[str]]) -> list[list[str]]:
     """Apply text cleanup to all cells in a table."""
-    return [
-        [clean_cell_text(cell) if isinstance(cell, str) else cell for cell in row]
-        for row in table
-    ]
+    return [[clean_cell_text(cell) if isinstance(cell, str) else cell for cell in row] for row in table]
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -252,14 +254,14 @@ def clean_table_cells(table: List[List[str]]) -> List[List[str]]:
 
 # Digit\u2192letter boundary (e.g. "110.9731080243CNYFC")
 _NUM_ALPHA_BOUNDARY_RE = re.compile(
-    r"(\d{1,3}\.\d{2})"           # Amount portion (e.g. 110.97)
-    r"(\d{5,}[A-Z]*\d*)"         # Account number portion (e.g. 31080243CNYFC0445)
+    r"(\d{1,3}\.\d{2})"  # Amount portion (e.g. 110.97)
+    r"(\d{5,}[A-Z]*\d*)"  # Account number portion (e.g. 31080243CNYFC0445)
 )
 
 
 def split_concatenated_cells(
-    table: List[List[str]],
-) -> List[List[str]]:
+    table: list[list[str]],
+) -> list[list[str]]:
     """Split concatenated cells \u2014 triggered when a row has fewer columns
     than the header.
 
@@ -315,7 +317,8 @@ def split_concatenated_cells(
 # Fix 4: Align row column counts
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def align_row_columns(table: List[List[str]]) -> List[List[str]]:
+
+def align_row_columns(table: list[list[str]]) -> list[list[str]]:
     """Align all rows' column counts to the header.
 
     Rules:
@@ -336,7 +339,7 @@ def align_row_columns(table: List[List[str]]) -> List[List[str]]:
             result.append(row + [""] * (target - len(row)))
         else:
             # Merge excess columns into the last column
-            merged = row[:target - 1] + [" ".join(str(c) for c in row[target - 1:] if c)]
+            merged = row[: target - 1] + [" ".join(str(c) for c in row[target - 1 :] if c)]
             result.append(merged)
 
     return result
@@ -350,7 +353,7 @@ def align_row_columns(table: List[List[str]]) -> List[List[str]]:
 _UNDERLINE_RE = re.compile(r"_{3,}")
 
 
-def strip_underline_footer(table: List[List[str]]) -> List[List[str]]:
+def strip_underline_footer(table: list[list[str]]) -> list[list[str]]:
     """Remove underline-delimited footer statistics from cells.
 
     Pattern: "4085.26___Total debits:...__Total credits:...__Count:..."
@@ -373,7 +376,7 @@ def strip_underline_footer(table: List[List[str]]) -> List[List[str]]:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-def trim_trailing_empty_columns(table: List[List[str]]) -> List[List[str]]:
+def trim_trailing_empty_columns(table: list[list[str]]) -> list[list[str]]:
     """Trim all-empty trailing columns.
 
     Generalised: only trims from the end; does not affect interior empty columns.
@@ -384,10 +387,7 @@ def trim_trailing_empty_columns(table: List[List[str]]) -> List[List[str]]:
     col_count = max(len(row) for row in table)
     trim_to = col_count
     for ci in range(col_count - 1, -1, -1):
-        all_empty = all(
-            not (row[ci] if ci < len(row) else "").strip()
-            for row in table
-        )
+        all_empty = all(not (row[ci] if ci < len(row) else "").strip() for row in table)
         if all_empty:
             trim_to = ci
         else:
@@ -406,7 +406,7 @@ def trim_trailing_empty_columns(table: List[List[str]]) -> List[List[str]]:
 _DIGIT_SPACE_RE = re.compile(r"^[\d\s]+$")
 
 
-def merge_digit_spaces(table: List[List[str]]) -> List[List[str]]:
+def merge_digit_spaces(table: list[list[str]]) -> list[list[str]]:
     """Remove spaces inside pure-digit cells.
 
     Pattern: "6216911304 963684" \u2192 "6216911304963684"
@@ -429,21 +429,24 @@ def merge_digit_spaces(table: List[List[str]]) -> List[List[str]]:
 
 # Common bilingual column-title suffixes (English portion) — matched longest-first
 _BILINGUAL_SUFFIXES = [
-    "Counterparty Institution", "Counterparty Name",
-    "Transaction Amount", "Transaction Date",
-    "Account Balance", "Abstract Code",
-    "Serial Number", "Description",
-    "Debit", "Credit",
+    "Counterparty Institution",
+    "Counterparty Name",
+    "Transaction Amount",
+    "Transaction Date",
+    "Account Balance",
+    "Abstract Code",
+    "Serial Number",
+    "Description",
+    "Debit",
+    "Credit",
 ]
 # Regex: match "CJK...English suffix" pattern
 _BILINGUAL_SUFFIX_RE = re.compile(
-    r"([\u4e00-\u9fff][\u4e00-\u9fff\s]*)\s*("
-    + "|".join(re.escape(s) for s in _BILINGUAL_SUFFIXES)
-    + r")\s*$"
+    r"([\u4e00-\u9fff][\u4e00-\u9fff\s]*)\s*(" + "|".join(re.escape(s) for s in _BILINGUAL_SUFFIXES) + r")\s*$"
 )
 
 
-def strip_header_labels_from_cells(table: List[List[str]]) -> List[List[str]]:
+def strip_header_labels_from_cells(table: list[list[str]]) -> list[list[str]]:
     """Remove bilingual column-title suffixes concatenated to data cells.
 
     Patterns:
@@ -471,18 +474,14 @@ def strip_header_labels_from_cells(table: List[List[str]]) -> List[List[str]]:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-def remove_empty_tables(tables: List[List[List[str]]]) -> List[List[List[str]]]:
+def remove_empty_tables(tables: list[list[list[str]]]) -> list[list[list[str]]]:
     """Remove tables where all cells are empty.
 
     Generalised: only removes fully empty tables; tables with any data are kept.
     """
     result = []
     for table in tables:
-        has_content = any(
-            (cell or "").strip()
-            for row in table
-            for cell in row
-        )
+        has_content = any((cell or "").strip() for row in table for cell in row)
         if has_content:
             result.append(table)
         else:
@@ -498,7 +497,7 @@ def remove_empty_tables(tables: List[List[List[str]]]) -> List[List[List[str]]]:
 _ACCT_PREFIX_RE = re.compile(r"^(\d{10,})([\u4e00-\u9fff].*)$")
 
 
-def split_account_from_name(table: List[List[str]]) -> List[List[str]]:
+def split_account_from_name(table: list[list[str]]) -> list[list[str]]:
     """Split long digit prefixes (account numbers) from account-name cells.
 
     Pattern: "7065018800015\u9547\u6c5f\u4e00\u751f\u4e00\u4e16\u597d\u6e38\u620f\u6709\u9650\u516c\u53f8" \u2192
@@ -556,7 +555,7 @@ _CURRENCY_PREFIX_RE = re.compile(
 )
 
 
-def strip_currency_prefix(table: List[List[str]]) -> List[List[str]]:
+def strip_currency_prefix(table: list[list[str]]) -> list[list[str]]:
     """Strip currency code prefixes from amount cells.
 
     Patterns: "RMB 352.10" \u2192 "352.10", "RMB7.77" \u2192 "7.77"
@@ -579,7 +578,8 @@ def strip_currency_prefix(table: List[List[str]]) -> List[List[str]]:
 # Unified entry point
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def fix_table_structure(table: List[List[str]]) -> List[List[str]]:
+
+def fix_table_structure(table: list[list[str]]) -> list[list[str]]:
     """Unified entry point for table structure fixes.
 
     Executes in order:
@@ -606,16 +606,16 @@ def fix_table_structure(table: List[List[str]]) -> List[List[str]]:
 
     original_rows = len(table)
 
-    table = merge_split_rows(table)              # Fix 1
-    table = split_concatenated_cells(table)       # Fix 3
-    table = align_row_columns(table)              # Fix 4
-    table = clean_table_cells(table)              # Fix 2
-    table = strip_underline_footer(table)         # Fix 5
-    table = trim_trailing_empty_columns(table)    # Fix 6
-    table = merge_digit_spaces(table)             # Fix 7
-    table = strip_header_labels_from_cells(table) # Fix 8
-    table = split_account_from_name(table)        # Fix 11
-    table = strip_currency_prefix(table)          # Fix 12
+    table = merge_split_rows(table)  # Fix 1
+    table = split_concatenated_cells(table)  # Fix 3
+    table = align_row_columns(table)  # Fix 4
+    table = clean_table_cells(table)  # Fix 2
+    table = strip_underline_footer(table)  # Fix 5
+    table = trim_trailing_empty_columns(table)  # Fix 6
+    table = merge_digit_spaces(table)  # Fix 7
+    table = strip_header_labels_from_cells(table)  # Fix 8
+    table = split_account_from_name(table)  # Fix 11
+    table = strip_currency_prefix(table)  # Fix 12
     table = remove_empty_interior_columns(table)  # Fix 13
 
     fixed_rows = len(table)
@@ -629,7 +629,7 @@ def fix_table_structure(table: List[List[str]]) -> List[List[str]]:
     return table
 
 
-def remove_empty_interior_columns(table: List[List[str]]) -> List[List[str]]:
+def remove_empty_interior_columns(table: list[list[str]]) -> list[list[str]]:
     """Remove all-empty interior columns (including those with empty or
     duplicate headers).
 

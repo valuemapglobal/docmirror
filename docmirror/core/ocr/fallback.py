@@ -27,34 +27,56 @@ Pipeline:
     7. **OCR post-processing** — amount/date/domain-term correction via
        ``ocr_postprocess.postprocess_ocr_result``.
 """
+
 from __future__ import annotations
 
-
 import logging
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from collections.abc import Callable
+from typing import Any, Dict, List, Optional, Tuple, Union
+
+from .image_preprocessing import (
+    deskew_image as _deskew_image,
+)
+from .image_preprocessing import (
+    preprocess_image_for_ocr as _preprocess_image_for_ocr,
+)
 
 # ── Delegated sub-modules ──
 from .image_preprocessing import (
     preprocess_minimal as _preprocess_minimal,
-    preprocess_image_for_ocr as _preprocess_image_for_ocr,
-    deskew_image as _deskew_image,
+)
+from .table_reconstruction import (
+    assign_chars_to_columns as _assign_chars_to_columns,
+)
+from .table_reconstruction import (
+    chars_to_text as _chars_to_text,
+)
+from .table_reconstruction import (
+    cluster_x_positions as _cluster_x_positions,
+)
+from .table_reconstruction import (
+    detect_has_table as _detect_has_table,
+)
+from .table_reconstruction import (
+    detect_table_lines_hough as _detect_table_lines_hough,
 )
 from .table_reconstruction import (
     group_chars_into_rows as _group_chars_into_rows,
-    chars_to_text as _chars_to_text,
-    cluster_x_positions as _cluster_x_positions,
-    assign_chars_to_columns as _assign_chars_to_columns,
-    split_tables_by_y_gap as _split_tables_by_y_gap,
-    reconstruct_table_grid_2d as _reconstruct_table_grid_2d,
-    detect_table_lines_hough as _detect_table_lines_hough,
-    detect_has_table as _detect_has_table,
+)
+from .table_reconstruction import (
     group_words_into_lines as _group_words_into_lines,
+)
+from .table_reconstruction import (
+    reconstruct_table_grid_2d as _reconstruct_table_grid_2d,
+)
+from .table_reconstruction import (
+    split_tables_by_y_gap as _split_tables_by_y_gap,
 )
 
 logger = logging.getLogger(__name__)
 
 
-def _resolve_external_ocr_provider(provider_spec: Optional[str]):
+def _resolve_external_ocr_provider(provider_spec: str | None):
     """Resolve 'module:callable' string to a callable, or return None.
 
     The callable is expected to have signature:
@@ -69,6 +91,7 @@ def _resolve_external_ocr_provider(provider_spec: Optional[str]):
     try:
         mod_name, attr = provider_spec.strip().rsplit(":", 1)
         import importlib
+
         mod = importlib.import_module(mod_name)
         return getattr(mod, attr)
     except Exception as e:
@@ -78,8 +101,9 @@ def _resolve_external_ocr_provider(provider_spec: Optional[str]):
 
 def _render_page_to_bgr(fitz_page, dpi: int = 200):
     """Render a fitz page to BGR numpy array. Returns (img_bgr, page_h, page_w)."""
-    import numpy as np
     import cv2
+    import numpy as np
+
     pix = fitz_page.get_pixmap(dpi=dpi)
     img = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.h, pix.w, pix.n)
     if pix.n == 3:
@@ -99,13 +123,16 @@ def assess_image_quality_from_bgr(img_bgr) -> int:
     whether to delegate to external OCR when quality is below threshold.
     """
     import numpy as np
+
     try:
         import cv2
+
         gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
     except Exception:
         gray = np.mean(img_bgr[:, :, :3], axis=2).astype(np.uint8)
     try:
         from scipy.ndimage import laplace  # type: ignore
+
         lap = laplace(gray.astype(np.float64))
         lap_var = float(np.var(lap))
         if lap_var >= 200:
@@ -143,6 +170,7 @@ def _read_exif_orientation(fitz_page) -> int:
         if len(images) == 1:
             xref = images[0][0]
             import fitz as _fitz
+
             pix = _fitz.Pixmap(doc, xref)
             # fitz Pixmap doesn't expose EXIF directly, but the
             # _image_to_virtual_pdf path already handles this via
@@ -182,14 +210,20 @@ def _preprocess_minimal(img_bgr):
         scale = 0
     if scale > 0:
         img_bgr = cv2.resize(
-            img_bgr, None, fx=scale, fy=scale,
+            img_bgr,
+            None,
+            fx=scale,
+            fy=scale,
             interpolation=cv2.INTER_LANCZOS4,
         )
-        sharp_kernel = np.array([
-            [0, -0.5, 0],
-            [-0.5, 3, -0.5],
-            [0, -0.5, 0],
-        ], dtype=np.float32)
+        sharp_kernel = np.array(
+            [
+                [0, -0.5, 0],
+                [-0.5, 3, -0.5],
+                [0, -0.5, 0],
+            ],
+            dtype=np.float32,
+        )
         img_bgr = cv2.filter2D(img_bgr, -1, sharp_kernel)
         h, w = img_bgr.shape[:2]
 
@@ -199,10 +233,7 @@ def _preprocess_minimal(img_bgr):
     contrast = float(gray_check.std())
     if mean_br < 80:
         gamma = 0.6
-        lut = np.array([
-            min(255, int(((i / 255.0) ** gamma) * 255))
-            for i in range(256)
-        ], dtype=np.uint8)
+        lut = np.array([min(255, int(((i / 255.0) ** gamma) * 255)) for i in range(256)], dtype=np.uint8)
         img_bgr = cv2.LUT(img_bgr, lut)
 
     # ── Histogram stretch for low contrast ──
@@ -213,7 +244,8 @@ def _preprocess_minimal(img_bgr):
             if p_hi - p_lo > 10:
                 img_bgr[:, :, c] = np.clip(
                     (ch.astype(np.float32) - p_lo) / (p_hi - p_lo) * 255,
-                    0, 255,
+                    0,
+                    255,
                 ).astype(np.uint8)
 
     # ── Red seal removal (same as full pipeline) ──
@@ -240,7 +272,6 @@ def _preprocess_minimal(img_bgr):
     return cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
 
 
-
 def _ocr_upscale_and_normalize(img_bgr, cv2, np):
     """Stage 1: Upscale low-res images, gamma correct, histogram stretch, edge pad."""
     h, w = img_bgr.shape[:2]
@@ -255,14 +286,20 @@ def _ocr_upscale_and_normalize(img_bgr, cv2, np):
         scale = 0
     if scale > 0:
         img_bgr = cv2.resize(
-            img_bgr, None, fx=scale, fy=scale,
+            img_bgr,
+            None,
+            fx=scale,
+            fy=scale,
             interpolation=cv2.INTER_LANCZOS4,
         )
-        sharp_kernel = np.array([
-            [0, -0.5, 0],
-            [-0.5, 3, -0.5],
-            [0, -0.5, 0],
-        ], dtype=np.float32)
+        sharp_kernel = np.array(
+            [
+                [0, -0.5, 0],
+                [-0.5, 3, -0.5],
+                [0, -0.5, 0],
+            ],
+            dtype=np.float32,
+        )
         img_bgr = cv2.filter2D(img_bgr, -1, sharp_kernel)
         h, w = img_bgr.shape[:2]
         logger.debug(f"[OCR] Upscaled {scale:.0f}\u00d7 (Lanczos+sharp) \u2192 {w}x{h}")
@@ -273,10 +310,7 @@ def _ocr_upscale_and_normalize(img_bgr, cv2, np):
     img_contrast = float(gray_check.std())
     if mean_brightness < 80:
         gamma = 0.6
-        lut = np.array([
-            min(255, int(((i / 255.0) ** gamma) * 255))
-            for i in range(256)
-        ], dtype=np.uint8)
+        lut = np.array([min(255, int(((i / 255.0) ** gamma) * 255)) for i in range(256)], dtype=np.uint8)
         img_bgr = cv2.LUT(img_bgr, lut)
         logger.debug(
             f"[OCR] Gamma correction (\u03b3={gamma}): "
@@ -290,9 +324,9 @@ def _ocr_upscale_and_normalize(img_bgr, cv2, np):
             p_lo, p_hi = np.percentile(channel, (1, 99))
             if p_hi - p_lo > 10:
                 channel = np.clip(
-                    (channel.astype(np.float32) - p_lo)
-                    / (p_hi - p_lo) * 255,
-                    0, 255,
+                    (channel.astype(np.float32) - p_lo) / (p_hi - p_lo) * 255,
+                    0,
+                    255,
                 ).astype(np.uint8)
                 img_bgr[:, :, c] = channel
         logger.debug(
@@ -303,8 +337,13 @@ def _ocr_upscale_and_normalize(img_bgr, cv2, np):
     # ── Edge padding to prevent border text clipping ──
     pad = 20
     img_bgr = cv2.copyMakeBorder(
-        img_bgr, pad, pad, pad, pad,
-        cv2.BORDER_CONSTANT, value=(255, 255, 255),
+        img_bgr,
+        pad,
+        pad,
+        pad,
+        pad,
+        cv2.BORDER_CONSTANT,
+        value=(255, 255, 255),
     )
     return img_bgr
 
@@ -374,12 +413,8 @@ def _ocr_remove_interference(img_bgr, cv2, np):
     # ── Decorative border cropping ──
     try:
         gray_border = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
-        _, thresh_border = cv2.threshold(
-            gray_border, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU
-        )
-        contours, _ = cv2.findContours(
-            thresh_border, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
-        )
+        _, thresh_border = cv2.threshold(gray_border, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+        contours, _ = cv2.findContours(thresh_border, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         if contours:
             largest = max(contours, key=cv2.contourArea)
             area_ratio = cv2.contourArea(largest) / (h * w)
@@ -390,7 +425,7 @@ def _ocr_remove_interference(img_bgr, cv2, np):
                 y = max(0, y - margin)
                 cw = min(w - x, cw + 2 * margin)
                 ch = min(h - y, ch + 2 * margin)
-                img_bgr = img_bgr[y:y+ch, x:x+cw]
+                img_bgr = img_bgr[y : y + ch, x : x + cw]
                 h, w = img_bgr.shape[:2]
     except Exception as e:
         logger.debug(f"[OCR] Border crop skipped: {e}")
@@ -402,9 +437,7 @@ def _ocr_remove_interference(img_bgr, cv2, np):
         edges = cv2.Canny(blurred_persp, 50, 150)
         kernel_persp = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
         edges = cv2.dilate(edges, kernel_persp, iterations=1)
-        contours_p, _ = cv2.findContours(
-            edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
-        )
+        contours_p, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         if contours_p:
             largest_p = max(contours_p, key=cv2.contourArea)
             peri = cv2.arcLength(largest_p, True)
@@ -413,23 +446,35 @@ def _ocr_remove_interference(img_bgr, cv2, np):
                 pts = approx.reshape(4, 2).astype(np.float32)
                 s = pts.sum(axis=1)
                 d = np.diff(pts, axis=1).ravel()
-                ordered = np.array([
-                    pts[np.argmin(s)], pts[np.argmin(d)],
-                    pts[np.argmax(s)], pts[np.argmax(d)],
-                ], dtype=np.float32)
+                ordered = np.array(
+                    [
+                        pts[np.argmin(s)],
+                        pts[np.argmin(d)],
+                        pts[np.argmax(s)],
+                        pts[np.argmax(d)],
+                    ],
+                    dtype=np.float32,
+                )
                 w_top = np.linalg.norm(ordered[1] - ordered[0])
                 w_bot = np.linalg.norm(ordered[2] - ordered[3])
                 h_left = np.linalg.norm(ordered[3] - ordered[0])
                 h_right = np.linalg.norm(ordered[2] - ordered[1])
                 out_w = int(max(w_top, w_bot))
                 out_h = int(max(h_left, h_right))
-                dst = np.array([
-                    [0, 0], [out_w, 0],
-                    [out_w, out_h], [0, out_h],
-                ], dtype=np.float32)
+                dst = np.array(
+                    [
+                        [0, 0],
+                        [out_w, 0],
+                        [out_w, out_h],
+                        [0, out_h],
+                    ],
+                    dtype=np.float32,
+                )
                 M = cv2.getPerspectiveTransform(ordered, dst)
                 img_bgr = cv2.warpPerspective(
-                    img_bgr, M, (out_w, out_h),
+                    img_bgr,
+                    M,
+                    (out_w, out_h),
                     flags=cv2.INTER_LANCZOS4,
                     borderMode=cv2.BORDER_REPLICATE,
                 )
@@ -469,34 +514,32 @@ def _ocr_binarize_and_clean(img_bgr, cv2, np):
     gray = cv2.addWeighted(gray, 1.5, blurred, -0.5, 0)
 
     # ── Multi-method binarisation voting ──
-    _, bin_otsu = cv2.threshold(
-        gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU
-    )
+    _, bin_otsu = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
     bin_gauss = cv2.adaptiveThreshold(
-        gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-        cv2.THRESH_BINARY, 21, 8,
+        gray,
+        255,
+        cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+        cv2.THRESH_BINARY,
+        21,
+        8,
     )
     bin_mean = cv2.adaptiveThreshold(
-        gray, 255, cv2.ADAPTIVE_THRESH_MEAN_C,
-        cv2.THRESH_BINARY, 21, 10,
+        gray,
+        255,
+        cv2.ADAPTIVE_THRESH_MEAN_C,
+        cv2.THRESH_BINARY,
+        21,
+        10,
     )
-    vote = (
-        bin_otsu.astype(np.uint16)
-        + bin_gauss.astype(np.uint16)
-        + bin_mean.astype(np.uint16)
-    )
+    vote = bin_otsu.astype(np.uint16) + bin_gauss.astype(np.uint16) + bin_mean.astype(np.uint16)
     binary = np.where(vote >= 2 * 255, 255, 0).astype(np.uint8)
 
     # ── Table/grid line removal ──
     try:
         h_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (w // 8, 1))
-        h_lines = cv2.morphologyEx(
-            cv2.bitwise_not(binary), cv2.MORPH_OPEN, h_kernel, iterations=1
-        )
+        h_lines = cv2.morphologyEx(cv2.bitwise_not(binary), cv2.MORPH_OPEN, h_kernel, iterations=1)
         v_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1, h // 8))
-        v_lines = cv2.morphologyEx(
-            cv2.bitwise_not(binary), cv2.MORPH_OPEN, v_kernel, iterations=1
-        )
+        v_lines = cv2.morphologyEx(cv2.bitwise_not(binary), cv2.MORPH_OPEN, v_kernel, iterations=1)
         all_lines = cv2.bitwise_or(h_lines, v_lines)
         kernel_line_d = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
         all_lines = cv2.dilate(all_lines, kernel_line_d, iterations=1)
@@ -535,7 +578,6 @@ def _preprocess_image_for_ocr(img_bgr):
     return _ocr_binarize_and_clean(img_bgr, cv2, np)
 
 
-
 def _deskew_image(img_bgr):
     """Deskew a page image by detecting and correcting rotation (±20°).
 
@@ -543,6 +585,7 @@ def _deskew_image(img_bgr):
     median filtering for robustness.
     """
     import cv2
+
     gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
     _, binary = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
 
@@ -574,25 +617,25 @@ def _deskew_image(img_bgr):
     center = (w // 2, h // 2)
     M = cv2.getRotationMatrix2D(center, median_angle, 1.0)
     rotated = cv2.warpAffine(
-        img_bgr, M, (w, h),
+        img_bgr,
+        M,
+        (w, h),
         flags=cv2.INTER_CUBIC,
         borderMode=cv2.BORDER_REPLICATE,
     )
     return rotated, median_angle
 
 
-def _group_chars_into_rows(
-    chars: List[dict], y_tolerance: float = 8.0
-) -> List[Tuple[float, List[dict]]]:
+def _group_chars_into_rows(chars: list[dict], y_tolerance: float = 8.0) -> list[tuple[float, list[dict]]]:
     """Group OCR character dicts into rows by y-coordinate proximity."""
     if not chars:
         return []
 
     sorted_chars = sorted(chars, key=lambda c: c.get("top", 0))
-    
-    rows: List[Tuple[float, List[dict]]] = []
+
+    rows: list[tuple[float, list[dict]]] = []
     current_y = sorted_chars[0].get("top", 0)
-    current_row: List[dict] = [sorted_chars[0]]
+    current_row: list[dict] = [sorted_chars[0]]
 
     for ch in sorted_chars[1:]:
         ch_y = ch.get("top", 0)
@@ -612,14 +655,12 @@ def _group_chars_into_rows(
     return rows
 
 
-def _chars_to_text(chars: List[dict]) -> str:
+def _chars_to_text(chars: list[dict]) -> str:
     """Merge a list of character dicts into a single text string."""
     return " ".join(c.get("text", "") for c in chars).strip()
 
 
-def _cluster_x_positions(
-    x_positions: List[float], gap_multiplier: float = 2.0
-) -> List[Tuple[float, float]]:
+def _cluster_x_positions(x_positions: list[float], gap_multiplier: float = 2.0) -> list[tuple[float, float]]:
     """Detect column boundaries by clustering x-coordinates."""
     if not x_positions:
         return []
@@ -629,7 +670,7 @@ def _cluster_x_positions(
         return [(sorted_x[0], sorted_x[0] + 100)]
 
     # Compute inter-position gaps
-    gaps = [sorted_x[i+1] - sorted_x[i] for i in range(len(sorted_x) - 1)]
+    gaps = [sorted_x[i + 1] - sorted_x[i] for i in range(len(sorted_x) - 1)]
     median_gap = sorted(gaps)[len(gaps) // 2] if gaps else 10
 
     # Split into columns at large gaps
@@ -650,12 +691,10 @@ def _cluster_x_positions(
     return bounds
 
 
-def _assign_chars_to_columns(
-    chars: List[dict], col_bounds: List[Tuple[float, float]]
-) -> List[str]:
+def _assign_chars_to_columns(chars: list[dict], col_bounds: list[tuple[float, float]]) -> list[str]:
     """Assign a row's characters to column bins."""
-    cols: List[List[dict]] = [[] for _ in col_bounds]
-    
+    cols: list[list[dict]] = [[] for _ in col_bounds]
+
     for ch in chars:
         cx = (ch.get("x0", 0) + ch.get("x1", 0)) / 2
         assigned = False
@@ -680,15 +719,15 @@ def _assign_chars_to_columns(
 
 
 def _split_tables_by_y_gap(
-    rows_by_y: List[Tuple[float, List[dict]]], page_h: float
-) -> List[List[Tuple[float, List[dict]]]]:
+    rows_by_y: list[tuple[float, list[dict]]], page_h: float
+) -> list[list[tuple[float, list[dict]]]]:
     """Split grouped rows into multiple tables based on vertical gaps."""
     if len(rows_by_y) < 4:
         return [rows_by_y]
 
     gap_threshold = page_h * 0.05
-    tables: List[List[Tuple[float, List[dict]]]] = []
-    current: List[Tuple[float, List[dict]]] = [rows_by_y[0]]
+    tables: list[list[tuple[float, list[dict]]]] = []
+    current: list[tuple[float, list[dict]]] = [rows_by_y[0]]
 
     for i in range(1, len(rows_by_y)):
         if rows_by_y[i][0] - rows_by_y[i - 1][0] > gap_threshold:
@@ -700,7 +739,9 @@ def _split_tables_by_y_gap(
     return [t for t in tables if len(t) >= 2]
 
 
-def _reconstruct_table_grid_2d(chars: List[dict], hough_lines: Optional[List[Tuple[float, float]]] = None) -> List[List[str]]:
+def _reconstruct_table_grid_2d(
+    chars: list[dict], hough_lines: list[tuple[float, float]] | None = None
+) -> list[list[str]]:
     """Robust 2D Table Grid Reconstruction (Virtual Grid Alignment).
 
     Replaces 1D x-coordinate clustering with a 2D spatial alignment algorithm.
@@ -720,27 +761,27 @@ def _reconstruct_table_grid_2d(chars: List[dict], hough_lines: Optional[List[Tup
     # 1. Base Row Clustering (Robust y-projection)
     # Sort by top coordinate
     sorted_chars = sorted(chars, key=lambda c: c["top"])
-    
-    rows_y = [] # list of (min_y, max_y, chars)
-    
+
+    rows_y = []  # list of (min_y, max_y, chars)
+
     for c in sorted_chars:
         c_min_y, c_max_y = c["top"], c["bottom"]
         matched = False
         # Try to match with existing row (look at last few rows to handle slight overlaps)
         for i in range(len(rows_y) - 1, max(-1, len(rows_y) - 4), -1):
             r_min_y, r_max_y, r_chars = rows_y[i]
-            
+
             # Calculate vertical IoU or significant overlap
             overlap = max(0, min(c_max_y, r_max_y) - max(c_min_y, r_min_y))
             c_height = c_max_y - c_min_y
-            
+
             # If overlap is > 40% of character height, it belongs to this row
             if overlap > 0.4 * c_height or (c_min_y >= r_min_y and c_max_y <= r_max_y):
                 # Update row boundaries
                 rows_y[i] = (min(r_min_y, c_min_y), max(r_max_y, c_max_y), r_chars + [c])
                 matched = True
                 break
-                
+
         if not matched:
             rows_y.append((c_min_y, c_max_y, [c]))
 
@@ -749,28 +790,28 @@ def _reconstruct_table_grid_2d(chars: List[dict], hough_lines: Optional[List[Tup
     row_chars_list = [r[2] for r in rows_y]
 
     # 2. Base Col Clustering
-    col_bounds = [] # list of (min_x, max_x)
-    
+    col_bounds = []  # list of (min_x, max_x)
+
     if hough_lines and len(hough_lines) >= 2:
         col_bounds = hough_lines
     else:
         # Fallback to robust X-clustering using all characters
         x_spans = [(c["x0"], c["x1"]) for c in chars]
         x_spans.sort(key=lambda x: x[0])
-        
+
         merged_cols = []
         for span in x_spans:
             if not merged_cols:
                 merged_cols.append([span[0], span[1]])
                 continue
-                
+
             last_col = merged_cols[-1]
             # If x overlaps or gap is very small (< 10px), merge into same column
             if span[0] <= last_col[1] + 10:
                 last_col[1] = max(last_col[1], span[1])
             else:
                 merged_cols.append([span[0], span[1]])
-                
+
         # If we merged everything into 1 column, fallback to K-Means/Gap logic
         if len(merged_cols) < 2:
             all_x0 = [c["x0"] for c in chars]
@@ -786,31 +827,29 @@ def _reconstruct_table_grid_2d(chars: List[dict], hough_lines: Optional[List[Tup
     # 3. Grid Snapping
     num_rows = len(row_chars_list)
     num_cols = len(col_bounds)
-    
-    table_grid: List[List[List[dict]]] = [[[] for _ in range(num_cols)] for _ in range(num_rows)]
-    
+
+    table_grid: list[list[list[dict]]] = [[[] for _ in range(num_cols)] for _ in range(num_rows)]
+
     for r_idx, r_chars in enumerate(row_chars_list):
         for c in r_chars:
             cx = (c["x0"] + c["x1"]) / 2
-            
+
             # Find best column index
             best_c_idx = 0
             min_dist = float("inf")
-            assigned = False
-            
+
             for c_idx, (start, end) in enumerate(col_bounds):
                 if start <= cx <= end:
                     best_c_idx = c_idx
-                    assigned = True
                     break
-                    
+
                 # Calculate distance to mid-point if outside
                 mid = (start + end) / 2
                 dist = abs(cx - mid)
                 if dist < min_dist:
                     min_dist = dist
                     best_c_idx = c_idx
-                    
+
             table_grid[r_idx][best_c_idx].append(c)
 
     # 4. Output Generation (Merge characters in each cell to string)
@@ -823,27 +862,29 @@ def _reconstruct_table_grid_2d(chars: List[dict], hough_lines: Optional[List[Tup
             cell_chars.sort(key=lambda c: c["x0"])
             row_str.append(_chars_to_text(cell_chars))
         final_table.append(row_str)
-        
+
     return final_table
 
 
-
-def _detect_table_lines_hough(
-    img_bgr, page_h: int, page_w: int
-) -> Optional[List[Tuple[float, float]]]:
+def _detect_table_lines_hough(img_bgr, page_h: int, page_w: int) -> list[tuple[float, float]] | None:
     """Detect vertical table lines in a scanned image using Hough transform.
 
     Returns column boundary intervals derived from clustered vertical
     line x-coordinates, or ``None`` if too few lines are found.
     """
     import cv2
+
     gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
     edges = cv2.Canny(gray, 50, 150, apertureSize=3)
 
     min_line_len = int(page_h * 0.15)
     lines = cv2.HoughLinesP(
-        edges, rho=1, theta=3.14159 / 180, threshold=80,
-        minLineLength=min_line_len, maxLineGap=10,
+        edges,
+        rho=1,
+        theta=3.14159 / 180,
+        threshold=80,
+        minLineLength=min_line_len,
+        maxLineGap=10,
     )
     if lines is None:
         return None
@@ -897,8 +938,7 @@ def _probe_best_orientation(img_bgr, ocr_engine=None):
     max_probe = 800
     if max(h, w) > max_probe:
         scale = max_probe / max(h, w)
-        small = cv2.resize(img_bgr, None, fx=scale, fy=scale,
-                           interpolation=cv2.INTER_AREA)
+        small = cv2.resize(img_bgr, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA)
     else:
         small = img_bgr.copy()
 
@@ -906,10 +946,7 @@ def _probe_best_orientation(img_bgr, ocr_engine=None):
     gray_check = cv2.cvtColor(small, cv2.COLOR_BGR2GRAY)
     if gray_check.mean() < 100:
         gamma = 0.5
-        lut = np.array([
-            min(255, int(((i / 255.0) ** gamma) * 255))
-            for i in range(256)
-        ], dtype=np.uint8)
+        lut = np.array([min(255, int(((i / 255.0) ** gamma) * 255)) for i in range(256)], dtype=np.uint8)
         small = cv2.LUT(small, lut)
 
     best_angle = 0
@@ -949,10 +986,12 @@ def _probe_best_orientation(img_bgr, ocr_engine=None):
 
 
 def analyze_scanned_page(
-    fitz_page, page_idx: int, min_confidence: float = 0.3,
-    table_bbox: Optional[Tuple[float, float, float, float]] = None,
+    fitz_page,
+    page_idx: int,
+    min_confidence: float = 0.3,
+    table_bbox: tuple[float, float, float, float] | None = None,
     target_dpi: int = 200,
-) -> Optional[Dict[str, Any]]:
+) -> dict[str, Any] | None:
     """Perform OCR-based extraction on a scanned document page.
 
     Pipeline:
@@ -976,18 +1015,18 @@ def analyze_scanned_page(
         ``footer_text``, or ``None`` on failure.
     """
     try:
-        import numpy as np
         import cv2
+        import numpy as np
 
         from ..extraction.foundation import FitzEngine
-        
+
         # ── Hybrid text–vision prompt prior ──
         text_prior = ""
         if table_bbox:
             text_prior = FitzEngine.extract_raw_text_from_bbox(fitz_page, table_bbox)
         else:
             text_prior = FitzEngine.extract_page_text(fitz_page)
-            
+
         if len(text_prior) > 1000:
             text_prior = text_prior[:1000]
 
@@ -995,6 +1034,7 @@ def analyze_scanned_page(
         ocr_engine = None
         try:
             from docmirror.core.ocr.vision.rapidocr_engine import get_ocr_engine
+
             ocr_engine = get_ocr_engine()
         except ImportError:
             pass
@@ -1006,9 +1046,7 @@ def analyze_scanned_page(
         # ── Auto-orientation probe ──
         # Render at low DPI for fast probe, detect best rotation
         probe_pix = fitz_page.get_pixmap(dpi=100)
-        probe_img = np.frombuffer(
-            probe_pix.samples, dtype=np.uint8
-        ).reshape(probe_pix.h, probe_pix.w, probe_pix.n)
+        probe_img = np.frombuffer(probe_pix.samples, dtype=np.uint8).reshape(probe_pix.h, probe_pix.w, probe_pix.n)
         if probe_pix.n == 3:
             probe_img = cv2.cvtColor(probe_img, cv2.COLOR_RGB2BGR)
         elif probe_pix.n == 4:
@@ -1057,9 +1095,7 @@ def analyze_scanned_page(
                 text = w[4].strip()
                 if not text:
                     continue
-                all_words.append((
-                    w[0], w[1], w[2], w[3], text
-                ))
+                all_words.append((w[0], w[1], w[2], w[3], text))
 
             if len(all_words) >= 10 or dpi == 300:
                 break
@@ -1073,33 +1109,32 @@ def analyze_scanned_page(
 
         header_words = [w for w in all_words if w[3] < header_y]
         footer_words = [w for w in all_words if w[1] > footer_y]
-        table_words = [w for w in all_words
-                       if w[1] >= header_y and w[3] <= footer_y]
+        table_words = [w for w in all_words if w[1] >= header_y and w[3] <= footer_y]
 
-        header_text = " ".join(
-            w[4] for w in sorted(header_words, key=lambda w: (w[1], w[0]))
-        )
-        footer_text = " ".join(
-            w[4] for w in sorted(footer_words, key=lambda w: (w[1], w[0]))
-        )
+        header_text = " ".join(w[4] for w in sorted(header_words, key=lambda w: (w[1], w[0])))
+        footer_text = " ".join(w[4] for w in sorted(footer_words, key=lambda w: (w[1], w[0])))
 
         if len(table_words) < 2:
             return None
 
         chars = []
         for x0, y0, x1, y1, text in table_words:
-            chars.append({
-                "x0": float(x0), "x1": float(x1),
-                "top": float(y0), "bottom": float(y1),
-                "text": str(text),
-                "upright": True,
-            })
+            chars.append(
+                {
+                    "x0": float(x0),
+                    "x1": float(x1),
+                    "top": float(y0),
+                    "bottom": float(y1),
+                    "text": str(text),
+                    "upright": True,
+                }
+            )
 
         rows_by_y = _group_chars_into_rows(chars, y_tolerance=8.0)
         if len(rows_by_y) < 2:
             return None
 
-        table_groups = _split_tables_by_y_gap(rows_by_y, page_h)
+        _split_tables_by_y_gap(rows_by_y, page_h)
 
         # Detect column boundaries — Hough lines first
         col_bounds_hough = _detect_table_lines_hough(img, page_h, img.shape[1] if img is not None else 0)
@@ -1108,17 +1143,17 @@ def analyze_scanned_page(
         # Group characters into independent tables first
         rows_by_y_raw = _group_chars_into_rows(chars, y_tolerance=8.0)
         table_groups_raw = _split_tables_by_y_gap(rows_by_y_raw, page_h)
-        
+
         tables = []
         for group in table_groups_raw:
             # Flatten group chars
             grp_chars = []
             for _, r_chars in group:
                 grp_chars.extend(r_chars)
-            
+
             # Reconstruct 2D grid
             tb = _reconstruct_table_grid_2d(grp_chars, hough_lines=col_bounds_hough)
-            
+
             # Clean up empty rows and single-column tables
             tb_clean = [row for row in tb if any(cell.strip() for cell in row)]
             if len(tb_clean) >= 2 and len(tb_clean[0]) >= 2:
@@ -1138,6 +1173,7 @@ def analyze_scanned_page(
 
         # Apply OCR post-processing corrections (amount / date / domain terms)
         from .ocr_postprocess import postprocess_ocr_result
+
         return postprocess_ocr_result(raw_result)
 
     except ImportError:
@@ -1151,6 +1187,7 @@ def analyze_scanned_page(
 # ===============================================================================
 # Universal OCR Extraction (content-type aware)
 # ===============================================================================
+
 
 def _merge_line_fragments(words):
     """Merge OCR word fragments that belong to the same text line.
@@ -1200,16 +1237,14 @@ def _merge_line_fragments(words):
             last[3] = max(last[3], w[3])
             last[4] = last[4] + w[4]
             # Weighted average confidence
-            last[5] = (last[5] * len(last[4]) + w[5] * len(w[4])) / (
-                len(last[4]) + len(w[4])
-            )
+            last[5] = (last[5] * len(last[4]) + w[5] * len(w[4])) / (len(last[4]) + len(w[4]))
         else:
             merged.append(list(w))
 
     return [tuple(m) for m in merged]
 
 
-def _merge_multi_scale_words(all_scale_words: List[Tuple[int, List[tuple]]]) -> List[tuple]:
+def _merge_multi_scale_words(all_scale_words: list[tuple[int, list[tuple]]]) -> list[tuple]:
     """Fuse words from multiple DPI scales using Non-Maximum Suppression (NMS).
 
     Args:
@@ -1242,22 +1277,22 @@ def _merge_multi_scale_words(all_scale_words: List[Tuple[int, List[tuple]]]) -> 
     projected_words.sort(key=lambda x: (x[5], x[7]), reverse=True)
 
     kept_words = []
-    
+
     def _compute_iou(b1, b2):
         # b = (x0, y0, x1, y1)
         ix0 = max(b1[0], b2[0])
         iy0 = max(b1[1], b2[1])
         ix1 = min(b1[2], b2[2])
         iy1 = min(b1[3], b2[3])
-        
+
         iw = max(0, ix1 - ix0)
         ih = max(0, iy1 - iy0)
         intersection = iw * ih
-        
+
         area1 = (b1[2] - b1[0]) * (b1[3] - b1[1])
         area2 = (b2[2] - b2[0]) * (b2[3] - b2[1])
         union = area1 + area2 - intersection
-        
+
         if union <= 0:
             return 0.0
         return intersection / union
@@ -1268,15 +1303,15 @@ def _merge_multi_scale_words(all_scale_words: List[Tuple[int, List[tuple]]]) -> 
         iy0 = max(b1[1], b2[1])
         ix1 = min(b1[2], b2[2])
         iy1 = min(b1[3], b2[3])
-        
+
         iw = max(0, ix1 - ix0)
         ih = max(0, iy1 - iy0)
         intersection = iw * ih
-        
+
         area1 = (b1[2] - b1[0]) * (b1[3] - b1[1])
         area2 = (b2[2] - b2[0]) * (b2[3] - b2[1])
         min_area = min(area1, area2)
-        
+
         if min_area <= 0:
             return 0.0
         return intersection / min_area
@@ -1285,7 +1320,7 @@ def _merge_multi_scale_words(all_scale_words: List[Tuple[int, List[tuple]]]) -> 
     for p_word in projected_words:
         b1 = p_word[0:4]
         is_suppressed = False
-        
+
         for k_word in kept_words:
             b2 = k_word[0:4]
             # If overlap is massive (>60% of the smaller box), they represent the same text
@@ -1293,7 +1328,7 @@ def _merge_multi_scale_words(all_scale_words: List[Tuple[int, List[tuple]]]) -> 
             if overlap_ratio > 0.6:
                 is_suppressed = True
                 break
-                
+
         if not is_suppressed:
             kept_words.append(p_word)
 
@@ -1301,7 +1336,7 @@ def _merge_multi_scale_words(all_scale_words: List[Tuple[int, List[tuple]]]) -> 
     # (Because the rest of the pipeline expects coordinates in the rendered image space)
     target_dpi = max(dpi for dpi, _ in all_scale_words)
     inv_scale = target_dpi / BASE_DPI
-    
+
     final_output = []
     for w in kept_words:
         fx0, fy0 = w[0] * inv_scale, w[1] * inv_scale
@@ -1312,7 +1347,7 @@ def _merge_multi_scale_words(all_scale_words: List[Tuple[int, List[tuple]]]) -> 
     return sorted(final_output, key=lambda w: (((w[1] + w[3]) / 2), w[0]))
 
 
-def _run_ocr(fitz_page, min_confidence: float = 0.3, *, dpi_list: Optional[List[int]] = None):
+def _run_ocr(fitz_page, min_confidence: float = 0.3, *, dpi_list: list[int] | None = None):
     """Run OCR on a fitz page with adaptive strategy escalation.
 
     Performance-optimized approach:
@@ -1330,8 +1365,8 @@ def _run_ocr(fitz_page, min_confidence: float = 0.3, *, dpi_list: Optional[List[
         (x0, y0, x1, y1, text, confidence).
         Returns (None, None, 0) on failure.
     """
-    import numpy as np
     import cv2
+    import numpy as np
 
     if dpi_list is None:
         dpi_list = [150, 200, 300]
@@ -1340,10 +1375,12 @@ def _run_ocr(fitz_page, min_confidence: float = 0.3, *, dpi_list: Optional[List[
     ocr_engine = None
     try:
         from rapidocr_onnxruntime import RapidOCR as _RapidOCR
+
         ocr_engine = _RapidOCR()
     except ImportError:
         try:
             from docmirror.core.ocr.vision.rapidocr_engine import get_ocr_engine
+
             _eng = get_ocr_engine()
             if _eng and _eng._engine:
                 ocr_engine = _eng._engine
@@ -1359,9 +1396,7 @@ def _run_ocr(fitz_page, min_confidence: float = 0.3, *, dpi_list: Optional[List[
     best_angle = _read_exif_orientation(fitz_page)
     if best_angle == 0:
         probe_pix = fitz_page.get_pixmap(dpi=100)
-        probe_img = np.frombuffer(
-            probe_pix.samples, dtype=np.uint8
-        ).reshape(probe_pix.h, probe_pix.w, probe_pix.n)
+        probe_img = np.frombuffer(probe_pix.samples, dtype=np.uint8).reshape(probe_pix.h, probe_pix.w, probe_pix.n)
         if probe_pix.n == 3:
             probe_img = cv2.cvtColor(probe_img, cv2.COLOR_RGB2BGR)
         elif probe_pix.n == 4:
@@ -1388,15 +1423,18 @@ def _run_ocr(fitz_page, min_confidence: float = 0.3, *, dpi_list: Optional[List[
                 continue
             x_coords = [p[0] for p in box]
             y_coords = [p[1] for p in box]
-            words.append((
-                min(x_coords), min(y_coords),
-                max(x_coords), max(y_coords),
-                text, conf,
-            ))
+            words.append(
+                (
+                    min(x_coords),
+                    min(y_coords),
+                    max(x_coords),
+                    max(y_coords),
+                    text,
+                    conf,
+                )
+            )
         score = sum(w[5] for w in words)
-        logger.debug(
-            f"[OCR] {label}: {len(words)} words, score={score:.1f}"
-        )
+        logger.debug(f"[OCR] {label}: {len(words)} words, score={score:.1f}")
         return words, score
 
     # ── Helper: Dynamic Color Slice (Strategy C: HSV/YcbCr KMeans) ──
@@ -1404,9 +1442,9 @@ def _run_ocr(fitz_page, min_confidence: float = 0.3, *, dpi_list: Optional[List[
         """Extract dominant ink layers using HSV KMeans, and run OCR on YCbCr Luminance."""
         import cv2
         import numpy as np
-        
+
         best_slice_words, best_slice_score = [], 0.0
-        
+
         # 1. YCbCr Luminance (Y channel) - best for human/OCR perception of detail
         ycbcr = cv2.cvtColor(img_input, cv2.COLOR_BGR2YCrCb)
         y_channel = ycbcr[:, :, 0]
@@ -1418,37 +1456,37 @@ def _run_ocr(fitz_page, min_confidence: float = 0.3, *, dpi_list: Optional[List[
         # 2. Dynamic HSV Hue extraction for colored overlays (e.g. red seals)
         hsv = cv2.cvtColor(img_input, cv2.COLOR_BGR2HSV)
         h_channel = hsv[:, :, 0]
-        
+
         # Subsample for fast KMeans (e.g., max 500x500 points)
         scale_k = min(1.0, 500.0 / max(img_input.shape[0:2]))
         small_h = cv2.resize(h_channel, (0, 0), fx=scale_k, fy=scale_k)
         pixels = np.float32(small_h.reshape(-1))
-        
+
         # Find 3 dominant hues (Background, Text, Overlay/Seal)
         criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 10, 1.0)
         _, labels, centers = cv2.kmeans(pixels, 3, None, criteria, 3, cv2.KMEANS_PP_CENTERS)
-        
+
         centers = np.uint8(centers.flatten())
-        
+
         # Generate a mask for each dominant hue layer and run OCR on it
         for i, center_val in enumerate(centers):
             # Create mask for pixels close to this hue
             lower_bound = max(0, int(center_val) - 15)
             upper_bound = min(179, int(center_val) + 15)
-            
+
             mask = cv2.inRange(h_channel, lower_bound, upper_bound)
-            
+
             # Apply mask to original luminance channel
             # We want to keep the text (dark) in the masked region
-            masked_y = np.full_like(y_channel, 255) # White background
+            masked_y = np.full_like(y_channel, 255)  # White background
             masked_y[mask > 0] = y_channel[mask > 0]
-            
+
             slice_bgr = cv2.cvtColor(masked_y, cv2.COLOR_GRAY2BGR)
             w, s = _ocr_pass(slice_bgr, _preprocess_minimal, f"HSV-Slice-{i}(H={center_val})")
-            
+
             if s > best_slice_score:
                 best_slice_words, best_slice_score = w, s
-                
+
         return best_slice_words, best_slice_score
 
     # ── Helper: DET/REC Decoupling Rescue (Strategy D) ──
@@ -1456,26 +1494,24 @@ def _run_ocr(fitz_page, min_confidence: float = 0.3, *, dpi_list: Optional[List[
         """Force REC on regions that DET missed using OpenCV morphology."""
         import cv2
         import numpy as np
+
         from docmirror.core.ocr.vision.rapidocr_engine import get_ocr_engine
-        
+
         # 1. Enhance and binarize for connected components
         gray = cv2.cvtColor(img_input, cv2.COLOR_BGR2GRAY)
         clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
         enhanced = clahe.apply(gray)
-        
+
         # Adaptive threshold to find dark blobs
-        binary = cv2.adaptiveThreshold(
-            enhanced, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
-            cv2.THRESH_BINARY_INV, 11, 2
-        )
-        
+        binary = cv2.adaptiveThreshold(enhanced, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 11, 2)
+
         # Connect nearby characters into text lines
         kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (15, 3))
         dilated = cv2.dilate(binary, kernel, iterations=1)
-        
+
         # Find contours of potential text blocks
         contours, _ = cv2.findContours(dilated, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        
+
         # Filter contours
         candidate_regions = []
         for cnt in contours:
@@ -1488,7 +1524,7 @@ def _run_ocr(fitz_page, min_confidence: float = 0.3, *, dpi_list: Optional[List[
                 cy0 = max(0, y - pad_y)
                 cx1 = min(img_input.shape[1], x + w + pad_x)
                 cy1 = min(img_input.shape[0], y + h + pad_y)
-                
+
                 # Check if this region is ALREADY covered by existing DET words
                 is_covered = False
                 for ex_w in existing_words:
@@ -1500,10 +1536,10 @@ def _run_ocr(fitz_page, min_confidence: float = 0.3, *, dpi_list: Optional[List[
                     if iw * ih > 0:
                         is_covered = True
                         break
-                        
+
                 if not is_covered:
                     candidate_regions.append((cx0, cy0, cx1, cy1))
-                    
+
         # Force recognize these candidate regions
         rescued_words = []
         if candidate_regions:
@@ -1513,7 +1549,7 @@ def _run_ocr(fitz_page, min_confidence: float = 0.3, *, dpi_list: Optional[List[
             for rx0, ry0, rx1, ry1, text, conf in raw_rescued:
                 if conf >= min_confidence:
                     rescued_words.append((rx0, ry0, rx1, ry1, text, conf))
-                    
+
         score = sum(w[5] for w in rescued_words)
         return rescued_words, score
 
@@ -1540,9 +1576,7 @@ def _run_ocr(fitz_page, min_confidence: float = 0.3, *, dpi_list: Optional[List[
 
     for dpi in dpi_list:
         pix = fitz_page.get_pixmap(dpi=dpi)
-        img = np.frombuffer(pix.samples, dtype=np.uint8).reshape(
-            pix.h, pix.w, pix.n
-        )
+        img = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.h, pix.w, pix.n)
         if pix.n == 3:
             img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
         elif pix.n == 4:
@@ -1560,31 +1594,25 @@ def _run_ocr(fitz_page, min_confidence: float = 0.3, *, dpi_list: Optional[List[
 
         # ── Adaptive strategy escalation (lightest first) ──
         # Step 1: Try Strategy B (minimal — fastest, ~100ms)
-        words_b, score_b = _ocr_pass(
-            img, _preprocess_minimal, "Strategy-B(minimal)"
-        )
+        words_b, score_b = _ocr_pass(img, _preprocess_minimal, "Strategy-B(minimal)")
         cs_b = _composite_score(words_b, score_b)
-        best_words, best_cs, winner = words_b, cs_b, 'B'
+        best_words, best_cs, winner = words_b, cs_b, "B"
 
         # Step 2: Only escalate to Strategy A if B is insufficient
         if cs_b < _GOOD_ENOUGH_SCORE:
-            words_a, score_a = _ocr_pass(
-                img, _preprocess_image_for_ocr, "Strategy-A(full)"
-            )
+            words_a, score_a = _ocr_pass(img, _preprocess_image_for_ocr, "Strategy-A(full)")
             cs_a = _composite_score(words_a, score_a)
             if cs_a > best_cs:
-                best_words, best_cs, winner = words_a, cs_a, 'A'
+                best_words, best_cs, winner = words_a, cs_a, "A"
 
         # Step 3: Only try Strategy C (heavy KMeans) if both A and B are poor
         if best_cs < _ESCALATION_THRESHOLD:
             words_c, score_c = _ocr_dynamic_color_slice(img)
             cs_c = _composite_score(words_c, score_c)
             if cs_c > best_cs:
-                best_words, best_cs, winner = words_c, cs_c, 'C'
+                best_words, best_cs, winner = words_c, cs_c, "C"
 
-        logger.debug(
-            f"[OCR] DPI={dpi}: winner=Strategy-{winner} (score={best_cs:.2f})"
-        )
+        logger.debug(f"[OCR] DPI={dpi}: winner=Strategy-{winner} (score={best_cs:.2f})")
 
         # Step 4: Rescue only when word count is suspiciously low
         if len(best_words) < 5:
@@ -1623,9 +1651,7 @@ def _detect_has_table(img, page_h: int) -> bool:
     Rejects decorative border frames by verifying that detected columns
     have comparable widths (widest / median ≤ 5).
     """
-    col_bounds = _detect_table_lines_hough(
-        img, page_h, img.shape[1] if img is not None else 0
-    )
+    col_bounds = _detect_table_lines_hough(img, page_h, img.shape[1] if img is not None else 0)
     if not col_bounds or len(col_bounds) < 3:
         return False
 
@@ -1641,9 +1667,7 @@ def _detect_has_table(img, page_h: int) -> bool:
     return True
 
 
-def _group_words_into_lines(
-    words: List[tuple], y_tolerance: float = 12.0
-) -> List[dict]:
+def _group_words_into_lines(words: list[tuple], y_tolerance: float = 12.0) -> list[dict]:
     """Group OCR words into text lines by y-proximity.
 
     Returns a list of line dicts sorted in reading order, each with:
@@ -1655,7 +1679,7 @@ def _group_words_into_lines(
     # Sort by y, then x
     sorted_w = sorted(words, key=lambda w: (w[1], w[0]))
 
-    lines: List[dict] = []
+    lines: list[dict] = []
     cur_words = [sorted_w[0]]
     cur_y = sorted_w[0][1]
 
@@ -1692,10 +1716,10 @@ def ocr_extract_universal(
     page_idx: int,
     min_confidence: float = 0.3,
     *,
-    page_quality: Optional[int] = None,
-    external_ocr_threshold: Optional[int] = None,
-    external_ocr_provider: Optional[Callable[..., Union[List[tuple], Dict[str, Any]]]] = None,
-) -> Optional[Dict[str, Any]]:
+    page_quality: int | None = None,
+    external_ocr_threshold: int | None = None,
+    external_ocr_provider: Callable[..., list[tuple] | dict[str, Any]] | None = None,
+) -> dict[str, Any] | None:
     """Universal OCR extraction — auto-detects document type.
 
     When ``page_quality`` is below ``external_ocr_threshold`` and
@@ -1723,9 +1747,7 @@ def ocr_extract_universal(
         ):
             img_bgr, page_h, page_w = _render_page_to_bgr(fitz_page, dpi=200)
             try:
-                out = external_ocr_provider(
-                    img_bgr, page_idx=page_idx, dpi=200, min_confidence=min_confidence
-                )
+                out = external_ocr_provider(img_bgr, page_idx=page_idx, dpi=200, min_confidence=min_confidence)
             except Exception as e:
                 logger.warning(f"[external_ocr] Provider failed on page {page_idx}: {e}")
                 out = None
@@ -1733,10 +1755,9 @@ def ocr_extract_universal(
                 if isinstance(out, dict) and out.get("content_type") in ("table", "general"):
                     if out.get("content_type") == "table":
                         from docmirror.core.ocr.ocr_postprocess import postprocess_ocr_result
+
                         postprocess_ocr_result(out)
-                    logger.info(
-                        f"[DocMirror] Page {page_idx} delegated to external OCR (quality={page_quality})"
-                    )
+                    logger.info(f"[DocMirror] Page {page_idx} delegated to external OCR (quality={page_quality})")
                     return out
                 if isinstance(out, list) and out:
                     # List of (x0,y0,x1,y1,text,conf) → continue with our pipeline
@@ -1744,9 +1765,7 @@ def ocr_extract_universal(
                     page_w = img.shape[1]
                     has_table = _detect_has_table(img, page_h)
                     if has_table:
-                        table_result = analyze_scanned_page(
-                            fitz_page, page_idx, min_confidence
-                        )
+                        table_result = analyze_scanned_page(fitz_page, page_idx, min_confidence)
                         if table_result:
                             table_result["content_type"] = "table"
                             return table_result

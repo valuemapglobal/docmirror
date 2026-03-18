@@ -23,8 +23,8 @@ Processing logic by format:
 
 Both formats produce a single-page ParseResult.
 """
-from __future__ import annotations
 
+from __future__ import annotations
 
 import csv
 import json
@@ -38,13 +38,13 @@ from docmirror.framework.base import BaseParser
 logger = logging.getLogger(__name__)
 
 # Currency-like pattern
-_CURRENCY_RE = re.compile(r'^[¥$€£₹]?\s*-?\d{1,3}(,\d{3})*(\.\d+)?$')
+_CURRENCY_RE = re.compile(r"^[¥$€£₹]?\s*-?\d{1,3}(,\d{3})*(\.\d+)?$")
 
 
 class StructuredAdapter(BaseParser):
     """Structured data (JSON/CSV) format adapter."""
 
-    async def to_parse_result(self, file_path: Path, **kwargs) -> "ParseResult":
+    async def to_parse_result(self, file_path: Path, **kwargs) -> ParseResult:
         """
         Parse a JSON or CSV file into a ParseResult.
 
@@ -52,19 +52,27 @@ class StructuredAdapter(BaseParser):
         CSV files → TableBlock with typed CellValue.
         """
         from docmirror.models.entities.parse_result import (
-            ParseResult, PageContent, TableBlock, TableRow, CellValue,
-            TextBlock, TextLevel, KeyValuePair, ParserInfo, DataType,
+            CellValue,
+            DataType,
+            KeyValuePair,
+            PageContent,
+            ParseResult,
+            ParserInfo,
+            TableBlock,
+            TableRow,
+            TextBlock,
+            TextLevel,
         )
 
         ext = file_path.suffix.lower()
         logger.info(f"[StructuredAdapter] Starting extraction for {ext} file: {file_path}")
 
-        texts: List[TextBlock] = []
-        tables: List[TableBlock] = []
-        key_values: List[KeyValuePair] = []
+        texts: list[TextBlock] = []
+        tables: list[TableBlock] = []
+        key_values: list[KeyValuePair] = []
 
         if ext == ".json":
-            with open(file_path, "r", encoding="utf-8") as f:
+            with open(file_path, encoding="utf-8") as f:
                 data = json.load(f)
 
             if isinstance(data, dict):
@@ -75,20 +83,19 @@ class StructuredAdapter(BaseParser):
                 headers = list(data[0].keys())
                 rows = []
                 for record in data:
-                    cells = [
-                        CellValue(text=str(record.get(h, "")), data_type=DataType.TEXT)
-                        for h in headers
-                    ]
+                    cells = [CellValue(text=str(record.get(h, "")), data_type=DataType.TEXT) for h in headers]
                     rows.append(TableRow(cells=cells))
-                tables.append(TableBlock(
-                    table_id="json_records",
-                    headers=headers,
-                    rows=rows,
-                    page=0,
-                ))
+                tables.append(
+                    TableBlock(
+                        table_id="json_records",
+                        headers=headers,
+                        rows=rows,
+                        page=0,
+                    )
+                )
 
         elif ext == ".csv":
-            with open(file_path, "r", encoding="utf-8") as f:
+            with open(file_path, encoding="utf-8") as f:
                 csv_rows = list(csv.reader(f))
 
             if csv_rows:
@@ -99,12 +106,14 @@ class StructuredAdapter(BaseParser):
                     if any(c.text for c in cells):
                         data_rows.append(TableRow(cells=cells))
 
-                tables.append(TableBlock(
-                    table_id="csv_data",
-                    headers=headers,
-                    rows=data_rows,
-                    page=0,
-                ))
+                tables.append(
+                    TableBlock(
+                        table_id="csv_data",
+                        headers=headers,
+                        rows=data_rows,
+                        page=0,
+                    )
+                )
 
         page = PageContent(
             page_number=0,
@@ -123,7 +132,7 @@ class StructuredAdapter(BaseParser):
         )
 
 
-def _classify_csv_cell(value: str) -> "CellValue":
+def _classify_csv_cell(value: str) -> CellValue:
     """Classify a CSV cell string into typed CellValue."""
     from docmirror.models.entities.parse_result import CellValue, DataType
 
@@ -140,7 +149,7 @@ def _classify_csv_cell(value: str) -> "CellValue":
 
     # Try currency-like
     if _CURRENCY_RE.match(text):
-        cleaned = re.sub(r'[¥$€£₹,\s]', '', text)
+        cleaned = re.sub(r"[¥$€£₹,\s]", "", text)
         try:
             numeric = float(cleaned)
             return CellValue(text=text, cleaned=cleaned, numeric=numeric, data_type=DataType.CURRENCY)

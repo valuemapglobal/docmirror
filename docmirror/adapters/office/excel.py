@@ -32,11 +32,12 @@ Metadata includes:
     - sheet_names: list of all worksheet names
     - table_count: total tables extracted
 """
+
 from __future__ import annotations
 
 import logging
 import re
-from datetime import datetime, date, time
+from datetime import date, datetime, time
 from pathlib import Path
 from typing import List, Optional
 
@@ -46,10 +47,10 @@ from docmirror.models.entities.domain import BaseResult, Block, PageLayout
 logger = logging.getLogger(__name__)
 
 # Pattern for currency-like values: optional sign, digits with commas, decimal part
-_CURRENCY_RE = re.compile(r'^[¥$€£₹]?\s*-?\d{1,3}(,\d{3})*(\.\d+)?$')
+_CURRENCY_RE = re.compile(r"^[¥$€£₹]?\s*-?\d{1,3}(,\d{3})*(\.\d+)?$")
 
 
-def _classify_cell(value) -> "CellValue":
+def _classify_cell(value) -> CellValue:
     """Convert an openpyxl cell value to a typed CellValue."""
     from docmirror.models.entities.parse_result import CellValue, DataType
 
@@ -88,7 +89,7 @@ def _classify_cell(value) -> "CellValue":
 
     # Try to parse currency-like strings: "15,000.00", "$1,234.56", "¥100"
     if _CURRENCY_RE.match(text):
-        cleaned = re.sub(r'[¥$€£₹,\s]', '', text)
+        cleaned = re.sub(r"[¥$€£₹,\s]", "", text)
         try:
             numeric = float(cleaned)
             return CellValue(
@@ -113,7 +114,7 @@ class ExcelAdapter(BaseParser):
            then processed through the standard PDF pipeline.
     """
 
-    async def to_parse_result(self, file_path: Path, **kwargs) -> "ParseResult":
+    async def to_parse_result(self, file_path: Path, **kwargs) -> ParseResult:
         """
         Parse .xlsx directly into ParseResult with Cell-level precision.
 
@@ -122,25 +123,32 @@ class ExcelAdapter(BaseParser):
         instead of re-parsing strings.
         """
         import openpyxl
+
         from docmirror.models.entities.parse_result import (
-            ParseResult, PageContent, TableBlock, TableRow,
-            TextBlock, TextLevel, ParserInfo,
+            PageContent,
+            ParseResult,
+            ParserInfo,
+            TableBlock,
+            TableRow,
+            TextBlock,
+            TextLevel,
         )
 
         logger.info(f"[ExcelAdapter] Cell-level extraction for: {file_path}")
         wb = openpyxl.load_workbook(str(file_path), data_only=True)
 
-        pages: List[PageContent] = []
+        pages: list[PageContent] = []
 
         for idx, sheet_name in enumerate(wb.sheetnames):
             sheet = wb[sheet_name]
 
             # Collect all rows with typed CellValues
-            all_rows: List[List] = []
+            all_rows: list[list] = []
             for row in sheet.iter_rows(values_only=True):
                 typed_cells = [_classify_cell(c) for c in row]
                 # Skip completely empty rows
                 from docmirror.models.entities.parse_result import DataType
+
                 if all(c.data_type == DataType.EMPTY for c in typed_cells):
                     continue
                 all_rows.append(typed_cells)
@@ -193,5 +201,6 @@ class ExcelAdapter(BaseParser):
         preserving the Cell-level precision extraction path.
         """
         from docmirror.models.construction.parse_result_bridge import ParseResultBridge
+
         pr = await self.to_parse_result(file_path)
         return ParseResultBridge.to_base_result(pr)

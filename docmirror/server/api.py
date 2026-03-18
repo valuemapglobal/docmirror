@@ -7,6 +7,7 @@
 """
 DocMirror Universal Parsing API
 """
+
 from __future__ import annotations
 
 import glob
@@ -17,10 +18,10 @@ import time
 from pathlib import Path
 from tempfile import NamedTemporaryFile, gettempdir
 
-from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks, Header, Query
+from fastapi import BackgroundTasks, FastAPI, File, Header, HTTPException, Query, UploadFile
 from fastapi.responses import JSONResponse
 
-from docmirror import perceive_document, DocumentType, __version__
+from docmirror import DocumentType, __version__, perceive_document
 from docmirror.server.schemas import ParseResponse
 
 logger = logging.getLogger(__name__)
@@ -36,6 +37,7 @@ app = FastAPI(
 
 
 # ── Startup/shutdown lifecycle ──
+
 
 @app.on_event("startup")
 async def _cleanup_stale_temp_files():
@@ -65,6 +67,7 @@ async def _warmup_ocr_engine():
     """
     try:
         from docmirror.core.ocr.vision.rapidocr_engine import get_ocr_engine
+
         engine = get_ocr_engine()
         if engine:
             logger.info("[Server] OCR engine warmed up on startup")
@@ -126,6 +129,7 @@ async def parse_document(
 
     try:
         import uuid
+
         result = await perceive_document(temp_path, DocumentType.OTHER)
 
         api_payload = result.to_api_dict(

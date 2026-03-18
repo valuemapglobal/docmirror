@@ -7,18 +7,19 @@
 """
 Table Postprocessing Utilities
 """
+
 from __future__ import annotations
 
 import logging
 from typing import List
 
-from docmirror.models.entities.domain import Block, PageLayout
 from docmirror.core.layout.layout_analysis import post_process_table
+from docmirror.models.entities.domain import Block, PageLayout
 
 logger = logging.getLogger(__name__)
 
 
-def process_page_tables(pages: List[PageLayout]) -> List[PageLayout]:
+def process_page_tables(pages: list[PageLayout]) -> list[PageLayout]:
     """Table post-processing -- header detection + preamble KV extraction + data row cleaning.
 
     For each table Block, execute the following steps:
@@ -40,11 +41,7 @@ def process_page_tables(pages: List[PageLayout]) -> List[PageLayout]:
         for block in page.blocks:
             if block.block_type == "table" and isinstance(block.raw_content, list):
                 # Skip entirely empty tables
-                if not any(
-                    (cell or "").strip()
-                    for row in block.raw_content
-                    for cell in row
-                ):
+                if not any((cell or "").strip() for row in block.raw_content for cell in row):
                     logger.debug("[DocMirror] skipped empty table")
                     continue
                 try:

@@ -30,6 +30,7 @@ Metadata includes:
     - paragraph_count: total paragraphs (including empty ones)
     - table_count: total tables in the document
 """
+
 from __future__ import annotations
 
 import logging
@@ -54,7 +55,7 @@ class WordAdapter(BaseParser):
            then processed through the standard PDF pipeline.
     """
 
-    async def perceive(self, file_path: Path, **context) -> "ParseResult":
+    async def perceive(self, file_path: Path, **context) -> ParseResult:
         """
         Native extraction for .docx; for legacy .doc, requires LibreOffice (soffice).
         If .doc and soffice is not found, returns failure with FORMAT_REQUIRES_CONVERTER.
@@ -64,6 +65,7 @@ class WordAdapter(BaseParser):
             soffice = shutil.which("soffice")
             if not soffice:
                 from docmirror.models.errors import build_failure_result
+
                 return build_failure_result(
                     "FORMAT_REQUIRES_CONVERTER",
                     "Legacy .doc format requires LibreOffice (soffice) to be installed for conversion. "
@@ -74,22 +76,30 @@ class WordAdapter(BaseParser):
                 )
         return await super().perceive(file_path, **context)
 
-    async def to_parse_result(self, file_path: Path, **kwargs) -> "ParseResult":
+    async def to_parse_result(self, file_path: Path, **kwargs) -> ParseResult:
         """
         Parse .docx directly into ParseResult with heading hierarchy
         and typed table cells.
         """
         from docx import Document
+
         from docmirror.models.entities.parse_result import (
-            ParseResult, PageContent, TableBlock, TableRow, CellValue,
-            TextBlock, TextLevel, ParserInfo, DataType,
+            CellValue,
+            DataType,
+            PageContent,
+            ParseResult,
+            ParserInfo,
+            TableBlock,
+            TableRow,
+            TextBlock,
+            TextLevel,
         )
 
         logger.info(f"[WordAdapter] Cell-level extraction for: {file_path}")
         doc = Document(str(file_path))
 
-        texts: List[TextBlock] = []
-        tables: List[TableBlock] = []
+        texts: list[TextBlock] = []
+        tables: list[TableBlock] = []
 
         from docmirror.adapters.office.omml_extractor import OMMLExtractor
 
@@ -97,16 +107,18 @@ class WordAdapter(BaseParser):
         for para in doc.paragraphs:
             # 1. Extract OMML math elements
             try:
-                math_elements = para._element.findall('.//m:oMath', namespaces={
-                    'm': 'http://schemas.openxmlformats.org/officeDocument/2006/math'
-                })
+                math_elements = para._element.findall(
+                    ".//m:oMath", namespaces={"m": "http://schemas.openxmlformats.org/officeDocument/2006/math"}
+                )
                 for math_elem in math_elements:
                     latex = OMMLExtractor.convert_element(math_elem)
                     if latex:
-                        texts.append(TextBlock(
-                            content=f"$${latex.strip()}$$",
-                            level=TextLevel.BODY,
-                        ))
+                        texts.append(
+                            TextBlock(
+                                content=f"$${latex.strip()}$$",
+                                level=TextLevel.BODY,
+                            )
+                        )
             except Exception as e:
                 logger.debug(f"[WordAdapter] OMML math extraction failed: {e}")
 
@@ -116,14 +128,12 @@ class WordAdapter(BaseParser):
             # 2. Determine heading level
             if para.style and para.style.name.startswith("Heading"):
                 try:
-                    m = re.search(r'(\d+)$', para.style.name)
+                    m = re.search(r"(\d+)$", para.style.name)
                     level_num = int(m.group(1)) if m else 1
                 except (ValueError, AttributeError):
                     level_num = 1
 
-                level = {1: TextLevel.H1, 2: TextLevel.H2, 3: TextLevel.H3}.get(
-                    level_num, TextLevel.H3
-                )
+                level = {1: TextLevel.H1, 2: TextLevel.H2, 3: TextLevel.H3}.get(level_num, TextLevel.H3)
             else:
                 level = TextLevel.BODY
 
@@ -133,8 +143,8 @@ class WordAdapter(BaseParser):
         for t_idx, table in enumerate(doc.tables):
             # First row as headers
             first_row = True
-            headers: List[str] = []
-            data_rows: List[TableRow] = []
+            headers: list[str] = []
+            data_rows: list[TableRow] = []
 
             for row in table.rows:
                 cells = [CellValue(text=cell.text.strip(), data_type=DataType.TEXT) for cell in row.cells]
@@ -147,12 +157,14 @@ class WordAdapter(BaseParser):
                         data_rows.append(TableRow(cells=cells))
 
             if headers or data_rows:
-                tables.append(TableBlock(
-                    table_id=f"word_table_{t_idx}",
-                    headers=headers,
-                    rows=data_rows,
-                    page=0,
-                ))
+                tables.append(
+                    TableBlock(
+                        table_id=f"word_table_{t_idx}",
+                        headers=headers,
+                        rows=data_rows,
+                        page=0,
+                    )
+                )
 
         page = PageContent(
             page_number=0,
@@ -174,5 +186,6 @@ class WordAdapter(BaseParser):
         Fallback: Parse .docx into BaseResult via ParseResultBridge.
         """
         from docmirror.models.construction.parse_result_bridge import ParseResultBridge
+
         pr = await self.to_parse_result(file_path)
         return ParseResultBridge.to_base_result(pr)

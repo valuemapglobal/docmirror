@@ -13,8 +13,8 @@ RapidOCR (ONNX Runtime) for plain text extraction. This adapter produces a singl
 TextBlock without complex structured table/entity data, as it currently operates
 in a purely CPU-bound environment without Vision-Language Models.
 """
-from __future__ import annotations
 
+from __future__ import annotations
 
 import logging
 from pathlib import Path
@@ -31,13 +31,17 @@ class ImageAdapter(BaseParser):
     Produces a single TextBlock containing all recognized text lines joined by newlines.
     """
 
-    async def to_parse_result(self, file_path: Path, **kwargs) -> "ParseResult":
+    async def to_parse_result(self, file_path: Path, **kwargs) -> ParseResult:
         """
         Convert an image file to ParseResult using OCR.
         """
         from docmirror.models.entities.parse_result import (
-            ParseResult, PageContent, TextBlock, TextLevel, ParserInfo,
             ExtractionMethod,
+            PageContent,
+            ParseResult,
+            ParserInfo,
+            TextBlock,
+            TextLevel,
         )
 
         logger.info(f"[ImageAdapter] Starting image parsing for: {file_path}")
@@ -60,6 +64,7 @@ class ImageAdapter(BaseParser):
     async def _extract_text(self, file_path: Path) -> str:
         """Extract text from the image using OCR."""
         import cv2
+
         logger.debug(f"[ImageAdapter] Reading image file: {file_path}")
         img = cv2.imread(str(file_path))
         if img is None:
@@ -74,10 +79,9 @@ class ImageAdapter(BaseParser):
             _resolve_external_ocr_provider,
             assess_image_quality_from_bgr,
         )
+
         threshold = getattr(default_settings, "external_ocr_quality_threshold", None)
-        provider = _resolve_external_ocr_provider(
-            getattr(default_settings, "external_ocr_provider", None)
-        )
+        provider = _resolve_external_ocr_provider(getattr(default_settings, "external_ocr_provider", None))
         quality = assess_image_quality_from_bgr(img)
         logger.debug(
             "[ImageAdapter] OCR route: quality=%s, threshold=%s, external_provider=%s → %s",
@@ -86,23 +90,18 @@ class ImageAdapter(BaseParser):
             "set" if provider is not None else "unset",
             "external" if (threshold is not None and provider is not None and quality < threshold) else "builtin",
         )
-        if (
-            threshold is not None
-            and provider is not None
-            and quality < threshold
-        ):
+        if threshold is not None and provider is not None and quality < threshold:
             try:
                 out = provider(img, page_idx=0, dpi=200)
             except Exception as e:
                 logger.warning(f"[ImageAdapter] External OCR failed: {e}")
                 out = None
             if out is not None:
-                logger.info(
-                    f"[ImageAdapter] Delegated to external OCR (quality={quality})"
-                )
+                logger.info(f"[ImageAdapter] Delegated to external OCR (quality={quality})")
                 return self._text_from_ocr_result(out)
         try:
             from docmirror.core.ocr.vision.rapidocr_engine import get_ocr_engine
+
             engine = get_ocr_engine()
             words = engine.detect_image_words(img)
             return "\n".join(w[4] for w in words) if words else ""
@@ -118,10 +117,7 @@ class ImageAdapter(BaseParser):
         if isinstance(out, dict):
             lines = out.get("lines", [])
             if lines:
-                return "\n".join(
-                    line.get("text", "") if isinstance(line, dict) else str(line)
-                    for line in lines
-                )
+                return "\n".join(line.get("text", "") if isinstance(line, dict) else str(line) for line in lines)
             header = out.get("header_text", "").strip()
             footer = out.get("footer_text", "").strip()
             table = out.get("table", [])

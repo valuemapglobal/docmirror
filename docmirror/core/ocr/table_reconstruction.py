@@ -10,6 +10,7 @@ Table Reconstruction from OCR Characters
 
 Converts raw OCR character outputs into 2D table grids using spatial clustering.
 """
+
 from __future__ import annotations
 
 import logging
@@ -18,18 +19,16 @@ from typing import List, Optional, Tuple
 logger = logging.getLogger(__name__)
 
 
-def group_chars_into_rows(
-    chars: List[dict], y_tolerance: float = 8.0
-) -> List[Tuple[float, List[dict]]]:
+def group_chars_into_rows(chars: list[dict], y_tolerance: float = 8.0) -> list[tuple[float, list[dict]]]:
     """Group OCR character dicts into rows by y-coordinate proximity."""
     if not chars:
         return []
 
     sorted_chars = sorted(chars, key=lambda c: c.get("top", 0))
 
-    rows: List[Tuple[float, List[dict]]] = []
+    rows: list[tuple[float, list[dict]]] = []
     current_y = sorted_chars[0].get("top", 0)
-    current_row: List[dict] = [sorted_chars[0]]
+    current_row: list[dict] = [sorted_chars[0]]
 
     for ch in sorted_chars[1:]:
         ch_y = ch.get("top", 0)
@@ -48,14 +47,12 @@ def group_chars_into_rows(
     return rows
 
 
-def chars_to_text(chars: List[dict]) -> str:
+def chars_to_text(chars: list[dict]) -> str:
     """Merge a list of character dicts into a single text string."""
     return " ".join(c.get("text", "") for c in chars).strip()
 
 
-def cluster_x_positions(
-    x_positions: List[float], gap_multiplier: float = 2.0
-) -> List[Tuple[float, float]]:
+def cluster_x_positions(x_positions: list[float], gap_multiplier: float = 2.0) -> list[tuple[float, float]]:
     """Detect column boundaries by clustering x-coordinates."""
     if not x_positions:
         return []
@@ -64,7 +61,7 @@ def cluster_x_positions(
     if len(sorted_x) < 2:
         return [(sorted_x[0], sorted_x[0] + 100)]
 
-    gaps = [sorted_x[i+1] - sorted_x[i] for i in range(len(sorted_x) - 1)]
+    gaps = [sorted_x[i + 1] - sorted_x[i] for i in range(len(sorted_x) - 1)]
     median_gap = sorted(gaps)[len(gaps) // 2] if gaps else 10
 
     col_starts = [sorted_x[0]]
@@ -83,11 +80,9 @@ def cluster_x_positions(
     return bounds
 
 
-def assign_chars_to_columns(
-    chars: List[dict], col_bounds: List[Tuple[float, float]]
-) -> List[str]:
+def assign_chars_to_columns(chars: list[dict], col_bounds: list[tuple[float, float]]) -> list[str]:
     """Assign a row's characters to column bins."""
-    cols: List[List[dict]] = [[] for _ in col_bounds]
+    cols: list[list[dict]] = [[] for _ in col_bounds]
 
     for ch in chars:
         cx = (ch.get("x0", 0) + ch.get("x1", 0)) / 2
@@ -112,15 +107,15 @@ def assign_chars_to_columns(
 
 
 def split_tables_by_y_gap(
-    rows_by_y: List[Tuple[float, List[dict]]], page_h: float
-) -> List[List[Tuple[float, List[dict]]]]:
+    rows_by_y: list[tuple[float, list[dict]]], page_h: float
+) -> list[list[tuple[float, list[dict]]]]:
     """Split grouped rows into multiple tables based on vertical gaps."""
     if len(rows_by_y) < 4:
         return [rows_by_y]
 
     gap_threshold = page_h * 0.05
-    tables: List[List[Tuple[float, List[dict]]]] = []
-    current: List[Tuple[float, List[dict]]] = [rows_by_y[0]]
+    tables: list[list[tuple[float, list[dict]]]] = []
+    current: list[tuple[float, list[dict]]] = [rows_by_y[0]]
 
     for i in range(1, len(rows_by_y)):
         if rows_by_y[i][0] - rows_by_y[i - 1][0] > gap_threshold:
@@ -133,8 +128,8 @@ def split_tables_by_y_gap(
 
 
 def reconstruct_table_grid_2d(
-    chars: List[dict], hough_lines: Optional[List[Tuple[float, float]]] = None
-) -> List[List[str]]:
+    chars: list[dict], hough_lines: list[tuple[float, float]] | None = None
+) -> list[list[str]]:
     """Robust 2D Table Grid Reconstruction (Virtual Grid Alignment).
 
     Algorithm:
@@ -197,7 +192,7 @@ def reconstruct_table_grid_2d(
     # 3. Grid Snapping
     num_rows = len(row_chars_list)
     num_cols = len(col_bounds)
-    table_grid: List[List[List[dict]]] = [[[] for _ in range(num_cols)] for _ in range(num_rows)]
+    table_grid: list[list[list[dict]]] = [[[] for _ in range(num_cols)] for _ in range(num_rows)]
 
     for r_idx, r_chars in enumerate(row_chars_list):
         for c in r_chars:
@@ -228,21 +223,24 @@ def reconstruct_table_grid_2d(
     return final_table
 
 
-def detect_table_lines_hough(
-    img_bgr, page_h: int, page_w: int
-) -> Optional[List[Tuple[float, float]]]:
+def detect_table_lines_hough(img_bgr, page_h: int, page_w: int) -> list[tuple[float, float]] | None:
     """Detect vertical table lines using Hough transform.
 
     Returns column boundary intervals or None if too few lines found.
     """
     import cv2
+
     gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
     edges = cv2.Canny(gray, 50, 150, apertureSize=3)
 
     min_line_len = int(page_h * 0.15)
     lines = cv2.HoughLinesP(
-        edges, rho=1, theta=3.14159 / 180, threshold=80,
-        minLineLength=min_line_len, maxLineGap=10,
+        edges,
+        rho=1,
+        theta=3.14159 / 180,
+        threshold=80,
+        minLineLength=min_line_len,
+        maxLineGap=10,
     )
     if lines is None:
         return None
@@ -278,9 +276,7 @@ def detect_table_lines_hough(
 
 def detect_has_table(img, page_h: int) -> bool:
     """Check whether the page image has genuine table line structure."""
-    col_bounds = detect_table_lines_hough(
-        img, page_h, img.shape[1] if img is not None else 0
-    )
+    col_bounds = detect_table_lines_hough(img, page_h, img.shape[1] if img is not None else 0)
     if not col_bounds or len(col_bounds) < 3:
         return False
 
@@ -293,9 +289,7 @@ def detect_has_table(img, page_h: int) -> bool:
     return True
 
 
-def group_words_into_lines(
-    words: List[tuple], y_tolerance: float = 12.0
-) -> List[dict]:
+def group_words_into_lines(words: list[tuple], y_tolerance: float = 12.0) -> list[dict]:
     """Group OCR words into text lines by y-proximity.
 
     Returns list of line dicts: {"text": str, "bbox": (x0, y0, x1, y1)}
@@ -305,7 +299,7 @@ def group_words_into_lines(
 
     sorted_w = sorted(words, key=lambda w: (w[1], w[0]))
 
-    lines: List[dict] = []
+    lines: list[dict] = []
     cur_words = [sorted_w[0]]
     cur_y = sorted_w[0][1]
 

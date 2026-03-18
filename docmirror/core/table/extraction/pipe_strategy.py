@@ -14,20 +14,21 @@ Designed for mainframe-generated ASCII-art PDFs:
   - Horizontal separators: ``─``, ``━`` and other ``HLINE_CHARS``
   - PDF contains no graphical primitives (lines / rects = 0)
 """
-from __future__ import annotations
 
+from __future__ import annotations
 
 import logging
 from collections import defaultdict
 from typing import Dict, List, Optional
 
-from ...utils.vocabulary import PIPE_CHARS, _ALL_BORDER_CHARS
+from ...utils.vocabulary import _ALL_BORDER_CHARS, PIPE_CHARS
 
 logger = logging.getLogger(__name__)
 
+
 def _extract_by_pipe_delimited(
     page_plum,
-) -> Optional[List[List[str]]]:
+) -> list[list[str]] | None:
     """Pipe-delimited table extraction (Layer 0.5) — Grid Consistency algorithm.
 
     Specifically designed for mainframe-generated ASCII-art PDFs:
@@ -53,7 +54,7 @@ def _extract_by_pipe_delimited(
         return None
 
     # ── Step 1: group characters into rows by y-coordinate ──
-    y_groups: Dict[int, List[dict]] = defaultdict(list)
+    y_groups: dict[int, list[dict]] = defaultdict(list)
     for c in chars:
         y_key = round(c["top"] / 3) * 3
         y_groups[y_key].append(c)
@@ -62,9 +63,9 @@ def _extract_by_pipe_delimited(
         return None
 
     # ── Step 2: classify rows — data rows vs horizontal separator rows ──
-    data_rows_ys: List[int] = []      # y_key values of pipe-containing data rows
-    hline_rows_ys: List[int] = []     # y_key values of pure horizontal-line rows
-    all_pipe_x_by_row: Dict[int, List[float]] = {}  # y_key → list of pipe x-coordinates
+    data_rows_ys: list[int] = []  # y_key values of pipe-containing data rows
+    hline_rows_ys: list[int] = []  # y_key values of pure horizontal-line rows
+    all_pipe_x_by_row: dict[int, list[float]] = {}  # y_key → list of pipe x-coordinates
 
     for y_key in sorted(y_groups.keys()):
         row_chars = y_groups[y_key]
@@ -79,11 +80,7 @@ def _extract_by_pipe_delimited(
                 continue
 
         # Collect pipe character x-coordinates
-        pipe_xs = [
-            round(c["x0"], 1)
-            for c in row_chars
-            if c.get("text") in PIPE_CHARS
-        ]
+        pipe_xs = [round(c["x0"], 1) for c in row_chars if c.get("text") in PIPE_CHARS]
         if len(pipe_xs) >= 2:
             data_rows_ys.append(y_key)
             all_pipe_x_by_row[y_key] = sorted(pipe_xs)
@@ -94,7 +91,7 @@ def _extract_by_pipe_delimited(
 
     # ── Step 3: cluster pipe x-coordinates to find vertical grid lines ──
     # Collect all pipe x-coordinates
-    all_pipe_xs: List[float] = []
+    all_pipe_xs: list[float] = []
     for xs in all_pipe_x_by_row.values():
         all_pipe_xs.extend(xs)
 
@@ -103,14 +100,14 @@ def _extract_by_pipe_delimited(
 
     # Cluster: snap to a 5-pt grid
     SNAP = 5.0
-    x_clusters: Dict[float, List[float]] = defaultdict(list)
+    x_clusters: dict[float, list[float]] = defaultdict(list)
     for x in sorted(all_pipe_xs):
         snapped = round(x / SNAP) * SNAP
         x_clusters[snapped].append(x)
 
     # Merge nearby clusters (distance < 8 pt)
     sorted_centers = sorted(x_clusters.keys())
-    merged_clusters: List[List[float]] = []
+    merged_clusters: list[list[float]] = []
     for center in sorted_centers:
         if merged_clusters and center - sum(merged_clusters[-1]) / len(merged_clusters[-1]) < 8:
             merged_clusters[-1].extend(x_clusters[center])
@@ -119,7 +116,7 @@ def _extract_by_pipe_delimited(
 
     # ── G2 + G4: check grid consistency ──
     n_data_rows = len(data_rows_ys)
-    consistent_grid_lines: List[float] = []  # Grid line x-centres that pass consistency check
+    consistent_grid_lines: list[float] = []  # Grid line x-centres that pass consistency check
 
     for cluster in merged_clusters:
         # Presence ratio: fraction of data rows containing this x-cluster
@@ -135,7 +132,7 @@ def _extract_by_pipe_delimited(
         # G4: x-coordinate standard deviation
         mean_x = sum(cluster) / len(cluster)
         variance = sum((x - mean_x) ** 2 for x in cluster) / len(cluster)
-        std_x = variance ** 0.5
+        std_x = variance**0.5
         if std_x > 3.0:
             continue
 
@@ -158,12 +155,9 @@ def _extract_by_pipe_delimited(
 
     # ── Step 4: split characters into columns using grid lines ──
     # Column intervals: (left_pipe_x, right_pipe_x)
-    col_intervals = [
-        (consistent_grid_lines[i], consistent_grid_lines[i + 1])
-        for i in range(n_cols)
-    ]
+    col_intervals = [(consistent_grid_lines[i], consistent_grid_lines[i + 1]) for i in range(n_cols)]
 
-    table: List[List[str]] = []
+    table: list[list[str]] = []
     for y_key in sorted(data_rows_ys):
         row_chars = sorted(y_groups[y_key], key=lambda c: c["x0"])
         # Filter out the pipe characters themselves
@@ -193,13 +187,11 @@ def _extract_by_pipe_delimited(
     # ── Step 5: merge continuation rows (mainframe records may span multiple lines) ──
     table = _merge_pipe_continuation_rows(table)
 
-    logger.info(
-        f"pipe_delimited: extracted {len(table)} rows x {n_cols} cols"
-    )
+    logger.info(f"pipe_delimited: extracted {len(table)} rows x {n_cols} cols")
     return table
 
 
-def _merge_pipe_continuation_rows(table: List[List[str]]) -> List[List[str]]:
+def _merge_pipe_continuation_rows(table: list[list[str]]) -> list[list[str]]:
     """Merge continuation rows in a pipe-delimited table.
 
     In mainframe output, a single record may be split across multiple lines:
@@ -212,7 +204,7 @@ def _merge_pipe_continuation_rows(table: List[List[str]]) -> List[List[str]]:
     if not table or len(table) < 2:
         return table
 
-    merged: List[List[str]] = [table[0]]
+    merged: list[list[str]] = [table[0]]
     for row in table[1:]:
         first_cell = row[0].strip() if row else ""
         # Continuation row: first column (sequence number) is empty with other content

@@ -35,13 +35,13 @@ logging.basicConfig(
     stream=sys.stdout,
 )
 
-from docmirror.core.factory import perceive_document, PerceptionFactory
-from docmirror.models.entities.document_types import DocumentType
-from docmirror.models.entities.parse_result import ParseResult
-from docmirror.models.entities.domain_models import DomainData
-from docmirror.models.construction.parse_result_bridge import ParseResultBridge
+from docmirror.core.factory import PerceptionFactory, perceive_document
 from docmirror.framework.dispatcher import ParserDispatcher
 from docmirror.framework.orchestrator import Orchestrator
+from docmirror.models.construction.parse_result_bridge import ParseResultBridge
+from docmirror.models.entities.document_types import DocumentType
+from docmirror.models.entities.domain_models import DomainData
+from docmirror.models.entities.parse_result import ParseResult
 
 logger = logging.getLogger(__name__)
 

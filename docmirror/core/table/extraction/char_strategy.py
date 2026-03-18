@@ -8,23 +8,24 @@
 
 Split from ``table_extraction.py``.
 """
-from __future__ import annotations
 
+from __future__ import annotations
 
 import logging
 from collections import defaultdict
 from typing import Dict, List, Optional, Tuple
 
-from ...utils.vocabulary import _is_header_row, _is_header_cell, _score_header_by_vocabulary, _RE_IS_DATE, _RE_IS_AMOUNT
+from ...utils.vocabulary import _RE_IS_AMOUNT, _RE_IS_DATE, _is_header_cell, _is_header_row, _score_header_by_vocabulary
 from ...utils.watermark import is_watermark_char
 from ..postprocess import _find_vocab_words_in_string
 
 logger = logging.getLogger(__name__)
 
 
-from .utils import _group_chars_into_rows, _cluster_x_positions, _assign_chars_to_columns, _chars_to_text
+from .utils import _assign_chars_to_columns, _chars_to_text, _cluster_x_positions, _group_chars_into_rows
 
-def _extract_by_hline_columns(page_plum) -> Optional[List[List[str]]]:
+
+def _extract_by_hline_columns(page_plum) -> list[list[str]] | None:
     """Horizontal-line column boundary method.
 
     For PDFs with horizontal dividers but no vertical lines
@@ -47,11 +48,7 @@ def _extract_by_hline_columns(page_plum) -> Optional[List[List[str]]]:
         return None
 
     # ── Extract column boundaries from horizontal-line x-coordinates ──
-    raw_x = sorted(set(
-        round(v, 1)
-        for l in h_lines
-        for v in [l["x0"], l["x1"]]
-    ))
+    raw_x = sorted(set(round(v, 1) for l in h_lines for v in [l["x0"], l["x1"]]))
     # Merge nearby x values (snap with 10 pt threshold — avoid tiny gaps creating empty columns)
     x_positions = [raw_x[0]]
     for x in raw_x[1:]:
@@ -163,10 +160,7 @@ def _extract_by_hline_columns(page_plum) -> Optional[List[List[str]]]:
         interval_mid = (intervals[ci][0] + intervals[ci][1]) / 2
         if pre_data_words:
             # Find the pre-data word whose x-centre is closest to the interval midpoint
-            best_w = min(
-                pre_data_words,
-                key=lambda w: abs((w["x0"] + w.get("x1", w["x0"] + 10)) / 2 - interval_mid)
-            )
+            best_w = min(pre_data_words, key=lambda w: abs((w["x0"] + w.get("x1", w["x0"] + 10)) / 2 - interval_mid))
             anchor = (best_w["x0"] + best_w.get("x1", best_w["x0"] + 10)) / 2
             # Only accept if within half the interval width (prevent mismatch)
             interval_half = (intervals[ci][1] - intervals[ci][0]) / 2
@@ -176,19 +170,14 @@ def _extract_by_hline_columns(page_plum) -> Optional[List[List[str]]]:
         # Fallback: use the interval midpoint
         header_anchors.append(interval_mid)
 
-    logger.debug(
-        f"hline-columns: anchors={[f'{a:.1f}' for a in header_anchors]}"
-    )
+    logger.debug(f"hline-columns: anchors={[f'{a:.1f}' for a in header_anchors]}")
 
     # ── Data rows: nearest-neighbour anchor assignment ──
     def _words_to_row_nn(row_words):
         cells = [""] * col_count
         for w in sorted(row_words, key=lambda w: w["x0"]):
             w_center = (w["x0"] + w.get("x1", w["x0"] + 5)) / 2
-            best_ci = min(
-                range(col_count),
-                key=lambda ci: abs(w_center - header_anchors[ci])
-            )
+            best_ci = min(range(col_count), key=lambda ci: abs(w_center - header_anchors[ci]))
             if cells[best_ci]:
                 cells[best_ci] += " " + w["text"]
             else:
@@ -204,14 +193,11 @@ def _extract_by_hline_columns(page_plum) -> Optional[List[List[str]]]:
     if len(table) < 2 or col_count < 2:
         return None
 
-    logger.info(
-        f"hline-columns: {len(table)-1} data rows, "
-        f"{col_count} cols from {len(h_lines)} h-lines"
-    )
+    logger.info(f"hline-columns: {len(table) - 1} data rows, {col_count} cols from {len(h_lines)} h-lines")
     return table
 
 
-def _extract_by_rect_columns(page_plum) -> Optional[List[List[str]]]:
+def _extract_by_rect_columns(page_plum) -> list[list[str]] | None:
     """Rectangle column boundary method."""
     rects = page_plum.rects
     if not rects or len(rects) < 3:
@@ -226,10 +212,7 @@ def _extract_by_rect_columns(page_plum) -> Optional[List[List[str]]]:
     if len(best_group) < 3:
         return None
 
-    raw_x = sorted(set(
-        round(v, 1) for r in best_group
-        for v in [r["x0"], r["x1"]]
-    ))
+    raw_x = sorted(set(round(v, 1) for r in best_group for v in [r["x0"], r["x1"]]))
     x_positions = [0.0]
     for x in raw_x:
         if x - x_positions[-1] > 2:
@@ -243,10 +226,14 @@ def _extract_by_rect_columns(page_plum) -> Optional[List[List[str]]]:
     header_bottom = max(r["bottom"] for r in best_group) + 1
 
     try:
-        cropped = page_plum.crop((
-            0, header_top,
-            page_plum.width, page_plum.height,
-        ))
+        cropped = page_plum.crop(
+            (
+                0,
+                header_top,
+                page_plum.width,
+                page_plum.height,
+            )
+        )
         chars = cropped.chars
         if not chars:
             return None
@@ -294,7 +281,7 @@ def _extract_by_rect_columns(page_plum) -> Optional[List[List[str]]]:
     return None
 
 
-def detect_columns_by_header_anchors(page_plum) -> Optional[List[List[str]]]:
+def detect_columns_by_header_anchors(page_plum) -> list[list[str]] | None:
     """Header-anchor column detection method."""
     chars = page_plum.chars
     if not chars or len(chars) < 10:
@@ -334,7 +321,7 @@ def detect_columns_by_header_anchors(page_plum) -> Optional[List[List[str]]]:
     if len(col_bounds) < 2:
         return None
 
-    result: List[List[str]] = []
+    result: list[list[str]] = []
     for y_mid, row_chars in rows_by_y[header_row_idx:]:
         row = _assign_chars_to_columns(row_chars, col_bounds)
         result.append(row)
@@ -343,9 +330,9 @@ def detect_columns_by_header_anchors(page_plum) -> Optional[List[List[str]]]:
 
 
 def _adjust_boundaries_by_vocab(
-    col_boundaries: List[float],
-    header_chars: List[dict],
-) -> List[float]:
+    col_boundaries: list[float],
+    header_chars: list[dict],
+) -> list[float]:
     """Vocabulary-guided column boundary adjustment.
 
     If a boundary falls inside a known header word, shift it past the word.
@@ -379,10 +366,7 @@ def _adjust_boundaries_by_vocab(
             if word_x0 + 1 < bx < word_x1 - 1:
                 # Boundary falls inside a vocab word → shift past the word
                 new_bx = word_x1 + 0.5
-                logger.debug(
-                    f"vocab boundary fix: {bx:.1f}\u2192{new_bx:.1f} "
-                    f"to preserve '{word}'"
-                )
+                logger.debug(f"vocab boundary fix: {bx:.1f}\u2192{new_bx:.1f} to preserve '{word}'")
                 adjusted[bi] = new_bx
                 modified = True
                 break
@@ -395,7 +379,7 @@ def _adjust_boundaries_by_vocab(
 
 def detect_columns_by_whitespace_projection(
     page_plum,
-) -> Optional[List[List[str]]]:
+) -> list[list[str]] | None:
     """Vertical whitespace projection — project all rows onto the x-axis
     and detect column boundaries from whitespace bands.
 
@@ -415,6 +399,7 @@ def detect_columns_by_whitespace_projection(
 
     # F-1: adaptive row-grouping tolerance
     from .utils import _adaptive_row_tolerance
+
     row_tol = _adaptive_row_tolerance(chars)
 
     # Collect non-space chars, group into rows by y (using adaptive tolerance)
@@ -422,7 +407,7 @@ def detect_columns_by_whitespace_projection(
     if not text_chars:
         return None
     sorted_chars = sorted(text_chars, key=lambda c: c["top"])
-    y_rows: Dict[int, List] = {}
+    y_rows: dict[int, list] = {}
     current_yk = round(sorted_chars[0]["top"] / row_tol) * row_tol
     y_rows[current_yk] = [sorted_chars[0]]
     for c in sorted_chars[1:]:
@@ -464,7 +449,7 @@ def detect_columns_by_whitespace_projection(
 
     # Find whitespace bands: contiguous x-ranges with projection <= 10 % of row count
     threshold = row_count * 0.10
-    gaps: List[Tuple[float, float, int]] = []
+    gaps: list[tuple[float, float, int]] = []
     in_gap = False
     gap_start = 0
 
@@ -505,10 +490,10 @@ def detect_columns_by_whitespace_projection(
     n_cols = len(col_boundaries) - 1  # Count may stay the same, positions shift
 
     # Split each row by column boundaries
-    result: List[List[str]] = []
+    result: list[list[str]] = []
     for yk in sorted(y_rows.keys()):
         row_chars = sorted(y_rows[yk], key=lambda c: c["x0"])
-        
+
         # 1. Merge adjacent characters into words (prevent words from being split mid-span)
         words = []
         curr_word = None
@@ -528,24 +513,19 @@ def detect_columns_by_whitespace_projection(
         if curr_word:
             words.append(curr_word)
 
-        cells: List[str] = []
+        cells: list[str] = []
         for i in range(n_cols):
             left = col_boundaries[i]
             right = col_boundaries[i + 1]
             # Assign to columns based on word centre point
             cell_words = [
-                w for w in words
-                if (w["x0"] + w["x1"]) / 2 >= left - 1
-                and (w["x0"] + w["x1"]) / 2 < right + 1
+                w for w in words if (w["x0"] + w["x1"]) / 2 >= left - 1 and (w["x0"] + w["x1"]) / 2 < right + 1
             ]
             cell_text = " ".join(w["text"] for w in cell_words).strip()
             cells.append(cell_text)
         result.append(cells)
 
-    logger.debug(
-        f"whitespace_projection: {len(result)} rows, "
-        f"{n_cols} cols from {len(gaps)} gaps"
-    )
+    logger.debug(f"whitespace_projection: {len(result)} rows, {n_cols} cols from {len(gaps)} gaps")
 
     if len(result) < 2:
         return None
@@ -572,7 +552,7 @@ def detect_columns_by_whitespace_projection(
     return result if len(result) >= 2 else None
 
 
-def detect_columns_by_clustering(page_plum) -> Optional[List[List[str]]]:
+def detect_columns_by_clustering(page_plum) -> list[list[str]] | None:
     """x-coordinate clustering method."""
     chars = page_plum.chars
     if not chars or len(chars) < 10:
@@ -589,7 +569,7 @@ def detect_columns_by_clustering(page_plum) -> Optional[List[List[str]]]:
         return None
 
     rows_by_y = _group_chars_into_rows(chars)
-    result: List[List[str]] = []
+    result: list[list[str]] = []
     for y_mid, row_chars in rows_by_y:
         row = _assign_chars_to_columns(row_chars, col_bounds)
         result.append(row)
@@ -597,7 +577,7 @@ def detect_columns_by_clustering(page_plum) -> Optional[List[List[str]]]:
     return result if len(result) >= 2 else None
 
 
-def detect_columns_by_word_anchors(page_plum) -> Optional[List[List[str]]]:
+def detect_columns_by_word_anchors(page_plum) -> list[list[str]] | None:
     """Word-anchor column detection.
 
     Uses ``extract_words()`` to locate each header word's x-position as a
@@ -612,9 +592,7 @@ def detect_columns_by_word_anchors(page_plum) -> Optional[List[List[str]]]:
         # then the default \u2014 keep the result with more words (= finer column splits)
         best_words = None
         for x_tol in (2, 3):
-            w = page_plum.extract_words(
-                keep_blank_chars=True, x_tolerance=x_tol
-            )
+            w = page_plum.extract_words(keep_blank_chars=True, x_tolerance=x_tol)
             if w and (best_words is None or len(w) > len(best_words)):
                 best_words = w
         words = best_words
@@ -627,7 +605,7 @@ def detect_columns_by_word_anchors(page_plum) -> Optional[List[List[str]]]:
     # ── Group words into rows by y-coordinate ──
     ROW_TOL = 5
     sorted_words = sorted(words, key=lambda w: (w["top"], w["x0"]))
-    word_rows: List[Tuple[float, List[Dict]]] = []
+    word_rows: list[tuple[float, list[dict]]] = []
     cur_y = sorted_words[0]["top"]
     cur_row = [sorted_words[0]]
     for w in sorted_words[1:]:
@@ -665,7 +643,7 @@ def detect_columns_by_word_anchors(page_plum) -> Optional[List[List[str]]]:
 
     # ── Build column boundaries from header word positions ──
     # Each word's x0, x1 become boundaries; _assign_chars_to_columns places splits in the gaps
-    col_bounds: List[Tuple[float, float]] = []
+    col_bounds: list[tuple[float, float]] = []
     for i, w in enumerate(header_words):
         x_start = w["x0"]
         x_end = w.get("x1", w["x0"] + 10)
@@ -686,7 +664,7 @@ def detect_columns_by_word_anchors(page_plum) -> Optional[List[List[str]]]:
 
     # Start extracting from the header row's y-position
     header_y = word_rows[header_row_idx][0]
-    result: List[List[str]] = []
+    result: list[list[str]] = []
     for y_mid, row_chars in char_rows:
         if y_mid < header_y - 3:
             continue
@@ -697,15 +675,14 @@ def detect_columns_by_word_anchors(page_plum) -> Optional[List[List[str]]]:
         return None
 
     logger.debug(
-        f"word-anchors: {len(result)-1} data rows, "
-        f"{len(col_bounds)} cols from {len(header_words)} header words"
+        f"word-anchors: {len(result) - 1} data rows, {len(col_bounds)} cols from {len(header_words)} header words"
     )
     return result
 
 
 def detect_columns_by_data_voting(
     page_plum,
-) -> Optional[List[List[str]]]:
+) -> list[list[str]] | None:
     """Data-row-driven column boundary detection.
 
     Uses gap positions from data rows (rows containing dates / amounts)
@@ -713,9 +690,7 @@ def detect_columns_by_data_voting(
     no dependency on header row, handles bilingual mixed headers.
     """
     try:
-        words = page_plum.extract_words(
-            keep_blank_chars=True, x_tolerance=2
-        )
+        words = page_plum.extract_words(keep_blank_chars=True, x_tolerance=2)
     except Exception as exc:
         logger.debug(f"operation: suppressed {exc}")
         return None
@@ -725,7 +700,7 @@ def detect_columns_by_data_voting(
     # ── Group words into rows by y-coordinate ──
     ROW_TOL = 5
     sorted_words = sorted(words, key=lambda w: (w["top"], w["x0"]))
-    word_rows: List[Tuple[float, List[Dict]]] = []
+    word_rows: list[tuple[float, list[dict]]] = []
     cur_y = sorted_words[0]["top"]
     cur_row = [sorted_words[0]]
     for w in sorted_words[1:]:
@@ -733,30 +708,24 @@ def detect_columns_by_data_voting(
             cur_row.append(w)
         else:
             y_mid = sum(ww["top"] for ww in cur_row) / len(cur_row)
-            word_rows.append(
-                (y_mid, sorted(cur_row, key=lambda x: x["x0"]))
-            )
+            word_rows.append((y_mid, sorted(cur_row, key=lambda x: x["x0"])))
             cur_row = [w]
             cur_y = w["top"]
     if cur_row:
         y_mid = sum(ww["top"] for ww in cur_row) / len(cur_row)
-        word_rows.append(
-            (y_mid, sorted(cur_row, key=lambda x: x["x0"]))
-        )
+        word_rows.append((y_mid, sorted(cur_row, key=lambda x: x["x0"])))
 
     if len(word_rows) < 5:
         return None
 
     # ── Filter data rows: rows containing dates or amounts ──
-    data_rows: List[Tuple[float, List[Dict]]] = []
+    data_rows: list[tuple[float, list[dict]]] = []
     for y_mid, rw in word_rows:
         texts = " ".join(w["text"] for w in rw)
         if _RE_IS_DATE.search(texts):
             data_rows.append((y_mid, rw))
         elif any(
-            _RE_IS_AMOUNT.match(
-                w["text"].strip().replace(",", "").replace("\u00a5", "")
-            )
+            _RE_IS_AMOUNT.match(w["text"].strip().replace(",", "").replace("\u00a5", ""))
             for w in rw
             if w["text"].strip()
         ):
@@ -766,7 +735,7 @@ def detect_columns_by_data_voting(
         return None
 
     # ── Collect gap midpoint positions (3 pt resolution) ──
-    gap_votes: Dict[int, int] = defaultdict(int)
+    gap_votes: dict[int, int] = defaultdict(int)
     page_w = page_plum.width or 600
     for _, rw in data_rows[:30]:
         for i in range(len(rw) - 1):
@@ -784,15 +753,13 @@ def detect_columns_by_data_voting(
     # ── Voting: gaps present in >= 40 % of data rows \u2192 column boundary ──
     n_voters = min(len(data_rows), 30)
     threshold = max(3, int(n_voters * 0.4))
-    voted_gaps = sorted(
-        x for x, count in gap_votes.items() if count >= threshold
-    )
+    voted_gaps = sorted(x for x, count in gap_votes.items() if count >= threshold)
 
     if len(voted_gaps) < 2:
         return None
 
     # ── Merge adjacent gaps (< 8 pt \u2192 same boundary) ──
-    merged_gaps: List[float] = [voted_gaps[0]]
+    merged_gaps: list[float] = [voted_gaps[0]]
     for g in voted_gaps[1:]:
         if g - merged_gaps[-1] < 8:
             merged_gaps[-1] = (merged_gaps[-1] + g) / 2
@@ -800,7 +767,7 @@ def detect_columns_by_data_voting(
             merged_gaps.append(g)
 
     # ── Build column boundaries from gap midpoints ──
-    col_bounds: List[Tuple[float, float]] = []
+    col_bounds: list[tuple[float, float]] = []
     col_bounds.append((0, merged_gaps[0]))
     for i in range(len(merged_gaps) - 1):
         col_bounds.append((merged_gaps[i], merged_gaps[i + 1]))
@@ -818,7 +785,7 @@ def detect_columns_by_data_voting(
         return None
 
     char_rows = _group_chars_into_rows(chars)
-    result: List[List[str]] = []
+    result: list[list[str]] = []
     for _, row_chars in char_rows:
         row = _assign_chars_to_columns(row_chars, col_bounds)
         result.append(row)

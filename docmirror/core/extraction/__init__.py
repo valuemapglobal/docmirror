@@ -6,7 +6,7 @@
 
 from .extractor import CoreExtractor  # noqa: F401
 from .foundation import FitzEngine  # noqa: F401
-from .pre_analyzer import PreAnalyzer, PreAnalysisResult  # noqa: F401
+from .pre_analyzer import PreAnalysisResult, PreAnalyzer  # noqa: F401
 
 __all__ = [
     "CoreExtractor",

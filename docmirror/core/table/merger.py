@@ -19,16 +19,16 @@ Merge strategy:
      strips summary rows / duplicate headers before merging.
   3. Completely different table (header mismatch) → treat as an independent table.
 """
-from __future__ import annotations
 
+from __future__ import annotations
 
 import logging
 from typing import Dict, List
 
 from ...models.entities.domain import Block, PageLayout
-from .postprocess import _strip_preamble
 from ..utils.text_utils import headers_match
 from ..utils.vocabulary import _is_header_row
+from .postprocess import _strip_preamble
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +43,7 @@ def _median_col_count(rows: list) -> int:
     return counts[len(counts) // 2]
 
 
-def merge_cross_page_tables(pages: List[PageLayout]) -> List[PageLayout]:
+def merge_cross_page_tables(pages: list[PageLayout]) -> list[PageLayout]:
     """Cross-page table merging — operates at the Block level.
 
     Args:
@@ -58,13 +58,15 @@ def merge_cross_page_tables(pages: List[PageLayout]) -> List[PageLayout]:
     all_blocks = []
     for page in pages:
         for block in page.blocks:
-            all_blocks.append({
-                "block": block,
-                "page_number": page.page_number,
-            })
+            all_blocks.append(
+                {
+                    "block": block,
+                    "page_number": page.page_number,
+                }
+            )
 
-    merged_table_data: List[Dict] = []
-    non_table_blocks: List[Dict] = []
+    merged_table_data: list[dict] = []
+    non_table_blocks: list[dict] = []
 
     for entry in all_blocks:
         block = entry["block"]
@@ -75,11 +77,13 @@ def merge_cross_page_tables(pages: List[PageLayout]) -> List[PageLayout]:
         curr_rows = block.raw_content
 
         if not merged_table_data:
-            merged_table_data.append({
-                "rows": list(curr_rows),
-                "pages": [entry["page_number"]],
-                "block": block,
-            })
+            merged_table_data.append(
+                {
+                    "rows": list(curr_rows),
+                    "pages": [entry["page_number"]],
+                    "block": block,
+                }
+            )
             continue
 
         prev = merged_table_data[-1]
@@ -106,22 +110,26 @@ def merge_cross_page_tables(pages: List[PageLayout]) -> List[PageLayout]:
                 )
                 continue  # Skip, don't break the merge chain
             # Similar but different column counts → treat as independent table
-            merged_table_data.append({
-                "rows": list(curr_rows),
-                "pages": [entry["page_number"]],
-                "block": block,
-            })
+            merged_table_data.append(
+                {
+                    "rows": list(curr_rows),
+                    "pages": [entry["page_number"]],
+                    "block": block,
+                }
+            )
         elif is_header and prev_rows:
             prev_header = prev_rows[0] if prev_rows else []
             if headers_match(prev_header, first_row):
                 prev["rows"].extend(curr_rows[1:])
                 prev["pages"].append(entry["page_number"])
             else:
-                merged_table_data.append({
-                    "rows": list(curr_rows),
-                    "pages": [entry["page_number"]],
-                    "block": block,
-                })
+                merged_table_data.append(
+                    {
+                        "rows": list(curr_rows),
+                        "pages": [entry["page_number"]],
+                        "block": block,
+                    }
+                )
         elif not is_header and prev_rows:
             # Continuation page: strip summary / duplicate header rows, then merge
             confirmed_hdr = prev_rows[0] if prev_rows else []
@@ -131,11 +139,13 @@ def merge_cross_page_tables(pages: List[PageLayout]) -> List[PageLayout]:
                 prev["rows"].extend(stripped)
                 prev["pages"].append(entry["page_number"])
         else:
-            merged_table_data.append({
-                "rows": list(curr_rows),
-                "pages": [entry["page_number"]],
-                "block": block,
-            })
+            merged_table_data.append(
+                {
+                    "rows": list(curr_rows),
+                    "pages": [entry["page_number"]],
+                    "block": block,
+                }
+            )
 
     # F-7: post-merge row count audit
     for mdata in merged_table_data:
@@ -148,7 +158,7 @@ def merge_cross_page_tables(pages: List[PageLayout]) -> List[PageLayout]:
 
     new_pages = []
     for page in pages:
-        page_blocks: List[Block] = []
+        page_blocks: list[Block] = []
         for entry in non_table_blocks:
             if entry["page_number"] == page.page_number:
                 page_blocks.append(entry["block"])

@@ -10,14 +10,18 @@ Provides a singleton ``get_ocr_engine()`` accessor that lazy-loads the
 RapidOCR CPU backend.  Supports multi-scale detection and per-word
 bounding-box output used by the zone OCR fallback path.
 """
+
 from __future__ import annotations
+
 import logging
 import re
-from typing import List, Tuple, Optional
+from typing import List, Optional, Tuple
+
 import numpy as np
 
 try:
     from rapidocr_onnxruntime import RapidOCR
+
     HAS_RAPIDOCR = True
 except ImportError:
     HAS_RAPIDOCR = False
@@ -38,16 +42,16 @@ logger = logging.getLogger(__name__)
 #   3. Pure numeric amount:             kept as-is ("10,665.66")
 
 # Detect "sequence_number + YYYYMMDD" compounds
-_SEQ_DATE_RE = re.compile(r'^(\d{1,4})(20\d{6})$')
+_SEQ_DATE_RE = re.compile(r"^(\d{1,4})(20\d{6})$")
 
 
 def _split_ocr_block(
     x0: float, y0: float, x1: float, y1: float, text: str
-) -> List[Tuple[float, float, float, float, str]]:
+) -> list[tuple[float, float, float, float, str]]:
     """
     Attempt to split merged OCR text blocks into individual sub-word units.
     Text that cannot or need not be split is returned as-is.
-    
+
     Returns:
         List of (x0, y0, x1, y1, sub_text)
     """
@@ -56,7 +60,7 @@ def _split_ocr_block(
         return []
 
     total_width = x1 - x0
-    
+
     # Rule 1: sequence number + date (e.g. "1720240224" → "17" + "20240224")
     m = _SEQ_DATE_RE.match(text)
     if m:
@@ -77,7 +81,7 @@ class RapidOCREngine:
     Singleton wrapper for RapidOCR ONNX Runtime engine.
     Extracts text and bounding boxes from images and normalizes the format
     to match PyMuPDF's `get_text("words")` tuple structure.
-    
+
     Key design:
       1. Call RapidOCR to obtain line-level text + polygon coordinates.
       2. Post-process via ``_split_ocr_block`` to split merged text into
@@ -85,6 +89,7 @@ class RapidOCREngine:
       3. Output format matches PyMuPDF exactly:
          ``(x0, y0, x1, y1, text, block_no, line_no, word_no)``.
     """
+
     _instance = None
     _engine = None
 
@@ -101,59 +106,63 @@ class RapidOCREngine:
         if self._engine is None:
             # Auto-detect optimal thread count
             import os
+
             try:
                 cpu_count = os.cpu_count() or 4
-                intra_threads = max(1, cpu_count - 1) # Use all but 1 core for ONNX matrix mult
+                intra_threads = max(1, cpu_count - 1)  # Use all but 1 core for ONNX matrix mult
             except Exception as exc:
                 logger.debug(f"cpu_count detection: suppressed {exc}")
                 intra_threads = 4
-                
+
             use_cuda = False
             try:
                 import onnxruntime
+
                 providers = onnxruntime.get_available_providers()
                 if "CUDAExecutionProvider" in providers:
                     use_cuda = True
                     logger.info("GPU (CUDA) detected, enabling GPU acceleration for OCR")
                 elif "CoreMLExecutionProvider" in providers:
-                    logger.info("Mac CoreML detected. Continuing with CPUExecutionProvider + Multi-threading (ONNX CoreML often underperforms on simple CV models).")
+                    logger.info(
+                        "Mac CoreML detected. Continuing with CPUExecutionProvider + Multi-threading (ONNX CoreML often underperforms on simple CV models)."
+                    )
             except Exception as exc:
                 logger.debug(f"operation: suppressed {exc}")
 
             logger.info(f"Initializing RapidOCR ONNX model (GPU={use_cuda}, Threads={intra_threads})...")
-            
+
             # Phase 6 Part 1: Hardware-Aware Engine Initialization
             # The underlying ONNX Runtime models (DET, REC, CLS) run completely sequentially in pure CPU loops.
             # `intra_op_num_threads` is the most powerful flag for ONNX Runtime CPU scaling, parallelizing internal tensor algebra.
             # `inter_op_num_threads` is less useful for these specific linear CNN models.
             tuning_kwargs = {
                 "intra_op_num_threads": intra_threads,
-                "inter_op_num_threads": 2, 
-                "rec_batch_num": 32, # Batch size for text recognition (default 6)
-                "cls_batch_num": 32, # Batch size for text classifier
+                "inter_op_num_threads": 2,
+                "rec_batch_num": 32,  # Batch size for text recognition (default 6)
+                "cls_batch_num": 32,  # Batch size for text classifier
             }
-            
+
             if use_cuda:
                 self._engine = RapidOCR(use_cuda=True, **tuning_kwargs)
             else:
                 self._engine = RapidOCR(**tuning_kwargs)
             logger.info("RapidOCR model loaded with Extreme CPU Tuning.")
 
-    def _detect_only(self, img: np.ndarray) -> Optional[np.ndarray]:
+    def _detect_only(self, img: np.ndarray) -> np.ndarray | None:
         """Runs only the Detection (DET) model on an image and returns un-scaled bounding boxes."""
         raw_h, raw_w = img.shape[:2]
         op_record = {}
         processed_img, ratio_h, ratio_w = self._engine.preprocess(img)
         op_record["preprocess"] = {"ratio_h": ratio_h, "ratio_w": ratio_w}
-        
+
         processed_img, op_record = self._engine.maybe_add_letterbox(processed_img, op_record)
         dt_boxes, _ = self._engine.auto_text_det(processed_img)
-        
+
         if dt_boxes is not None:
             dt_boxes = self._engine._get_origin_points(dt_boxes, op_record, raw_h, raw_w)
         return dt_boxes
 
-    def _nms_boxes(self, boxes: List[np.ndarray], iou_threshold: float = 0.5) -> List[np.ndarray]:
+    def _nms_boxes(self, boxes: list[np.ndarray], iou_threshold: float = 0.5) -> list[np.ndarray]:
         """
         Non-Maximum Suppression (NMS) for oriented bounding boxes.
         Merges multi-scale bounding boxes by keeping the larger bounding boxes
@@ -161,14 +170,15 @@ class RapidOCREngine:
         """
         if not boxes:
             return []
-            
+
         import cv2
+
         # Convert to standard OpenCV bounding rects: [x, y, w, h] for NMS calculation
         # Store original polygon mapped to its bounding rect
         rects = []
         scores = []
         box_polygon_map = []
-        
+
         for idx, box in enumerate(boxes):
             if len(box) != 4:
                 continue
@@ -176,33 +186,33 @@ class RapidOCREngine:
             y_coords = [p[1] for p in box]
             x, y = int(min(x_coords)), int(min(y_coords))
             w, h = int(max(x_coords) - x), int(max(y_coords) - y)
-            
+
             # Area as confidence score - favors larger encapsulating boxes
             area = float(w * h)
             if area > 10:  # Ignore microscopic noise
                 rects.append([x, y, w, h])
                 scores.append(area)
                 box_polygon_map.append(box)
-                
+
         if not rects:
             return []
 
         # cv2.dnn.NMSBoxes expects floats for scores
         indices = cv2.dnn.NMSBoxes(rects, scores, score_threshold=0.0, nms_threshold=iou_threshold)
-        
+
         fused_boxes = []
         if len(indices) > 0:
             for i in indices.flatten():
                 fused_boxes.append(box_polygon_map[i])
-                
+
         # Sort top-to-bottom, left-to-right
         fused_boxes.sort(key=lambda b: (min([p[1] for p in b]), min([p[0] for p in b])))
         # Ensure correct type format for RapidOCR downstream (list of np.ndarray)
         return [np.array(b, dtype=np.float32) for b in fused_boxes]
 
     def detect_multiscale_words(
-        self, img: np.ndarray, scales: Optional[List[float]] = None
-    ) -> List[Tuple[float, float, float, float, str, int, int, int]]:
+        self, img: np.ndarray, scales: list[float] | None = None
+    ) -> list[tuple[float, float, float, float, str, int, int, int]]:
         """
         Multi-Scale OCR with NMS (Non-Maximum Suppression).
         1. Runs the DET model multiple times at different scales.
@@ -215,70 +225,70 @@ class RapidOCREngine:
             scales = [1.0, 2.0]
 
         import cv2
+
         all_scaled_boxes = []
-        
+
         # 1. Multi-Pass Detection
         for scale in scales:
             if scale == 1.0:
                 scaled_img = img
             else:
                 scaled_img = cv2.resize(img, None, fx=scale, fy=scale, interpolation=cv2.INTER_LANCZOS4)
-                
+
             dt_boxes = self._detect_only(scaled_img)
-            
+
             if dt_boxes is not None:
                 # Map coordinates back to scale=1.0
                 if scale != 1.0:
                     dt_boxes = dt_boxes / scale
                 all_scaled_boxes.extend(dt_boxes)
-                
+
         if not all_scaled_boxes:
             return []
-            
+
         # 2. IoU NMS Merging
         fused_boxes = self._nms_boxes(all_scaled_boxes, iou_threshold=0.3)
         if not fused_boxes:
             return []
-            
+
         # 3. Optimized REC pass (Run only once)
         # RapidOCR requires a specific format: list of numpy arrays
         # Then we create crop images based on these boxes
         fused_boxes_np = np.array(fused_boxes)
         img_crops = self._engine.get_crop_img_list(img, fused_boxes_np)
-        
+
         rec_res, _ = self._engine.text_rec(img_crops, return_word_box=False)
-        
+
         # Construct final output
         words = []
         if not rec_res:
             return words
-            
+
         word_idx = 0
         for i, (box, rec_data) in enumerate(zip(fused_boxes, rec_res)):
             if not rec_data or not rec_data[0]:
                 continue
-                
+
             text, conf = rec_data
-            
+
             x_coords = [p[0] for p in box]
             y_coords = [p[1] for p in box]
             bx0, bx1 = min(x_coords), max(x_coords)
             by0, by1 = min(y_coords), max(y_coords)
-            
+
             sub_words = _split_ocr_block(bx0, by0, bx1, by1, text)
-            
+
             for sx0, sy0, sx1, sy1, sub_text in sub_words:
-                words.append((
-                    float(sx0), float(sy0), float(sx1), float(sy1),
-                    str(sub_text), 0, i, word_idx, float(conf)
-                ))
+                words.append(
+                    (float(sx0), float(sy0), float(sx1), float(sy1), str(sub_text), 0, i, word_idx, float(conf))
+                )
                 word_idx += 1
-                
+
         return words
 
     def detect_image_words(
         self, img: np.ndarray, multi_scale: bool = False
-    ) -> List[Tuple[float, float, float, float, str, int, int, int]]:
+    ) -> list[tuple[float, float, float, float, str, int, int, int]]:
         """
         Detect words in an image and return them in PyMuPDF 'words' format.
         Wraps detect_multiscale_words for unified access.
@@ -287,8 +297,8 @@ class RapidOCREngine:
         return self.detect_multiscale_words(img, scales=scales)
 
     def force_recognize_regions(
-        self, img: np.ndarray, regions: List[Tuple[int, int, int, int]]
-    ) -> List[Tuple[float, float, float, float, str, float]]:
+        self, img: np.ndarray, regions: list[tuple[int, int, int, int]]
+    ) -> list[tuple[float, float, float, float, str, float]]:
         """
         Bypass DET (Detection) and force REC (Recognition) on specific regions.
         Useful for rescuing text blocks that are too degraded for the DET model
@@ -301,7 +311,7 @@ class RapidOCREngine:
         Returns:
             List of (x0, y0, x1, y1, text, confidence) for successfully recognized regions.
         """
-        if not self._engine or not hasattr(self._engine, 'text_rec'):
+        if not self._engine or not hasattr(self._engine, "text_rec"):
             return []
 
         # Phase 6: Dynamic Tensor Batching for REC
@@ -309,12 +319,12 @@ class RapidOCREngine:
         valid_regions = []
         for x0, y0, x1, y1 in regions:
             # Crop region
-            crop_img = img[int(y0):int(y1), int(x0):int(x1)]
+            crop_img = img[int(y0) : int(y1), int(x0) : int(x1)]
             if crop_img.size == 0 or crop_img.shape[0] < 5 or crop_img.shape[1] < 5:
                 continue
             crop_list.append(crop_img)
             valid_regions.append((x0, y0, x1, y1))
-            
+
         if not crop_list:
             return []
 
@@ -329,12 +339,13 @@ class RapidOCREngine:
                         results.append((float(x0), float(y0), float(x1), float(y1), text, float(conf)))
         except Exception as exc:
             logger.debug(f"operation: suppressed {exc}")
-            
+
         return results
 
 
 # Singleton instance for easy import
 ocr_engine = RapidOCREngine()
+
 
 def get_ocr_engine() -> RapidOCREngine:
     return ocr_engine

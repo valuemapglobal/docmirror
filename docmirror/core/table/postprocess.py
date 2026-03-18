@@ -12,16 +12,19 @@ Split from ``layout_analysis.py``.  Contains ``post_process_table``,
 ``_strip_preamble``, ``_fix_header_by_vocabulary``, ``_clean_cell``,
 ``_merge_split_rows``, ``_extract_summary_entities``, etc.
 """
-from __future__ import annotations
 
+from __future__ import annotations
 
 import logging
 import re
 from collections import defaultdict
 from typing import Dict, List, Optional, Tuple
 
-from ..utils.text_utils import normalize_table, parse_amount, _RE_DATE_COMPACT, _RE_DATE_HYPHEN, _RE_TIME, _RE_ONLY_CJK
+from ..utils.text_utils import _RE_DATE_COMPACT, _RE_DATE_HYPHEN, _RE_ONLY_CJK, _RE_TIME, normalize_table, parse_amount
 from ..utils.vocabulary import (
+    _RE_IS_AMOUNT,
+    _RE_IS_DATE,
+    _RE_VALID_DATE,
     KNOWN_HEADER_WORDS,
     VOCAB_BY_CATEGORY,
     _is_data_row,
@@ -29,21 +32,19 @@ from ..utils.vocabulary import (
     _is_junk_row,
     _normalize_for_vocab,
     _score_header_by_vocabulary,
-    _RE_IS_AMOUNT,
-    _RE_IS_DATE,
-    _RE_VALID_DATE,
 )
 
 logger = logging.getLogger(__name__)
 
-def _extract_preamble_kv(rows: List[List[str]]) -> Dict[str, str]:
+
+def _extract_preamble_kv(rows: list[list[str]]) -> dict[str, str]:
     """Extract key-value metadata pairs from pre-header rows.
 
     Rule: adjacent non-empty cells matching a (CJK label, numeric/date value)
     pattern are extracted as KV pairs.  ``None`` cells are skipped first to
     produce a compact cell list.
     """
-    kv: Dict[str, str] = {}
+    kv: dict[str, str] = {}
     for row in rows:
         # Filter out None / whitespace to get a compact non-empty cell list
         cells = [str(c).strip() for c in row if c is not None and str(c).strip()]
@@ -54,15 +55,15 @@ def _extract_preamble_kv(rows: List[List[str]]) -> Dict[str, str]:
             # key: non-empty, contains CJK, not a pure number / date
             # val: non-empty, is an amount / date / pure number
             if (
-                key and val
+                key
+                and val
                 and re.search(r"[\u4e00-\u9fff]", key)
                 and not _RE_IS_DATE.match(key)
                 and not _RE_IS_AMOUNT.match(key.replace(",", ""))
             ):
                 clean_val = val.replace(",", "").replace("\u00a5", "").replace(" ", "")
                 is_num_or_date = bool(
-                    _RE_IS_DATE.search(val) or
-                    (_RE_IS_AMOUNT.match(clean_val) if clean_val else False)
+                    _RE_IS_DATE.search(val) or (_RE_IS_AMOUNT.match(clean_val) if clean_val else False)
                 )
                 if is_num_or_date:
                     kv[key] = val
@@ -73,10 +74,10 @@ def _extract_preamble_kv(rows: List[List[str]]) -> Dict[str, str]:
 
 
 def _strip_preamble(
-    rows: List[List[str]],
-    confirmed_header: List[str],
-    categories: Optional[List[str]] = None,
-) -> List[List[str]]:
+    rows: list[list[str]],
+    confirmed_header: list[str],
+    categories: list[str] | None = None,
+) -> list[list[str]]:
     """Strip duplicate summary rows and repeated headers from the beginning
     of a continuation-page table.
 
@@ -89,11 +90,7 @@ def _strip_preamble(
         return rows
 
     # Non-empty cells of the confirmed header (normalised)
-    header_cells = {
-        _normalize_for_vocab(c).strip()
-        for c in confirmed_header
-        if c and c.strip()
-    }
+    header_cells = {_normalize_for_vocab(c).strip() for c in confirmed_header if c and c.strip()}
 
     if not categories:
         categories = ["BANK_STATEMENT"]
@@ -113,31 +110,21 @@ def _strip_preamble(
         # F-7: strip protection — cap at 5 rows to avoid data loss
         if last_header_idx > 5:
             logger.warning(
-                f"strip_preamble: vocab header at row {last_header_idx} "
-                f"(> 5 rows) \u2014 capping to avoid data loss"
+                f"strip_preamble: vocab header at row {last_header_idx} (> 5 rows) \u2014 capping to avoid data loss"
             )
             last_header_idx = 5
-        logger.debug(
-            f"strip_preamble: skip rows 0-{last_header_idx} "
-            f"(vocab repeated header at row {last_header_idx})"
-        )
-        return rows[last_header_idx + 1:]
+        logger.debug(f"strip_preamble: skip rows 0-{last_header_idx} (vocab repeated header at row {last_header_idx})")
+        return rows[last_header_idx + 1 :]
 
     # Phase 2: no duplicate header found; try header-similarity matching
     for i in range(max_scan):
         row = rows[i]
-        norm_cells = {
-            _normalize_for_vocab(c).strip()
-            for c in row if c and c.strip()
-        }
+        norm_cells = {_normalize_for_vocab(c).strip() for c in row if c and c.strip()}
         if header_cells and norm_cells:
             overlap = len(norm_cells & header_cells) / len(header_cells)
             if overlap >= 0.5:
-                logger.debug(
-                    f"strip_preamble: skip rows 0-{i} "
-                    f"(header overlap={overlap:.2f})"
-                )
-                return rows[i + 1:]
+                logger.debug(f"strip_preamble: skip rows 0-{i} (header overlap={overlap:.2f})")
+                return rows[i + 1 :]
         # Stop similarity detection once a real data row is encountered
         if _is_data_row(row):
             break
@@ -147,21 +134,21 @@ def _strip_preamble(
 
 # ── Regex patterns for semantic column split ──
 _RE_SEQ_PLUS_DESC = re.compile(
-    r'^(\d{1,6})'              # Sequence number (1-6 digits)
-    r'([^\d\s,.].*)',          # Followed by non-numeric text (the description)
+    r"^(\d{1,6})"  # Sequence number (1-6 digits)
+    r"([^\d\s,.].*)",  # Followed by non-numeric text (the description)
     re.DOTALL,
 )
 _RE_BALANCE_PLUS_TEXT = re.compile(
-    r'^([\d,]+\.\d{2})'       # Amount with 2 decimal places (e.g. 56,264.17)
-    r'([^\d\s,.].*)',          # Followed by non-numeric text (remarks)
+    r"^([\d,]+\.\d{2})"  # Amount with 2 decimal places (e.g. 56,264.17)
+    r"([^\d\s,.].*)",  # Followed by non-numeric text (remarks)
     re.DOTALL,
 )
 
 
 def _split_merged_columns(
-    header: List[str],
-    data_rows: List[List[str]],
-) -> "Tuple[List[str], List[List[str]]] | None":
+    header: list[str],
+    data_rows: list[list[str]],
+) -> tuple[list[str], list[list[str]]] | None:
     """Semantic column split: detect and repair cells where adjacent columns
     were merged due to narrow spatial gaps in the PDF.
 
@@ -191,8 +178,7 @@ def _split_merged_columns(
         # Pattern 1: 序号+摘要 — sequence number column with description appended
         if h in ("序号", "交易序号", "编号", "no", "no.", "序列号"):
             match_count = sum(
-                1 for r in data_rows
-                if ci < len(r) and r[ci] and _RE_SEQ_PLUS_DESC.match(str(r[ci]).strip())
+                1 for r in data_rows if ci < len(r) and r[ci] and _RE_SEQ_PLUS_DESC.match(str(r[ci]).strip())
             )
             if match_count > n_rows * 0.3:
                 # Find the next column — it should be the empty "摘要" target
@@ -210,8 +196,7 @@ def _split_merged_columns(
         # Look for columns where values look like "56,264.17财付通-微信支付-每天数独"
         # Trigger: check ANY column for this pattern (not just specific headers)
         match_count = sum(
-            1 for r in data_rows
-            if ci < len(r) and r[ci] and _RE_BALANCE_PLUS_TEXT.match(str(r[ci]).strip())
+            1 for r in data_rows if ci < len(r) and r[ci] and _RE_BALANCE_PLUS_TEXT.match(str(r[ci]).strip())
         )
         if match_count > n_rows * 0.3:
             # The balance portion should go to the PREVIOUS column (if mostly empty)
@@ -268,21 +253,20 @@ def _split_merged_columns(
         return None
 
     # Count how many rows were actually split
-    split_count = sum(
-        1 for orig, new in zip(data_rows, new_data_rows)
-        if orig != new
-    )
-    
+    split_count = sum(1 for orig, new in zip(data_rows, new_data_rows) if orig != new)
+
     spec_desc = ", ".join(f"col {ci}->{target_ci}" for ci, _, target_ci in split_specs)
-    logger.info(f"[TableFix] Applied semantic column split for concatenated cells (e.g. CCB format): repaired {split_count}/{n_rows} rows ({spec_desc})")
+    logger.info(
+        f"[TableFix] Applied semantic column split for concatenated cells (e.g. CCB format): repaired {split_count}/{n_rows} rows ({spec_desc})"
+    )
 
     return header, new_data_rows
 
 
 def post_process_table(
-    table_data: List[List[str]],
-    confirmed_header: Optional[List[str]] = None,
-) -> Tuple[Optional[List[List[str]]], Dict[str, str]]:
+    table_data: list[list[str]],
+    confirmed_header: list[str] | None = None,
+) -> tuple[list[list[str]] | None, dict[str, str]]:
     """General-purpose table post-processing \u2014 keyword-independent.
 
     Args:
@@ -332,7 +316,7 @@ def post_process_table(
                 return table_data, {}
 
     # ── Extract pre-header rows as KV metadata (returned, no global state) ──
-    preamble_kv: Dict[str, str] = {}
+    preamble_kv: dict[str, str] = {}
     if header_row_idx > 0:
         preamble_rows = table_data[:header_row_idx]
         preamble_kv = _extract_preamble_kv(preamble_rows)
@@ -340,7 +324,7 @@ def post_process_table(
             logger.debug(f"preamble KV extracted: {preamble_kv}")
 
     header = table_data[header_row_idx]
-    data_rows = list(table_data[header_row_idx + 1:])
+    data_rows = list(table_data[header_row_idx + 1 :])
 
     # ── Multi-row header merge: detect sub-header rows that refine spanning parent cells ──
     # Pattern: Parent  = ["Txn Date",  "Serial#",  "Amount",    "",      "Balance", "Cpty Info",  "",         "Summary", "Remarks"]
@@ -355,21 +339,11 @@ def post_process_table(
     if data_rows:
         candidate = data_rows[0]
         empty_in_header = {i for i, c in enumerate(header) if not (c or "").strip()}
-        filled_in_candidate = {
-            i for i, c in enumerate(candidate)
-            if i < len(candidate) and (c or "").strip()
-        }
+        filled_in_candidate = {i for i, c in enumerate(candidate) if i < len(candidate) and (c or "").strip()}
         # Must fill at least one empty parent cell AND not be a data row
         fills_empty = filled_in_candidate & empty_in_header
-        candidate_is_header_like = (
-            _is_header_row(candidate)
-            or _score_header_by_vocabulary(candidate) >= 1
-        )
-        if (
-            fills_empty
-            and candidate_is_header_like
-            and not _is_data_row(candidate)
-        ):
+        candidate_is_header_like = _is_header_row(candidate) or _score_header_by_vocabulary(candidate) >= 1
+        if fills_empty and candidate_is_header_like and not _is_data_row(candidate):
             merged_header = list(header)
             for i in filled_in_candidate:
                 if i < len(merged_header):
@@ -380,7 +354,6 @@ def post_process_table(
             )
             header = merged_header
             data_rows = data_rows[1:]
-
 
     # Strip preamble rows immediately after the header (summary / duplicate header),
     # regardless of which row the header is on
@@ -441,17 +414,17 @@ def post_process_table(
     # the engine splits them: cell N gets a trailing fragment like '5,'
     # and cell N+1 gets the remainder like '000,888.02'.  Detect and
     # reassemble such split numbers.
-    _RE_TRAILING_FRAG = re.compile(r'(\s+)(\d{1,3},)$')
+    _RE_TRAILING_FRAG = re.compile(r"(\s+)(\d{1,3},)$")
     for row in data_rows:
         for j in range(len(row) - 1):
             cell = (row[j] or "").strip()
             next_cell = (row[j + 1] or "").strip()
             if not cell or not next_cell:
                 continue
-            if not re.match(r'\d', next_cell):
+            if not re.match(r"\d", next_cell):
                 continue
             # Case 1: entire cell is a fragment (e.g. '5,' or '12,')
-            if re.fullmatch(r'\d{1,3},', cell):
+            if re.fullmatch(r"\d{1,3},", cell):
                 row[j] = ""
                 row[j + 1] = cell + next_cell
                 continue
@@ -459,17 +432,17 @@ def post_process_table(
             m = _RE_TRAILING_FRAG.search(cell)
             if m:
                 tail = m.group(2)
-                row[j] = cell[:m.start()].strip()
+                row[j] = cell[: m.start()].strip()
                 row[j + 1] = tail + next_cell
 
     # ── Data row cleaning: column alignment + cell cleaning ──
-    result: List[List[str]] = [header]
+    result: list[list[str]] = [header]
 
     for row in data_rows:
         if len(row) < len(header):
             row = row + [""] * (len(header) - len(row))
         elif len(row) > len(header):
-            row = row[:len(header)]
+            row = row[: len(header)]
 
         try:
             row = [_clean_cell(cell, col_name) for cell, col_name in zip(row, header)]
@@ -482,8 +455,8 @@ def post_process_table(
 
 def _find_vocab_words_in_string(
     s: str,
-    categories: Optional[List[str]] = None,
-) -> List[Tuple[str, int, int]]:
+    categories: list[str] | None = None,
+) -> list[tuple[str, int, int]]:
     """Find all known header words in a string using Aho-Corasick automaton.
 
     O(L) single-pass matching replaces the previous O(V × L) greedy search.
@@ -507,8 +480,8 @@ def _find_vocab_words_in_string(
 
 
 def _fix_header_by_vocabulary(
-    table: List[List[str]],
-) -> List[List[str]]:
+    table: list[list[str]],
+) -> list[list[str]]:
     """Vocabulary-driven header correction: fix concatenated column names
     without changing the column count or data rows.
 
@@ -548,12 +521,9 @@ def _fix_header_by_vocabulary(
     if len(new_header) > n_cols:
         new_header = new_header[:n_cols]
     elif len(new_header) < n_cols:
-        new_header += header[len(new_header):]
+        new_header += header[len(new_header) :]
 
-    logger.info(
-        f"vocab header fix: score {old_score}\u2192{len(found)}, "
-        f"header {header[:3]}\u2192{new_header[:3]}"
-    )
+    logger.info(f"vocab header fix: score {old_score}\u2192{len(found)}, header {header[:3]}\u2192{new_header[:3]}")
 
     result = [new_header] + table[1:]
     return result
@@ -568,8 +538,18 @@ def _clean_cell(cell: str, col_name: str) -> str:
     col_lower = col_name.lower()
 
     # ── F-5: account-number / ID columns — return as-is, no formatting ──
-    _ID_KEYWORDS = ["\u8d26\u53f7", "\u5361\u53f7", "\u5e8f\u53f7", "\u7f16\u53f7", "\u51ed\u8bc1", "\u6d41\u6c34\u53f7",
-                    "\u65e5\u5fd7\u53f7", "account", "\u50a8\u79cd", "\u5730\u533a"]
+    _ID_KEYWORDS = [
+        "\u8d26\u53f7",
+        "\u5361\u53f7",
+        "\u5e8f\u53f7",
+        "\u7f16\u53f7",
+        "\u51ed\u8bc1",
+        "\u6d41\u6c34\u53f7",
+        "\u65e5\u5fd7\u53f7",
+        "account",
+        "\u50a8\u79cd",
+        "\u5730\u533a",
+    ]
     if any(kw in col_lower for kw in _ID_KEYWORDS):
         return cell
 
@@ -588,12 +568,12 @@ def _clean_cell(cell: str, col_name: str) -> str:
                 date_match = _RE_DATE_HYPHEN.search(date_str)
                 # Try extracting HHMMSS from after the compact date (e.g. 20250921162345)
                 if not time_match:
-                    after_date = compact[raw_match.end():]
+                    after_date = compact[raw_match.end() :]
                     hhmmss = re.match(r"(\d{2})(\d{2})(\d{2})", after_date)
                     if hhmmss:
                         h, m, s = int(hhmmss.group(1)), int(hhmmss.group(2)), int(hhmmss.group(3))
                         if 0 <= h <= 23 and 0 <= m <= 59 and 0 <= s <= 59:
-                            time_match = type('M', (), {'group': lambda self: f"{h:02d}:{m:02d}:{s:02d}"})()\
+                            time_match = type("M", (), {"group": lambda self: f"{h:02d}:{m:02d}:{s:02d}"})()
 
         if date_match:
             # Also try finding standard time format (HH:MM:SS) from compact string
@@ -609,7 +589,6 @@ def _clean_cell(cell: str, col_name: str) -> str:
         return cleaned if cleaned else cell
 
     return cell
-
 
 
 def _extract_summary_entities(chars: list, out: dict):
@@ -637,7 +616,7 @@ def _extract_summary_entities(chars: list, out: dict):
         lines.append("".join(parts))
 
     full = "\n".join(lines)
-    for segment in re.split(r'\s{2,}|\n', full):
+    for segment in re.split(r"\s{2,}|\n", full):
         segment = segment.strip()
         if not segment:
             continue
@@ -647,7 +626,7 @@ def _extract_summary_entities(chars: list, out: dict):
 # Common KV key pattern (short CJK word + colon)
 _KV_EMBEDDED_RE = re.compile(
     r"([\u4e00-\u9fff]{2,6})"  # 2\u20136 CJK characters (key)
-    r"[\uff1a:]"                # Colon separator
+    r"[\uff1a:]"  # Colon separator
 )
 
 
@@ -691,14 +670,34 @@ def _parse_kv_segment(segment: str, out: dict):
 
 # Common KV keywords (for precise matching of embedded keys)
 _COMMON_KV_KEYWORDS = [
-    "\u5e01\u79cd", "\u6237\u540d", "\u8d26\u53f7", "\u5361\u53f7", "\u8d26\u6237", "\u7c7b\u578b", "\u65e5\u671f",
-    "\u59d3\u540d", "\u7f16\u53f7", "\u72b6\u6001", "\u5907\u6ce8", "\u6458\u8981", "\u91d1\u989d", "\u4f59\u989d",
-    "\u884c\u540d", "\u8d77\u6b62\u65e5\u671f", "\u8d77\u59cb\u65e5\u671f", "\u622a\u6b62\u65e5\u671f", "\u7ec8\u6b62\u65e5\u671f", "\u6253\u5370\u65e5\u671f",
-    "\u603b\u7b14\u6570", "\u603b\u91d1\u989d", "\u9875\u7801", "\u673a\u6784",
+    "\u5e01\u79cd",
+    "\u6237\u540d",
+    "\u8d26\u53f7",
+    "\u5361\u53f7",
+    "\u8d26\u6237",
+    "\u7c7b\u578b",
+    "\u65e5\u671f",
+    "\u59d3\u540d",
+    "\u7f16\u53f7",
+    "\u72b6\u6001",
+    "\u5907\u6ce8",
+    "\u6458\u8981",
+    "\u91d1\u989d",
+    "\u4f59\u989d",
+    "\u884c\u540d",
+    "\u8d77\u6b62\u65e5\u671f",
+    "\u8d77\u59cb\u65e5\u671f",
+    "\u622a\u6b62\u65e5\u671f",
+    "\u7ec8\u6b62\u65e5\u671f",
+    "\u6253\u5370\u65e5\u671f",
+    "\u603b\u7b14\u6570",
+    "\u603b\u91d1\u989d",
+    "\u9875\u7801",
+    "\u673a\u6784",
 ]
 
 
-def _find_embedded_kv_by_keywords(v: str) -> "int | None":
+def _find_embedded_kv_by_keywords(v: str) -> int | None:
     """Find an embedded key:value pair in a value string using known keywords.
 
     Returns the leftmost match position, preferring longer keywords to avoid
@@ -719,7 +718,7 @@ def _find_embedded_kv_by_keywords(v: str) -> "int | None":
     return best_pos
 
 
-def _find_embedded_kv_by_colon_scan(v: str) -> "int | None":
+def _find_embedded_kv_by_colon_scan(v: str) -> int | None:
     """Scan colon positions and check whether 2\u20134 CJK characters precede
     the colon (suspected embedded key)."""
     best_pos = None
@@ -732,7 +731,7 @@ def _find_embedded_kv_by_colon_scan(v: str) -> "int | None":
             # Count CJK characters before the colon
             cjk_before = 0
             scan = idx - 1
-            while scan >= 0 and '\u4e00' <= v[scan] <= '\u9fff':
+            while scan >= 0 and "\u4e00" <= v[scan] <= "\u9fff":
                 cjk_before += 1
                 scan -= 1
             # 2\u20134 CJK chars + preceding non-CJK content \u2192 possibly an embedded key

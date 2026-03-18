@@ -25,16 +25,16 @@ Only **parsing artifacts** reduce the score. Document characteristics
     6. Whitespace Anomaly — Excessive inter-character spacing
     7. Text Truncation — Text ending mid-word without punctuation
 """
-from __future__ import annotations
 
+from __future__ import annotations
 
 import logging
 import re
 import unicodedata
 from typing import Any, Dict, List, Optional, Set
 
+from ...models.entities.parse_result import ParseResult, TableBlock, TrustResult
 from ..base import BaseMiddleware
-from ...models.entities.parse_result import ParseResult, TrustResult, TableBlock
 
 logger = logging.getLogger(__name__)
 
@@ -44,30 +44,24 @@ logger = logging.getLogger(__name__)
 # ══════════════════════════════════════════════════════════════════
 
 _RE_GARBLED = re.compile(
-    r'[\ufffd\ufffe\uffff]|'
-    r'[\x00-\x08\x0b\x0c\x0e-\x1f]'
+    r"[\ufffd\ufffe\uffff]|"
+    r"[\x00-\x08\x0b\x0c\x0e-\x1f]"
 )
 
-_RE_CHAR_SPACED = re.compile(
-    r'(?:\S\s){3,}\S'
-)
+_RE_CHAR_SPACED = re.compile(r"(?:\S\s){3,}\S")
 
-_RE_CJK = re.compile(
-    r'[\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff]'
-)
+_RE_CJK = re.compile(r"[\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff]")
 
-_RE_SENTENCE_END = re.compile(
-    r'[.!?。！？；;:：\-—)\]》）】」』\d%‰]$'
-)
+_RE_SENTENCE_END = re.compile(r"[.!?。！？；;:：\-—)\]》）】」』\d%‰]$")
 
 _PENALTY_CAPS = {
-    "column_misalignment":  0.25,
-    "encoding_errors":      0.20,
-    "page_loss":            0.15,
-    "duplicate_rows":       0.15,
-    "header_repetition":    0.10,
-    "whitespace_anomaly":   0.10,
-    "text_truncation":      0.05,
+    "column_misalignment": 0.25,
+    "encoding_errors": 0.20,
+    "page_loss": 0.15,
+    "duplicate_rows": 0.15,
+    "header_repetition": 0.10,
+    "whitespace_anomaly": 0.10,
+    "text_truncation": 0.05,
 }
 
 
@@ -81,7 +75,7 @@ class Validator(BaseMiddleware):
 
     def __init__(
         self,
-        config: Optional[Dict[str, Any]] = None,
+        config: dict[str, Any] | None = None,
         pass_threshold: float = 0.7,
     ):
         super().__init__(config)
@@ -90,9 +84,9 @@ class Validator(BaseMiddleware):
     def process(self, result: ParseResult) -> ParseResult:
         """Assess mirror fidelity of the parsed document."""
         # ─── Collect data directly from ParseResult ───
-        tables: List[TableBlock] = result.all_tables()
-        all_text_content: List[str] = []
-        block_pages: Set[int] = set()
+        tables: list[TableBlock] = result.all_tables()
+        all_text_content: list[str] = []
+        block_pages: set[int] = set()
         total_page_count = result.page_count
 
         for page in result.pages:
@@ -121,64 +115,50 @@ class Validator(BaseMiddleware):
         table_arrays = self._tables_to_arrays(tables)
 
         # ─── Detect all 7 artifact categories ───
-        details: Dict[str, float] = {}
-        penalties: Dict[str, float] = {}
+        details: dict[str, float] = {}
+        penalties: dict[str, float] = {}
 
         # 1. Column Misalignment
         score = self._check_column_alignment(table_arrays)
         details["column_alignment"] = score
         if score < 1.0:
-            penalties["column_misalignment"] = round(
-                (1.0 - score) * _PENALTY_CAPS["column_misalignment"], 4
-            )
+            penalties["column_misalignment"] = round((1.0 - score) * _PENALTY_CAPS["column_misalignment"], 4)
 
         # 2. Encoding Errors
         score = self._check_encoding_fidelity(all_text_content)
         details["encoding_fidelity"] = score
         if score < 1.0:
-            penalties["encoding_errors"] = round(
-                (1.0 - score) * _PENALTY_CAPS["encoding_errors"], 4
-            )
+            penalties["encoding_errors"] = round((1.0 - score) * _PENALTY_CAPS["encoding_errors"], 4)
 
         # 3. Page Loss
         score = self._check_page_coverage(block_pages, total_page_count)
         details["page_coverage"] = score
         if score < 1.0:
-            penalties["page_loss"] = round(
-                (1.0 - score) * _PENALTY_CAPS["page_loss"], 4
-            )
+            penalties["page_loss"] = round((1.0 - score) * _PENALTY_CAPS["page_loss"], 4)
 
         # 4. Duplicate Rows
         score = self._check_duplicate_rows(table_arrays)
         details["row_uniqueness"] = score
         if score < 1.0:
-            penalties["duplicate_rows"] = round(
-                (1.0 - score) * _PENALTY_CAPS["duplicate_rows"], 4
-            )
+            penalties["duplicate_rows"] = round((1.0 - score) * _PENALTY_CAPS["duplicate_rows"], 4)
 
         # 5. Header Repetition
         score = self._check_header_repetition(table_arrays)
         details["header_uniqueness"] = score
         if score < 1.0:
-            penalties["header_repetition"] = round(
-                (1.0 - score) * _PENALTY_CAPS["header_repetition"], 4
-            )
+            penalties["header_repetition"] = round((1.0 - score) * _PENALTY_CAPS["header_repetition"], 4)
 
         # 6. Whitespace Anomaly
         score = self._check_whitespace_anomaly(all_text_content)
         details["whitespace_fidelity"] = score
         if score < 1.0:
-            penalties["whitespace_anomaly"] = round(
-                (1.0 - score) * _PENALTY_CAPS["whitespace_anomaly"], 4
-            )
+            penalties["whitespace_anomaly"] = round((1.0 - score) * _PENALTY_CAPS["whitespace_anomaly"], 4)
 
         # 7. Text Truncation
         score = self._check_text_truncation(all_text_content)
         details["text_completeness"] = score
         if score < 1.0:
-            penalties["text_truncation"] = round(
-                (1.0 - score) * _PENALTY_CAPS["text_truncation"], 4
-            )
+            penalties["text_truncation"] = round((1.0 - score) * _PENALTY_CAPS["text_truncation"], 4)
 
         # ─── Composite mirror fidelity ───
         total_penalty = min(1.0, sum(penalties.values()))
@@ -194,9 +174,7 @@ class Validator(BaseMiddleware):
                 **details,
                 "penalties": penalties,
                 "threshold": self.pass_threshold,
-                "row_count": sum(
-                    max(0, len(t) - 1) for t in table_arrays
-                ) if table_arrays else 0,
+                "row_count": sum(max(0, len(t) - 1) for t in table_arrays) if table_arrays else 0,
             },
         )
 
@@ -210,10 +188,7 @@ class Validator(BaseMiddleware):
             reason=f"mirror fidelity: penalties={penalties}",
         )
 
-        logger.info(
-            f"[Validator] fidelity={total_score:.3f} | "
-            f"passed={passed} | penalties={penalties}"
-        )
+        logger.info(f"[Validator] fidelity={total_score:.3f} | passed={passed} | penalties={penalties}")
 
         return result
 
@@ -222,13 +197,13 @@ class Validator(BaseMiddleware):
     # ════════════════════════════════════════════════════════════════
 
     @staticmethod
-    def _tables_to_arrays(tables: List[TableBlock]) -> List[List[List[str]]]:
+    def _tables_to_arrays(tables: list[TableBlock]) -> list[list[list[str]]]:
         """Convert typed TableBlocks to 2D string arrays for checks."""
         arrays = []
         for table in tables:
             if not table.headers and not table.rows:
                 continue
-            array: List[List[str]] = []
+            array: list[list[str]] = []
             if table.headers:
                 array.append(table.headers)
             for row in table.rows:
@@ -241,7 +216,7 @@ class Validator(BaseMiddleware):
     # ════════════════════════════════════════════════════════════════
 
     @staticmethod
-    def _check_column_alignment(tables: List[List[List[str]]]) -> float:
+    def _check_column_alignment(tables: list[list[list[str]]]) -> float:
         total = 0
         aligned = 0
         for table in tables:
@@ -255,7 +230,7 @@ class Validator(BaseMiddleware):
         return aligned / total if total > 0 else 1.0
 
     @staticmethod
-    def _check_encoding_fidelity(texts: List[str]) -> float:
+    def _check_encoding_fidelity(texts: list[str]) -> float:
         total_chars = 0
         garbled_chars = 0
         for text in texts:
@@ -272,7 +247,7 @@ class Validator(BaseMiddleware):
         return max(0.0, 1.0 - garbled_ratio * 20)
 
     @staticmethod
-    def _check_page_coverage(block_pages: Set[int], total: int) -> float:
+    def _check_page_coverage(block_pages: set[int], total: int) -> float:
         if total <= 1:
             return 1.0
         if not block_pages:
@@ -280,7 +255,7 @@ class Validator(BaseMiddleware):
         return len(block_pages) / total
 
     @staticmethod
-    def _check_duplicate_rows(tables: List[List[List[str]]]) -> float:
+    def _check_duplicate_rows(tables: list[list[list[str]]]) -> float:
         total = 0
         duplicates = 0
         for table in tables:
@@ -292,7 +267,7 @@ class Validator(BaseMiddleware):
         return (total - duplicates) / total if total > 0 else 1.0
 
     @staticmethod
-    def _check_header_repetition(tables: List[List[List[str]]]) -> float:
+    def _check_header_repetition(tables: list[list[list[str]]]) -> float:
         total = 0
         repeated = 0
         for table in tables:
@@ -308,7 +283,7 @@ class Validator(BaseMiddleware):
         return (total - repeated) / total if total > 0 else 1.0
 
     @staticmethod
-    def _check_whitespace_anomaly(texts: List[str]) -> float:
+    def _check_whitespace_anomaly(texts: list[str]) -> float:
         total_segments = 0
         anomalous_segments = 0
         for text in texts:
@@ -317,20 +292,17 @@ class Validator(BaseMiddleware):
             total_segments += 1
             if _RE_CHAR_SPACED.search(text):
                 anomalous_segments += 1
-        return (
-            (total_segments - anomalous_segments) / total_segments
-            if total_segments > 0 else 1.0
-        )
+        return (total_segments - anomalous_segments) / total_segments if total_segments > 0 else 1.0
 
     @staticmethod
-    def _check_text_truncation(texts: List[str]) -> float:
+    def _check_text_truncation(texts: list[str]) -> float:
         checked = 0
         truncated = 0
         for text in texts:
             if not text:
                 continue
             stripped = text.strip()
-            if len(stripped) < 10 or ' ' not in stripped:
+            if len(stripped) < 10 or " " not in stripped:
                 continue
             checked += 1
             if not _RE_SENTENCE_END.search(stripped):

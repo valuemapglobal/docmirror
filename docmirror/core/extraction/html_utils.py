@@ -7,6 +7,7 @@
 """
 HTML utility functions for extraction.
 """
+
 from __future__ import annotations
 
 import re
@@ -34,7 +35,7 @@ def strip_html_to_plain_text(html_text: str, drop_tables: bool = False) -> str:
     return text
 
 
-def parse_html_tables_to_key_value(html_text: str) -> Optional[Dict[str, str]]:
+def parse_html_tables_to_key_value(html_text: str) -> dict[str, str] | None:
     """Parse two-column HTML <table> in text into a single key-value dict.
 
     Used when external OCR returns markdown/HTML with <table>…</table> so we
@@ -49,7 +50,7 @@ def parse_html_tables_to_key_value(html_text: str) -> Optional[Dict[str, str]]:
     cells = [c.strip() for c in cells if c.strip()]
     if len(cells) < 2:
         return None
-    out: Dict[str, str] = {}
+    out: dict[str, str] = {}
     for i in range(0, len(cells) - 1, 2):
         k, v = cells[i], cells[i + 1]
         if k:

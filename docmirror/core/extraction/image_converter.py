@@ -7,6 +7,7 @@
 """
 Image to Virtual PDF Converter
 """
+
 from __future__ import annotations
 
 import logging
@@ -15,7 +16,7 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 
-def image_to_virtual_pdf(image_path: Path) -> "fitz.Document":
+def image_to_virtual_pdf(image_path: Path) -> fitz.Document:
     """Convert image to a virtual single-page PDF, pre-scaling large images to max 4096px."""
     import fitz
 
@@ -31,7 +32,7 @@ def image_to_virtual_pdf(image_path: Path) -> "fitz.Document":
         max_dim = 4096
         if max(w, h) > max_dim:
             scale = max_dim / max(w, h)
-            logger.info(f"[DocMirror] Image pre-scaled: {w:.0f}x{h:.0f} -> {w*scale:.0f}x{h*scale:.0f}")
+            logger.info(f"[DocMirror] Image pre-scaled: {w:.0f}x{h:.0f} -> {w * scale:.0f}x{h * scale:.0f}")
             # use pixmap scaling
             mat = fitz.Matrix(scale, scale)
             pix = page.get_pixmap(matrix=mat)

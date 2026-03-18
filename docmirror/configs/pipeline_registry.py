@@ -38,16 +38,17 @@ Usage::
     # ['SceneDetector', 'EntityExtractor', 'InstitutionDetector',
     #  'Validator']
 """
+
 from __future__ import annotations
 
-from typing import Dict, List
 import logging
+from typing import Dict, List
 
 logger = logging.getLogger(__name__)
 
 
 # File format → { enhance_mode → ordered list of middleware class names }
-FORMAT_PIPELINES: Dict[str, Dict[str, List[str]]] = {
+FORMAT_PIPELINES: dict[str, dict[str, list[str]]] = {
     "pdf": {
         "raw": [],
         "standard": [
@@ -85,7 +86,7 @@ FORMAT_PIPELINES: Dict[str, Dict[str, List[str]]] = {
 }
 
 
-def get_pipeline_config(file_type: str, enhance_mode: str = "standard") -> List[str]:
+def get_pipeline_config(file_type: str, enhance_mode: str = "standard") -> list[str]:
     """
     Get the ordered middleware list for a given format and enhancement mode.
 
@@ -104,5 +105,7 @@ def get_pipeline_config(file_type: str, enhance_mode: str = "standard") -> List[
     """
     fmt_config = FORMAT_PIPELINES.get(file_type, FORMAT_PIPELINES.get("*", {}))
     middlewares = fmt_config.get(enhance_mode, fmt_config.get("standard", []))
-    logger.info(f"[Config] Loaded pipeline configuration: format='{file_type}', mode='{enhance_mode}' -> {len(middlewares)} middlewares activated")
+    logger.info(
+        f"[Config] Loaded pipeline configuration: format='{file_type}', mode='{enhance_mode}' -> {len(middlewares)} middlewares activated"
+    )
     return middlewares

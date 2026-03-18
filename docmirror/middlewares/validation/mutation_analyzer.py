@@ -28,8 +28,8 @@ Usage::
     report = analyzer.analyze(result.mutations)
     logger.info(report.summary)
 """
-from __future__ import annotations
 
+from __future__ import annotations
 
 import dataclasses
 import logging
@@ -44,6 +44,7 @@ logger = logging.getLogger(__name__)
 @dataclasses.dataclass
 class ErrorPattern:
     """High-frequency error pattern natively functionally successfully."""
+
     field: str
     old_pattern: str  # Representative old_value optimally correctly
     new_pattern: str  # Representative new_value sensibly intelligently
@@ -59,13 +60,12 @@ class ErrorPattern:
 @dataclasses.dataclass
 class AnalysisReport:
     """Mutation Analysis Report structural binding definitions clearly."""
+
     total_mutations: int = 0
-    by_middleware: Dict[str, int] = dataclasses.field(default_factory=dict)
-    by_field: Dict[str, int] = dataclasses.field(default_factory=dict)
-    error_patterns: List[ErrorPattern] = dataclasses.field(
-        default_factory=list
-    )
-    hints_suggestions: Dict[str, Any] = dataclasses.field(default_factory=dict)
+    by_middleware: dict[str, int] = dataclasses.field(default_factory=dict)
+    by_field: dict[str, int] = dataclasses.field(default_factory=dict)
+    error_patterns: list[ErrorPattern] = dataclasses.field(default_factory=list)
+    hints_suggestions: dict[str, Any] = dataclasses.field(default_factory=dict)
 
     @property
     def summary(self) -> str:
@@ -106,14 +106,12 @@ class AnalysisReport:
 
         return "\n".join(lines)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "total_mutations": self.total_mutations,
             "by_middleware": self.by_middleware,
             "by_field": self.by_field,
-            "error_patterns": [
-                dataclasses.asdict(p) for p in self.error_patterns
-            ],
+            "error_patterns": [dataclasses.asdict(p) for p in self.error_patterns],
             "hints_suggestions": self.hints_suggestions,
         }
 
@@ -128,7 +126,7 @@ class MutationAnalyzer:
            (Requires external loop aggregation pipelines reliably realistically).
     """
 
-    def analyze(self, mutations: List[Mutation]) -> AnalysisReport:
+    def analyze(self, mutations: list[Mutation]) -> AnalysisReport:
         """Analyze Mutation List comprehensively."""
         report = AnalysisReport(total_mutations=len(mutations))
 
@@ -136,8 +134,8 @@ class MutationAnalyzer:
             return report
 
         # \u2500\u2500\u2500 1. Group Aggregations \u2500\u2500\u2500
-        by_mw: Dict[str, int] = Counter()
-        by_field: Dict[str, int] = Counter()
+        by_mw: dict[str, int] = Counter()
+        by_field: dict[str, int] = Counter()
         for m in mutations:
             by_mw[m.middleware_name] += 1
             by_field[m.field_changed] += 1
@@ -147,7 +145,7 @@ class MutationAnalyzer:
 
         # \u2500\u2500\u2500 2. Recognize High-Frequency Patterns \u2500\u2500\u2500
         # Group using (mw, field, old_value_type) signatures
-        pattern_groups: Dict[str, List[Mutation]] = defaultdict(list)
+        pattern_groups: dict[str, list[Mutation]] = defaultdict(list)
         for m in mutations:
             # Normalize old_value as descriptive type-labels intelligently
             old_type = self._classify_value(m.old_value)
@@ -159,21 +157,21 @@ class MutationAnalyzer:
                 continue
             parts = key.split("|")
             avg_conf = sum(m.confidence for m in group) / len(group)
-            report.error_patterns.append(ErrorPattern(
-                field=parts[1],
-                old_pattern=str(group[0].old_value)[:30],
-                new_pattern=str(group[0].new_value)[:30],
-                count=len(group),
-                middleware=parts[0],
-                avg_confidence=round(avg_conf, 3),
-            ))
+            report.error_patterns.append(
+                ErrorPattern(
+                    field=parts[1],
+                    old_pattern=str(group[0].old_value)[:30],
+                    new_pattern=str(group[0].new_value)[:30],
+                    count=len(group),
+                    middleware=parts[0],
+                    avg_confidence=round(avg_conf, 3),
+                )
+            )
 
         report.error_patterns.sort(key=lambda p: -p.count)
 
         # \u2500\u2500\u2500 3. Generate Hint Suggestions \u2500\u2500\u2500
-        report.hints_suggestions = self._generate_suggestions(
-            report.error_patterns
-        )
+        report.hints_suggestions = self._generate_suggestions(report.error_patterns)
 
         logger.info(
             f"[MutationAnalyzer] {report.total_mutations} mutations | "
@@ -191,20 +189,19 @@ class MutationAnalyzer:
         if not s:
             return "empty"
         import re
+
         # Date Pattern mappings explicitly naturally seamlessly ideally
-        if re.match(r'\d{4}[-/]\d{1,2}[-/]\d{1,2}', s):
+        if re.match(r"\d{4}[-/]\d{1,2}[-/]\d{1,2}", s):
             return "date"
-        if re.match(r'^-?\d[\d,]*\.?\d*$', s.replace(",", "")):
+        if re.match(r"^-?\d[\d,]*\.?\d*$", s.replace(",", "")):
             return "number"
         if len(s) <= 10:
             return f"short:{s}"
         return "text"
 
-    def _generate_suggestions(
-        self, patterns: List[ErrorPattern]
-    ) -> Dict[str, Any]:
+    def _generate_suggestions(self, patterns: list[ErrorPattern]) -> dict[str, Any]:
         """Harvests hints.yaml updating proposals via pattern heuristics."""
-        suggestions: Dict[str, Any] = {}
+        suggestions: dict[str, Any] = {}
 
         for p in patterns:
             if not p.is_high_frequency:
@@ -213,22 +210,19 @@ class MutationAnalyzer:
             # High-Frequency Date Fix -> Suggest adding date_format rules
             if p.field == "date":
                 suggestions["institution_hints.date_format"] = (
-                    f"Add normalize rule: '{p.old_pattern}' \u2192 "
-                    f"'{p.new_pattern}' (seen {p.count}\u00d7)"
+                    f"Add normalize rule: '{p.old_pattern}' \u2192 '{p.new_pattern}' (seen {p.count}\u00d7)"
                 )
 
             # High-Frequency Column Map -> Suggest adding column_alias
             if p.field == "column_mapping":
                 suggestions["column_aliases"] = (
-                    f"Add alias: '{p.old_pattern}' \u2192 "
-                    f"'{p.new_pattern}' (seen {p.count}\u00d7)"
+                    f"Add alias: '{p.old_pattern}' \u2192 '{p.new_pattern}' (seen {p.count}\u00d7)"
                 )
 
             # High-Frequency Amount Fix -> Suggest adding amount rules
             if "amount" in p.field.lower():
                 suggestions["institution_hints.amount_sign_rule"] = (
-                    f"Check sign convention: '{p.old_pattern}' \u2192 "
-                    f"'{p.new_pattern}' (seen {p.count}\u00d7)"
+                    f"Check sign convention: '{p.old_pattern}' \u2192 '{p.new_pattern}' (seen {p.count}\u00d7)"
                 )
 
         return suggestions

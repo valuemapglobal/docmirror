@@ -5,8 +5,8 @@
 # LICENSE file in the root directory of this source tree.
 
 """Shared utility functions split from table_extraction.py."""
-from __future__ import annotations
 
+from __future__ import annotations
 
 import bisect
 import logging
@@ -17,10 +17,10 @@ from ...utils.text_utils import _is_cjk_char, _smart_join
 logger = logging.getLogger(__name__)
 
 
-
 # ── Shared utility functions ──
 
-def _adaptive_row_tolerance(chars: List[Dict]) -> float:
+
+def _adaptive_row_tolerance(chars: list[dict]) -> float:
     """F-1: Calculate adaptive y-tolerance for row grouping.
 
     Based on the median character height, dynamically adjusts the tolerance
@@ -34,8 +34,9 @@ def _adaptive_row_tolerance(chars: List[Dict]) -> float:
     if not chars or len(chars) < 5:
         return 3.0
 
-    heights = [c["bottom"] - c["top"] for c in chars
-               if c.get("bottom", 0) > c.get("top", 0) and c["bottom"] - c["top"] < 30]
+    heights = [
+        c["bottom"] - c["top"] for c in chars if c.get("bottom", 0) > c.get("top", 0) and c["bottom"] - c["top"] < 30
+    ]
     if not heights:
         return 3.0
 
@@ -46,9 +47,7 @@ def _adaptive_row_tolerance(chars: List[Dict]) -> float:
     return tol
 
 
-def _group_chars_into_rows(
-    chars: List[Dict], y_tolerance: float = 3.0
-) -> List[Tuple[float, List[Dict]]]:
+def _group_chars_into_rows(chars: list[dict], y_tolerance: float = 3.0) -> list[tuple[float, list[dict]]]:
     """Group characters into rows by y-coordinate proximity.
 
     F-1 enhancement: when ``y_tolerance <= 0``, automatically uses
@@ -62,8 +61,8 @@ def _group_chars_into_rows(
         y_tolerance = _adaptive_row_tolerance(chars)
 
     sorted_chars = sorted(chars, key=lambda c: c["top"])
-    rows: List[Tuple[float, List[Dict]]] = []
-    current_row: List[Dict] = [sorted_chars[0]]
+    rows: list[tuple[float, list[dict]]] = []
+    current_row: list[dict] = [sorted_chars[0]]
     current_y = sorted_chars[0]["top"]
 
     for c in sorted_chars[1:]:
@@ -83,8 +82,8 @@ def _group_chars_into_rows(
 
 
 def _cluster_x_positions(
-    x_coords: List[float], gap_multiplier: float = 2.0, min_col_width: float = 10.0
-) -> List[Tuple[float, float]]:
+    x_coords: list[float], gap_multiplier: float = 2.0, min_col_width: float = 10.0
+) -> list[tuple[float, float]]:
     """X-coordinate clustering: find column boundaries.
 
     Optimisation 3: uses an IQR-inspired adaptive threshold (natural-break)
@@ -99,7 +98,7 @@ def _cluster_x_positions(
     if len(sorted_x) < 2:
         return [(sorted_x[0], sorted_x[0] + 50)]
 
-    gaps = [sorted_x[i+1] - sorted_x[i] for i in range(len(sorted_x) - 1)]
+    gaps = [sorted_x[i + 1] - sorted_x[i] for i in range(len(sorted_x) - 1)]
     non_zero_gaps = sorted(g for g in gaps if g > 0.5)
 
     if not non_zero_gaps:
@@ -132,7 +131,7 @@ def _cluster_x_positions(
         # Too few data points: fall back to original logic
         threshold = median_gap * gap_multiplier
 
-    col_bounds: List[Tuple[float, float]] = []
+    col_bounds: list[tuple[float, float]] = []
     col_start = sorted_x[0]
 
     for i, gap in enumerate(gaps):
@@ -149,9 +148,7 @@ def _cluster_x_positions(
     return col_bounds
 
 
-def _assign_chars_to_columns(
-    row_chars: List[Dict], col_bounds: List[Tuple[float, float]]
-) -> List[str]:
+def _assign_chars_to_columns(row_chars: list[dict], col_bounds: list[tuple[float, float]]) -> list[str]:
     """Assign a row's characters to column bins using divider midpoints.
 
     Divider lines are placed at the midpoint between adjacent column
@@ -175,6 +172,7 @@ def _assign_chars_to_columns(
     sorted_chars = sorted(row_chars, key=lambda x: x["x0"])
     words = []
     curr_word = None
+
     def is_cjk(ch):
         return _is_cjk_char(ch)
 
@@ -188,7 +186,7 @@ def _assign_chars_to_columns(
             is_prev_cjk = _is_cjk_char(curr_word["text"][-1]) if curr_word["text"] else False
             is_curr_cjk = _is_cjk_char(c["text"])
             threshold = 5.0 if (is_prev_cjk or is_curr_cjk) else 2.5
-            
+
             if gap < threshold:
                 curr_word["x1"] = max(curr_word["x1"], c.get("x1", c["x0"]))
                 curr_word["text"] += c["text"]
@@ -217,14 +215,14 @@ def _assign_chars_to_columns(
     return [cell.strip() for cell in cells]
 
 
-def _chars_to_text(chars: List[Dict]) -> str:
+def _chars_to_text(chars: list[dict]) -> str:
     """Merge a list of character dicts into a single text string."""
     if not chars:
         return ""
     sorted_c = sorted(chars, key=lambda c: c["x0"])
     parts = [sorted_c[0].get("text", "")]
     for i in range(1, len(sorted_c)):
-        gap = sorted_c[i]["x0"] - sorted_c[i-1].get("x1", sorted_c[i-1]["x0"])
+        gap = sorted_c[i]["x0"] - sorted_c[i - 1].get("x1", sorted_c[i - 1]["x0"])
         if gap > 3:
             parts.append(" ")
         parts.append(sorted_c[i].get("text", ""))

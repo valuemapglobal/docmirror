@@ -14,8 +14,8 @@ Design principles:
     - PipelineExecutor provides per-middleware exception isolation.
     - All data transformations are recorded via Mutations on ParseResult.
 """
-from __future__ import annotations
 
+from __future__ import annotations
 
 import concurrent.futures
 import logging
@@ -23,8 +23,8 @@ import time
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
 
-from ..models.entities.parse_result import ParseResult
 from ..core.exceptions import MiddlewareError
+from ..models.entities.parse_result import ParseResult
 
 logger = logging.getLogger(__name__)
 
@@ -46,10 +46,10 @@ class BaseMiddleware(ABC):
     """
 
     # ── Causal Dependency Declarations ──
-    DEPENDS_ON: List[str] = []   # Middleware names that must run before this one
-    PROVIDES: List[str] = []     # Data keys this middleware contributes
+    DEPENDS_ON: list[str] = []  # Middleware names that must run before this one
+    PROVIDES: list[str] = []  # Data keys this middleware contributes
 
-    def __init__(self, config: Optional[Dict[str, Any]] = None):
+    def __init__(self, config: dict[str, Any] | None = None):
         self.config = config or {}
         self._name = self.__class__.__name__
 
@@ -97,7 +97,7 @@ class MiddlewarePipeline:
 
     def execute(
         self,
-        middlewares: List[BaseMiddleware],
+        middlewares: list[BaseMiddleware],
         result: ParseResult,
     ) -> ParseResult:
         """
@@ -115,10 +115,7 @@ class MiddlewarePipeline:
         Returns:
             The processed ParseResult.
         """
-        logger.info(
-            f"[Middleware] Pipeline \u25b6 {len(middlewares)} middlewares: "
-            f"{[m.name for m in middlewares]}"
-        )
+        logger.info(f"[Middleware] Pipeline \u25b6 {len(middlewares)} middlewares: {[m.name for m in middlewares]}")
 
         # ── Validate causal ordering (Deutsch V5) ──
         seen: set = set()
@@ -131,7 +128,7 @@ class MiddlewarePipeline:
                     )
             seen.add(mw.name)
 
-        step_timings: Dict[str, float] = {}
+        step_timings: dict[str, float] = {}
 
         # ── T4-1: Group into parallel batches ──
         # Batch = set of middlewares whose DEPENDS_ON are all in `completed` set
@@ -153,8 +150,7 @@ class MiddlewarePipeline:
             if not batch:
                 # Circular dependency or bug — run remaining sequentially
                 logger.warning(
-                    f"[DocMirror] ⚠ Pipeline: unsatisfied deps for "
-                    f"{[m.name for m in remaining]}, running sequentially"
+                    f"[DocMirror] ⚠ Pipeline: unsatisfied deps for {[m.name for m in remaining]}, running sequentially"
                 )
                 batch = remaining
                 remaining = []
@@ -186,7 +182,7 @@ class MiddlewarePipeline:
         self,
         mw: BaseMiddleware,
         result: ParseResult,
-        step_timings: Dict[str, float],
+        step_timings: dict[str, float],
     ) -> None:
         """Execute a single middleware sequentially (original path)."""
         if mw.should_skip(result):
@@ -206,32 +202,27 @@ class MiddlewarePipeline:
                 result.entities = result_new.entities
             elapsed = (time.time() - t0) * 1000
             step_timings[mw.name] = round(elapsed, 1)
-            num_mutations = sum(
-                1 for m in result.mutations if m.middleware_name == mw.name
-            )
-            logger.info(
-                f"[Middleware] {mw.name} \u25c0 {elapsed:.0f}ms | "
-                f"mutations=+{num_mutations}"
-            )
+            num_mutations = sum(1 for m in result.mutations if m.middleware_name == mw.name)
+            logger.info(f"[Middleware] {mw.name} \u25c0 {elapsed:.0f}ms | mutations=+{num_mutations}")
         except Exception as e:
             elapsed = (time.time() - t0) * 1000
             step_timings[mw.name] = round(elapsed, 1)
             from ..core.exceptions import MiddlewareError
-            mw_error = MiddlewareError(
-                str(e), middleware_name=mw.name
-            )
+
+            mw_error = MiddlewareError(str(e), middleware_name=mw.name)
             logger.warning(f"[Middleware] {mw_error}", exc_info=True)
             result.add_error(str(mw_error))
             if self.fail_strategy == "abort":
                 logger.warning(f"[Middleware] Pipeline aborted at {mw.name}")
                 from ..models.entities.parse_result import ResultStatus
+
                 result.status = ResultStatus.FAILURE
 
     def _run_parallel_batch(
         self,
-        batch: List[BaseMiddleware],
+        batch: list[BaseMiddleware],
         result: ParseResult,
-        step_timings: Dict[str, float],
+        step_timings: dict[str, float],
         remaining: list,
     ) -> None:
         """Execute a batch of independent middlewares in parallel threads.
@@ -241,9 +232,7 @@ class MiddlewarePipeline:
         """
         import threading
 
-        logger.debug(
-            f"[Middleware] T4-1: parallel batch: {[m.name for m in batch]}"
-        )
+        logger.debug(f"[Middleware] T4-1: parallel batch: {[m.name for m in batch]}")
 
         _lock = threading.Lock()
 
@@ -261,10 +250,7 @@ class MiddlewarePipeline:
                     m.process(result)
                 elapsed = (time.time() - t0) * 1000
                 with _lock:
-                    num_mut = sum(
-                        1 for mut in result.mutations
-                        if mut.middleware_name == m.name
-                    )
+                    num_mut = sum(1 for mut in result.mutations if mut.middleware_name == m.name)
                 return (m.name, num_mut, elapsed, None)
             except Exception as e:
                 elapsed = (time.time() - t0) * 1000
@@ -278,24 +264,19 @@ class MiddlewarePipeline:
                     step_timings[name] = round(elapsed, 1)
                     if error:
                         from ..core.exceptions import MiddlewareError
-                        mw_error = MiddlewareError(
-                            str(error), middleware_name=name
-                        )
+
+                        mw_error = MiddlewareError(str(error), middleware_name=name)
                         logger.warning(f"[Middleware] {mw_error}", exc_info=True)
                         result.add_error(str(mw_error))
                         if self.fail_strategy == "abort":
-                            logger.warning(
-                                f"[Middleware] Pipeline aborted at {name}"
-                            )
+                            logger.warning(f"[Middleware] Pipeline aborted at {name}")
                             from ..models.entities.parse_result import ResultStatus
+
                             result.status = ResultStatus.FAILURE
                             remaining.clear()
                             break
                     elif elapsed > 0:
-                        logger.info(
-                            f"[Middleware] {name} ◀ {elapsed:.0f}ms | "
-                            f"mutations=+{num_mut}"
-                        )
+                        logger.info(f"[Middleware] {name} ◀ {elapsed:.0f}ms | mutations=+{num_mut}")
                     else:
                         logger.info(f"[Middleware] {name} ⏭ skipped")
         except Exception as e:

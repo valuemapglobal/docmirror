@@ -12,6 +12,7 @@ Two preprocessing strategies for scanned document images:
   - **Strategy A (full)**: Heavy preprocessing with binarisation.
   - **Strategy B (minimal)**: Light preprocessing preserving gradients.
 """
+
 from __future__ import annotations
 
 import logging
@@ -25,7 +26,7 @@ try:
     import numpy as np
 except ImportError:
     cv2 = None  # type: ignore
-    np = None   # type: ignore
+    np = None  # type: ignore
 
 
 def _base_preprocess(img_bgr):
@@ -49,14 +50,20 @@ def _base_preprocess(img_bgr):
         scale = 0
     if scale > 0:
         img_bgr = cv2.resize(
-            img_bgr, None, fx=scale, fy=scale,
+            img_bgr,
+            None,
+            fx=scale,
+            fy=scale,
             interpolation=cv2.INTER_LANCZOS4,
         )
-        sharp_kernel = np.array([
-            [0, -0.5, 0],
-            [-0.5, 3, -0.5],
-            [0, -0.5, 0],
-        ], dtype=np.float32)
+        sharp_kernel = np.array(
+            [
+                [0, -0.5, 0],
+                [-0.5, 3, -0.5],
+                [0, -0.5, 0],
+            ],
+            dtype=np.float32,
+        )
         img_bgr = cv2.filter2D(img_bgr, -1, sharp_kernel)
         h, w = img_bgr.shape[:2]
 
@@ -66,10 +73,7 @@ def _base_preprocess(img_bgr):
     contrast = float(gray_check.std())
     if mean_br < 80:
         gamma = 0.6
-        lut = np.array([
-            min(255, int(((i / 255.0) ** gamma) * 255))
-            for i in range(256)
-        ], dtype=np.uint8)
+        lut = np.array([min(255, int(((i / 255.0) ** gamma) * 255)) for i in range(256)], dtype=np.uint8)
         img_bgr = cv2.LUT(img_bgr, lut)
 
     # ── Histogram stretch for low contrast ──
@@ -80,7 +84,8 @@ def _base_preprocess(img_bgr):
             if p_hi - p_lo > 10:
                 img_bgr[:, :, c] = np.clip(
                     (ch.astype(np.float32) - p_lo) / (p_hi - p_lo) * 255,
-                    0, 255,
+                    0,
+                    255,
                 ).astype(np.uint8)
 
     # ── Red seal removal ──
@@ -98,7 +103,7 @@ def _base_preprocess(img_bgr):
     return img_bgr, h, w
 
 
-def preprocess_minimal(img_bgr) -> "np.ndarray":
+def preprocess_minimal(img_bgr) -> np.ndarray:
     """Minimal preprocessing (Strategy B): preserves maximum information.
 
     Delegates shared steps to _base_preprocess, then applies CLAHE + bilateral.
@@ -119,7 +124,7 @@ def preprocess_minimal(img_bgr) -> "np.ndarray":
     return cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
 
 
-def preprocess_image_for_ocr(img_bgr) -> "np.ndarray":
+def preprocess_image_for_ocr(img_bgr) -> np.ndarray:
     """Enhanced image preprocessing for OCR (v4 — full pipeline).
 
     Delegates shared base steps to _base_preprocess(), then applies:
@@ -134,8 +139,13 @@ def preprocess_image_for_ocr(img_bgr) -> "np.ndarray":
     # ── Edge padding to prevent border text clipping ──
     pad = 20
     img_bgr = cv2.copyMakeBorder(
-        img_bgr, pad, pad, pad, pad,
-        cv2.BORDER_CONSTANT, value=(255, 255, 255),
+        img_bgr,
+        pad,
+        pad,
+        pad,
+        pad,
+        cv2.BORDER_CONSTANT,
+        value=(255, 255, 255),
     )
     h, w = img_bgr.shape[:2]
 
@@ -200,12 +210,8 @@ def preprocess_image_for_ocr(img_bgr) -> "np.ndarray":
     # ── Step B: decorative border cropping ──
     try:
         gray_border = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
-        _, thresh_border = cv2.threshold(
-            gray_border, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU
-        )
-        contours, _ = cv2.findContours(
-            thresh_border, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
-        )
+        _, thresh_border = cv2.threshold(gray_border, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+        contours, _ = cv2.findContours(thresh_border, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         if contours:
             largest = max(contours, key=cv2.contourArea)
             area_ratio = cv2.contourArea(largest) / (h * w)
@@ -216,7 +222,7 @@ def preprocess_image_for_ocr(img_bgr) -> "np.ndarray":
                 y = max(0, y - margin)
                 cw = min(w - x, cw + 2 * margin)
                 ch = min(h - y, ch + 2 * margin)
-                img_bgr = img_bgr[y:y+ch, x:x+cw]
+                img_bgr = img_bgr[y : y + ch, x : x + cw]
                 h, w = img_bgr.shape[:2]
     except Exception as e:
         logger.debug(f"[OCR] Border crop skipped: {e}")
@@ -228,9 +234,7 @@ def preprocess_image_for_ocr(img_bgr) -> "np.ndarray":
         edges = cv2.Canny(blurred_persp, 50, 150)
         kernel_persp = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
         edges = cv2.dilate(edges, kernel_persp, iterations=1)
-        contours_p, _ = cv2.findContours(
-            edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
-        )
+        contours_p, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         if contours_p:
             largest_p = max(contours_p, key=cv2.contourArea)
             peri = cv2.arcLength(largest_p, True)
@@ -239,23 +243,35 @@ def preprocess_image_for_ocr(img_bgr) -> "np.ndarray":
                 pts = approx.reshape(4, 2).astype(np.float32)
                 s = pts.sum(axis=1)
                 d = np.diff(pts, axis=1).ravel()
-                ordered = np.array([
-                    pts[np.argmin(s)], pts[np.argmin(d)],
-                    pts[np.argmax(s)], pts[np.argmax(d)],
-                ], dtype=np.float32)
+                ordered = np.array(
+                    [
+                        pts[np.argmin(s)],
+                        pts[np.argmin(d)],
+                        pts[np.argmax(s)],
+                        pts[np.argmax(d)],
+                    ],
+                    dtype=np.float32,
+                )
                 w_top = np.linalg.norm(ordered[1] - ordered[0])
                 w_bot = np.linalg.norm(ordered[2] - ordered[3])
                 h_left = np.linalg.norm(ordered[3] - ordered[0])
                 h_right = np.linalg.norm(ordered[2] - ordered[1])
                 out_w = int(max(w_top, w_bot))
                 out_h = int(max(h_left, h_right))
-                dst = np.array([
-                    [0, 0], [out_w, 0],
-                    [out_w, out_h], [0, out_h],
-                ], dtype=np.float32)
+                dst = np.array(
+                    [
+                        [0, 0],
+                        [out_w, 0],
+                        [out_w, out_h],
+                        [0, out_h],
+                    ],
+                    dtype=np.float32,
+                )
                 M = cv2.getPerspectiveTransform(ordered, dst)
                 img_bgr = cv2.warpPerspective(
-                    img_bgr, M, (out_w, out_h),
+                    img_bgr,
+                    M,
+                    (out_w, out_h),
                     flags=cv2.INTER_LANCZOS4,
                     borderMode=cv2.BORDER_REPLICATE,
                 )
@@ -322,7 +338,7 @@ def preprocess_image_for_ocr(img_bgr) -> "np.ndarray":
     return cv2.cvtColor(binary, cv2.COLOR_GRAY2BGR)
 
 
-def deskew_image(img_bgr) -> Tuple:
+def deskew_image(img_bgr) -> tuple:
     """Deskew a page image by detecting and correcting rotation (±20°).
 
     Uses contour-based minimum-area-rectangle angle estimation with
@@ -362,7 +378,9 @@ def deskew_image(img_bgr) -> Tuple:
     center = (w // 2, h // 2)
     M = cv2.getRotationMatrix2D(center, median_angle, 1.0)
     rotated = cv2.warpAffine(
-        img_bgr, M, (w, h),
+        img_bgr,
+        M,
+        (w, h),
         flags=cv2.INTER_CUBIC,
         borderMode=cv2.BORDER_REPLICATE,
     )

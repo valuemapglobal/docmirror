@@ -29,21 +29,21 @@ Contents:
     - ``PIPE_CHARS`` / ``HLINE_CHARS`` / ``_ALL_BORDER_CHARS`` — character
       sets for identifying mainframe ASCII-art table borders.
 """
-from __future__ import annotations
 
+from __future__ import annotations
 
 import logging
 import re
 import unicodedata
 from collections import deque
-from typing import Dict, Iterable, List, Optional, Tuple
-
+from collections.abc import Iterable
+from typing import Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
 _RE_IS_DATE = re.compile(r"\d{4}[-/.]?\d{1,2}[-/.]?\d{1,2}|\d{8}")
 _RE_IS_AMOUNT = re.compile(r"^[-+]?\d[\d,]*\.?\d*$")
-_RE_VALID_DATE = re.compile(r'(?:19|20)\d{2}[-/.]?\d{1,2}[-/.]?\d{1,2}')
+_RE_VALID_DATE = re.compile(r"(?:19|20)\d{2}[-/.]?\d{1,2}[-/.]?\d{1,2}")
 
 # Pre-compiled junk row patterns (C3: avoid per-call re.compile overhead)
 _RE_JUNK_STRONG = re.compile(r"^\s*(合计|总计|累计|汇总)[：:]?")
@@ -60,34 +60,81 @@ _RE_JUNK_PATTERNS = re.compile(
 # cross-domain false positives
 # ══════════════════════════════════════════════════════════════════════════════
 
-VOCAB_BY_CATEGORY: Dict[str, frozenset] = {
+VOCAB_BY_CATEGORY: dict[str, frozenset] = {
     # Bank Statement
-    "BANK_STATEMENT": frozenset({
-        # Date / time
-        "日期", "交易日期", "记账日期", "入账日期", "交易时间", "交易日",
-        # Amount
-        "金额", "交易金额", "发生额", "收入金额", "支出金额", "本次余额",
-        # Balance
-        "余额", "账户余额", "结存", "可用余额",
-        # Description / remarks
-        "摘要", "摘要内容", "交易摘要", "用途", "附言", "备注",
-        "交易类型", "交易类别", "业务摘要",
-        # Counterparty information
-        "对方户名", "对方账号", "对手账号", "对手户名", "对方信息",
-        "对方账户", "对方名称", "对方行名",
-        # Sequence / voucher
-        "序号", "账户序号", "账号序号", "凭证类型", "凭证号码", "流水号",
-        # Currency / cash–transfer flag
-        "币种", "钞汇", "现/转", "现转", "钞汇标识", "现转标志",
-        # Debit / credit direction
-        "借贷", "借贷状态", "支/收", "收支", "借贷标志",
-        # Channel / institution
-        "交易渠道", "交易机构", "交易方式", "交易地点",
-        # Reversal flags
-        "被冲账标识", "冲账标识",
-        # Transaction reference / remarks
-        "交易流水号", "交易备注",
-    }),
+    "BANK_STATEMENT": frozenset(
+        {
+            # Date / time
+            "日期",
+            "交易日期",
+            "记账日期",
+            "入账日期",
+            "交易时间",
+            "交易日",
+            # Amount
+            "金额",
+            "交易金额",
+            "发生额",
+            "收入金额",
+            "支出金额",
+            "本次余额",
+            # Balance
+            "余额",
+            "账户余额",
+            "结存",
+            "可用余额",
+            # Description / remarks
+            "摘要",
+            "摘要内容",
+            "交易摘要",
+            "用途",
+            "附言",
+            "备注",
+            "交易类型",
+            "交易类别",
+            "业务摘要",
+            # Counterparty information
+            "对方户名",
+            "对方账号",
+            "对手账号",
+            "对手户名",
+            "对方信息",
+            "对方账户",
+            "对方名称",
+            "对方行名",
+            # Sequence / voucher
+            "序号",
+            "账户序号",
+            "账号序号",
+            "凭证类型",
+            "凭证号码",
+            "流水号",
+            # Currency / cash–transfer flag
+            "币种",
+            "钞汇",
+            "现/转",
+            "现转",
+            "钞汇标识",
+            "现转标志",
+            # Debit / credit direction
+            "借贷",
+            "借贷状态",
+            "支/收",
+            "收支",
+            "借贷标志",
+            # Channel / institution
+            "交易渠道",
+            "交易机构",
+            "交易方式",
+            "交易地点",
+            # Reversal flags
+            "被冲账标识",
+            "冲账标识",
+            # Transaction reference / remarks
+            "交易流水号",
+            "交易备注",
+        }
+    ),
     # Reserved: VAT Invoice (commented out — enable when VAT extraction is implemented)
     # "VAT_INVOICE": frozenset({
     #     "品名", "规格型号", "单位", "数量", "单价", "金额", "税率", "税额",
@@ -105,6 +152,7 @@ KNOWN_HEADER_WORDS: frozenset = frozenset().union(*VOCAB_BY_CATEGORY.values())
 # Aho-Corasick Multi-Pattern Matcher
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 class AhoCorasick:
     """Pure-Python Aho-Corasick automaton for O(L) multi-pattern matching.
 
@@ -112,13 +160,13 @@ class AhoCorasick:
     ``search_longest_non_overlapping()`` on any text string.
     """
 
-    __slots__ = ('_goto', '_fail', '_output', '_patterns')
+    __slots__ = ("_goto", "_fail", "_output", "_patterns")
 
     def __init__(self, patterns: Iterable[str]):
         self._patterns = list(patterns)
-        self._goto: List[Dict[str, int]] = [{}]   # state 0 = root
-        self._output: List[List[int]] = [[]]       # output[state] = [pattern_idx]
-        self._fail: List[int] = [0]
+        self._goto: list[dict[str, int]] = [{}]  # state 0 = root
+        self._output: list[list[int]] = [[]]  # output[state] = [pattern_idx]
+        self._fail: list[int] = [0]
 
         # ── Phase 1: Build Trie (goto function) ──
         for pi, pat in enumerate(self._patterns):
@@ -151,7 +199,7 @@ class AhoCorasick:
                     self._fail[s] = 0
                 self._output[s] = self._output[s] + self._output[self._fail[s]]
 
-    def search(self, text: str) -> List[Tuple[str, int, int]]:
+    def search(self, text: str) -> list[tuple[str, int, int]]:
         """Find all pattern occurrences in *text*.
 
         Returns:
@@ -170,8 +218,9 @@ class AhoCorasick:
         return results
 
     def search_longest_non_overlapping(
-        self, text: str,
-    ) -> List[Tuple[str, int, int]]:
+        self,
+        text: str,
+    ) -> list[tuple[str, int, int]]:
         """Find non-overlapping matches, preferring longest match.
 
         Greedy left-to-right: among overlapping matches at the same
@@ -198,23 +247,23 @@ class AhoCorasick:
 
 # ── Module-level AC singletons (built once at import time) ──
 _AC_ALL = AhoCorasick(KNOWN_HEADER_WORDS)
-_AC_BY_CATEGORY: Dict[str, AhoCorasick] = {
-    cat: AhoCorasick(words)
-    for cat, words in VOCAB_BY_CATEGORY.items()
-}
+_AC_BY_CATEGORY: dict[str, AhoCorasick] = {cat: AhoCorasick(words) for cat, words in VOCAB_BY_CATEGORY.items()}
 
 
 # ── CJK normalisation: NFKC + Traditional → Simplified patches ──
-_TRAD_TO_SIMP = str.maketrans({
-    "\u6236": "\u6237",  # Traditional 戶 → Simplified 户
-    "\u2ea0": "\u6c11",  # CJK radical ⺠ → 民
-    "\u8cf3": "\u8d26",
-    "\u865f": "\u53f7",
-    "\u984d": "\u989d",
-    "\u6642": "\u65f6",
-    "\u6a5f": "\u673a",
-    "\u69cb": "\u6784",
-})
+_TRAD_TO_SIMP = str.maketrans(
+    {
+        "\u6236": "\u6237",  # Traditional 戶 → Simplified 户
+        "\u2ea0": "\u6c11",  # CJK radical ⺠ → 民
+        "\u8cf3": "\u8d26",
+        "\u865f": "\u53f7",
+        "\u984d": "\u989d",
+        "\u6642": "\u65f6",
+        "\u6a5f": "\u673a",
+        "\u69cb": "\u6784",
+    }
+)
+
 
 def _normalize_for_vocab(s: str) -> str:
     """Apply NFKC + Traditional-to-Simplified patches for vocabulary matching."""
@@ -222,8 +271,8 @@ def _normalize_for_vocab(s: str) -> str:
 
 
 def _score_header_by_vocabulary(
-    row: List[str],
-    categories: Optional[List[str]] = None,
+    row: list[str],
+    categories: list[str] | None = None,
 ) -> int:
     """Count how many cells in *row* match known header keywords.
 
@@ -237,25 +286,26 @@ def _score_header_by_vocabulary(
     """
     vocab = (
         frozenset().union(*(VOCAB_BY_CATEGORY.get(c, frozenset()) for c in categories))
-        if categories else KNOWN_HEADER_WORDS
+        if categories
+        else KNOWN_HEADER_WORDS
     )
     score = 0
     for cell in row:
-        text = _normalize_for_vocab((cell or "")).strip()
+        text = _normalize_for_vocab(cell or "").strip()
         if text in vocab:
             score += 1
     return score
 
 
 # Currency-prefixed amount: "RMB 631.20", "USD 100.00"
-_RE_CURRENCY_AMOUNT = re.compile(r'^[A-Z]{2,4}\s+[\d,.]+$')
+_RE_CURRENCY_AMOUNT = re.compile(r"^[A-Z]{2,4}\s+[\d,.]+$")
 # Bare currency code: "RMB", "USD", "CNY"
-_RE_BARE_CURRENCY = re.compile(r'^[A-Z]{2,4}$')
+_RE_BARE_CURRENCY = re.compile(r"^[A-Z]{2,4}$")
 
 # Pure time format: "08:54:19"
-_RE_IS_TIME_ONLY = re.compile(r'^\d{2}:\d{2}:\d{2}$')
+_RE_IS_TIME_ONLY = re.compile(r"^\d{2}:\d{2}:\d{2}$")
 # Long digit string (account / transaction numbers, ≥ 10 digits)
-_RE_LONG_DIGIT = re.compile(r'^\d{10,}$')
+_RE_LONG_DIGIT = re.compile(r"^\d{10,}$")
 
 
 def _is_header_cell(cell: str) -> bool:
@@ -293,7 +343,7 @@ def _is_header_cell(cell: str) -> bool:
     return True
 
 
-def _is_header_row(row: List[str]) -> bool:
+def _is_header_row(row: list[str]) -> bool:
     """Determine whether a row is a header row using a dual-gate algorithm.
 
     Gate 1 (definitive reject):
@@ -315,13 +365,13 @@ def _is_header_row(row: List[str]) -> bool:
     # ── Gate 1: strong data signals → definitive reject ──
     for cell in non_empty:
         clean = cell.replace(",", "").replace("¥", "")
-        if _RE_IS_DATE.search(cell):          # Date
+        if _RE_IS_DATE.search(cell):  # Date
             return False
-        if _RE_IS_AMOUNT.match(clean):        # Amount (decimal number)
+        if _RE_IS_AMOUNT.match(clean):  # Amount (decimal number)
             return False
-        if _RE_IS_TIME_ONLY.match(cell):      # Time HH:MM:SS
+        if _RE_IS_TIME_ONLY.match(cell):  # Time HH:MM:SS
             return False
-        if _RE_LONG_DIGIT.match(cell):        # Long digit string
+        if _RE_LONG_DIGIT.match(cell):  # Long digit string
             return False
 
     # ── Gate 2: vocab hit count ≥ 3 → definitive accept ──
@@ -333,7 +383,7 @@ def _is_header_row(row: List[str]) -> bool:
     return header_count / len(non_empty) >= 0.6
 
 
-def _is_junk_row(row: List[str]) -> bool:
+def _is_junk_row(row: list[str]) -> bool:
     """Detect page headers, footers, totals, and other non-data rows.
 
     Strategy:
@@ -361,7 +411,7 @@ def _is_junk_row(row: List[str]) -> bool:
     return False
 
 
-def _is_data_row(row: List[str]) -> bool:
+def _is_data_row(row: list[str]) -> bool:
     """Return ``True`` if the row contains at least one date or one amount."""
     for cell in row:
         cell = (cell or "").strip()
@@ -374,6 +424,6 @@ def _is_data_row(row: List[str]) -> bool:
 
 
 # ── Pipe / line-drawing character sets (mainframe ASCII-art tables) ──
-PIPE_CHARS = frozenset('|│┃┆┇┊┋')
-HLINE_CHARS = frozenset('─━┄┅┈┉—–-')
-_ALL_BORDER_CHARS = PIPE_CHARS | HLINE_CHARS | frozenset('+┌┐└┘├┤┬┴┼')
+PIPE_CHARS = frozenset("|│┃┆┇┊┋")
+HLINE_CHARS = frozenset("─━┄┅┈┉—–-")
+_ALL_BORDER_CHARS = PIPE_CHARS | HLINE_CHARS | frozenset("+┌┐└┘├┤┬┴┼")

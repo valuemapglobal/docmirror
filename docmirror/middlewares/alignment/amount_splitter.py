@@ -8,12 +8,12 @@
 Debit/Credit Split Column Detection (Amount Split Detector)
 ===========================================================
 
-Extracted from ``column_mapper.py``: Detects income/expense split-column 
+Extracted from ``column_mapper.py``: Detects income/expense split-column
 patterns in tables.
 
 Supports 3 modes:
   1. Explicit Split: Table headers explicitly contain income/expense keywords.
-  2. Implicit Split: Amount column adjacent to an empty header column 
+  2. Implicit Split: Amount column adjacent to an empty header column
      (e.g., Shanghai Pudong Development Bank 'Transaction amount' + Empty column).
   3. Merged Split: Concatenated column names containing embedded debit/credit keywords.
 
@@ -23,8 +23,8 @@ F-6 Enhancements:
   - Debit/Credit Flag Detection: If a dedicated "Debit/Credit Flag" column exists,
     amount splitting is aggressively skipped.
 """
-from __future__ import annotations
 
+from __future__ import annotations
 
 import logging
 import re
@@ -37,9 +37,9 @@ _RE_HAS_NUMBER = re.compile(r"\d")
 
 
 def _validate_split_by_data(
-    data_rows: List[List[str]],
-    inc_idx: Optional[int],
-    exp_idx: Optional[int],
+    data_rows: list[list[str]],
+    inc_idx: int | None,
+    exp_idx: int | None,
     max_sample: int = 20,
 ) -> bool:
     """F-6: Samples data rows to validate if column splitting is logical.
@@ -82,13 +82,13 @@ def _validate_split_by_data(
 
 
 def detect_split_amount(
-    headers: List[str],
-    mapping: Dict[str, Optional[str]],
-    income_keywords: Set[str],
-    expense_keywords: Set[str],
-    amount_like_keywords: Set[str],
-    data_rows: Optional[List[List[str]]] = None,
-) -> Tuple[bool, Optional[int], Optional[int]]:
+    headers: list[str],
+    mapping: dict[str, str | None],
+    income_keywords: set[str],
+    expense_keywords: set[str],
+    amount_like_keywords: set[str],
+    data_rows: list[list[str]] | None = None,
+) -> tuple[bool, int | None, int | None]:
     """Detects whether an income/expense split column layout exists.
 
     Args:
@@ -103,8 +103,17 @@ def detect_split_amount(
         A tuple: (has_split_amount, income_col_idx, expense_col_idx)
     """
     # F-6: Detect Debit/Credit Flag Column \u2014 skip split if flag column exists
-    _DEBIT_CREDIT_FLAGS = {"借贷标志", "借贷", "借/贷", "收支", "支/收",
-                           "借贷Status", "收支标志", "DC标志", "Debit/Credit Flag"}
+    _DEBIT_CREDIT_FLAGS = {
+        "借贷标志",
+        "借贷",
+        "借/贷",
+        "收支",
+        "支/收",
+        "借贷Status",
+        "收支标志",
+        "DC标志",
+        "Debit/Credit Flag",
+    }
     header_set = {h.strip() for h in headers if h}
     if header_set & _DEBIT_CREDIT_FLAGS:
         logger.info("[AmountSplit] F-6: skipped \u2014 debit/credit flag column found")
@@ -138,8 +147,7 @@ def detect_split_amount(
                 if data_rows and not _validate_split_by_data(data_rows, i + 1, i):
                     continue
                 logger.info(
-                    f"[AmountSplit] detected implicit split: "
-                    f"'{h_clean}'(idx={i})=expense + empty(idx={i+1})=income"
+                    f"[AmountSplit] detected implicit split: '{h_clean}'(idx={i})=expense + empty(idx={i + 1})=income"
                 )
                 return True, i + 1, i
 
@@ -164,8 +172,7 @@ def detect_split_amount(
                     merged_exp_idx = i
                 break
 
-    if (merged_inc_idx is not None and merged_exp_idx is not None
-            and merged_inc_idx != merged_exp_idx):
+    if merged_inc_idx is not None and merged_exp_idx is not None and merged_inc_idx != merged_exp_idx:
         # F-6: Data validation phase
         if data_rows and not _validate_split_by_data(data_rows, merged_inc_idx, merged_exp_idx):
             return False, None, None

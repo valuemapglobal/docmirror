@@ -14,6 +14,7 @@ Provides lightweight localized document security authentication for the MultiMod
 Forgery detection results are for **reference only** and do not constitute legal or compliance conclusions.
 Metadata blacklist can be overridden via DOCMIRROR_FORGERY_METADATA_BLACKLIST (JSON array of lowercase terms).
 """
+
 from __future__ import annotations
 
 import json
@@ -41,7 +42,7 @@ _DEFAULT_SUSPICIOUS_METADATA_LOWER = [
 ]
 
 
-def _get_forgery_metadata_blacklist() -> List[str]:
+def _get_forgery_metadata_blacklist() -> list[str]:
     """Return metadata blacklist: from DOCMIRROR_FORGERY_METADATA_BLACKLIST (JSON array) or default."""
     raw = os.getenv("DOCMIRROR_FORGERY_METADATA_BLACKLIST", "").strip()
     if not raw:
@@ -55,7 +56,7 @@ def _get_forgery_metadata_blacklist() -> List[str]:
     return _DEFAULT_SUSPICIOUS_METADATA_LOWER.copy()
 
 
-def detect_pdf_forgery(file_path: str | Path) -> Tuple[bool, List[str]]:
+def detect_pdf_forgery(file_path: str | Path) -> tuple[bool, list[str]]:
     """
     Check if a PDF file is suspected of being edited/tampered.
     Extremely low overhead, only reads physical headers and structure tree.
@@ -88,18 +89,20 @@ def detect_pdf_forgery(file_path: str | Path) -> Tuple[bool, List[str]]:
                 reasons.append(f"Suspicious Core Metadata (Creator): Found '{suspicious_term}' ({meta.get('creator')})")
             if suspicious_term in producer:
                 is_forged = True
-                reasons.append(f"Suspicious Core Metadata (Producer): Found '{suspicious_term}' ({meta.get('producer')})")
+                reasons.append(
+                    f"Suspicious Core Metadata (Producer): Found '{suspicious_term}' ({meta.get('producer')})"
+                )
 
         # 2. XREF Incremental Update Detection
         # PyMuPDF can get the historical modification version count. If not 1, it indicates the PDF was subsequently modified and saved.
         # Electronic statements are typically guaranteed to be 1 at generation.
         try:
-            version_count = len(doc.resolve_names()) if hasattr(doc, 'resolve_names') else 1 # fallback check
+            len(doc.resolve_names()) if hasattr(doc, "resolve_names") else 1  # fallback check
             # PyMuPDF lacks a safe direct public API for XREF trailer count, but we can catch certain anomalies via xref
             # Using a safer alternative strategy here: check for unfixed interactive forms
         except Exception as exc:
             logger.debug(f"operation: suppressed {exc}")
-            
+
         if doc.is_form_pdf:
             is_forged = True
             reasons.append("PDF contains interactive form fields (Unexpected for electronic origination)")
@@ -107,11 +110,9 @@ def detect_pdf_forgery(file_path: str | Path) -> Tuple[bool, List[str]]:
         # 3. Digital Signature Check
         # In this L0 layer, we do not strictly enforce the presence of a signature (as not all banks have them),
         # but if it 'contains a corrupted or unverifiable signature field', it indicates interception and editing.
-        has_sig = False
         for p in doc:
             for w in p.widgets():
                 if w.is_signed:
-                    has_sig = True
                     break
     finally:
         doc.close()
@@ -119,14 +120,14 @@ def detect_pdf_forgery(file_path: str | Path) -> Tuple[bool, List[str]]:
     return is_forged, reasons
 
 
-def detect_image_forgery(file_path: str | Path) -> Tuple[bool, List[str]]:
+def detect_image_forgery(file_path: str | Path) -> tuple[bool, list[str]]:
     """
     Check if scan/photo has suspected splicing or tampering (Error Level Analysis - ELA).
 
     Core idea:
     Re-save image at 95% quality; original captures show uniform error distribution.
     Spliced regions (e.g., tampered amounts) show inconsistent compression artifacts at edges.
-    
+
     Args:
         file_path: Image path (jpg, png, etc.)
 
@@ -144,8 +145,8 @@ def detect_image_forgery(file_path: str | Path) -> Tuple[bool, List[str]]:
         return False, ["Verification Skipped: cv2 unavailable"]
 
     img_ext = Path(file_path).suffix.lower()
-    if img_ext not in ['.jpg', '.jpeg', '.png']:
-        return False, [] # Only detect mainstream raster images
+    if img_ext not in [".jpg", ".jpeg", ".png"]:
+        return False, []  # Only detect mainstream raster images
 
     try:
         # Read original image
@@ -155,27 +156,29 @@ def detect_image_forgery(file_path: str | Path) -> Tuple[bool, List[str]]:
 
         # ELA algorithm: In-memory re-compression at 95 quality
         encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), 95]
-        _, encimg = cv2.imencode('.jpg', original, encode_param)
+        _, encimg = cv2.imencode(".jpg", original, encode_param)
         compressed = cv2.imdecode(encimg, 1)
 
         # Extract residual and amplify (Enhance visualization)
         diff = cv2.absdiff(original, compressed)
-        
+
         # Extract max difference to evaluate if there are abnormally mutated blocks
         # Normal image residual (at 95 compression) is mostly in the 0-15 range. Block-clustered values far exceeding the threshold may indicate cloning.
         max_diff = np.max(diff)
-        
+
         # Simple heuristic threshold check: If color value jump exceeds threshold after high-quality re-compression (e.g., >50 RGB span), it is highly suspicious
         if max_diff > 50:
             # Further check connected components of anomalous pixels. If area is too large, it indicates pasting/editing.
             gray_diff = cv2.cvtColor(diff, cv2.COLOR_BGR2GRAY)
             _, thresh = cv2.threshold(gray_diff, 40, 255, cv2.THRESH_BINARY)
             contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-            
+
             large_suspicious_blocks = [c for c in contours if cv2.contourArea(c) > 50]
             if large_suspicious_blocks:
                 is_forged = True
-                reasons.append(f"ELA Anomaly: Found {len(large_suspicious_blocks)} highly disjoint pixel regions (Max Diff={max_diff}) indicating potential patchwork/Photoshop.")
+                reasons.append(
+                    f"ELA Anomaly: Found {len(large_suspicious_blocks)} highly disjoint pixel regions (Max Diff={max_diff}) indicating potential patchwork/Photoshop."
+                )
 
     except Exception as e:
         logger.warning(f"Image forgery detection failed: {e}")

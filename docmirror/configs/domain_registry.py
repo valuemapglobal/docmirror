@@ -30,6 +30,7 @@ Usage::
     identity = resolve_identity("bank_statement", extracted_entities)
     # {'document_type': 'bank_statement', 'institution': 'HSBC', ...}
 """
+
 from __future__ import annotations
 
 import logging
@@ -47,7 +48,8 @@ _CONFIGS_DIR = Path(__file__).parent
 # Multilingual Key Synonyms — loaded from key_synonyms.yaml
 # ══════════════════════════════════════════════════════════════════════════════
 
-def _load_key_synonyms() -> Dict[str, str]:
+
+def _load_key_synonyms() -> dict[str, str]:
     """
     Load and flatten the key_synonyms.yaml config into a single lookup dict.
 
@@ -62,7 +64,7 @@ def _load_key_synonyms() -> Dict[str, str]:
         return {}
 
     try:
-        with open(yaml_path, "r", encoding="utf-8") as f:
+        with open(yaml_path, encoding="utf-8") as f:
             raw = yaml.safe_load(f)
     except Exception as e:
         logger.warning("Failed to load key_synonyms.yaml: %s", e)
@@ -71,7 +73,7 @@ def _load_key_synonyms() -> Dict[str, str]:
     if not isinstance(raw, dict):
         return {}
 
-    flat: Dict[str, str] = {}
+    flat: dict[str, str] = {}
     for domain, locales in raw.items():
         if not isinstance(locales, dict):
             continue
@@ -85,10 +87,10 @@ def _load_key_synonyms() -> Dict[str, str]:
 
 
 # Module-level singleton — loaded once on first import
-KEY_SYNONYMS: Dict[str, str] = _load_key_synonyms()
+KEY_SYNONYMS: dict[str, str] = _load_key_synonyms()
 
 
-def normalize_entity_keys(entities: Dict[str, Any]) -> Dict[str, Any]:
+def normalize_entity_keys(entities: dict[str, Any]) -> dict[str, Any]:
     """
     Normalize locale-specific entity keys to canonical English equivalents.
 
@@ -108,7 +110,7 @@ def normalize_entity_keys(entities: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         New dict with normalized keys.
     """
-    normalized: Dict[str, Any] = {}
+    normalized: dict[str, Any] = {}
 
     for key, value in entities.items():
         canonical = KEY_SYNONYMS.get(key, key)
@@ -128,7 +130,7 @@ def normalize_entity_keys(entities: Dict[str, Any]) -> Dict[str, Any]:
 
 # Each tuple: (display_name, candidate_key_1, candidate_key_2, ...)
 # The resolver tries candidate keys in order and uses the first non-empty match.
-DOMAIN_IDENTITY: Dict[str, List[Tuple[str, ...]]] = {
+DOMAIN_IDENTITY: dict[str, list[tuple[str, ...]]] = {
     "bank_statement": [
         ("institution", "bank_name", "Bank name", "Bank branch"),
         ("account_holder", "Account name", "Account holder", "Card holder", "Customer name"),
@@ -166,7 +168,7 @@ DOMAIN_IDENTITY: Dict[str, List[Tuple[str, ...]]] = {
 }
 
 
-def resolve_identity(domain: str, entities: Dict[str, Any]) -> Dict[str, str]:
+def resolve_identity(domain: str, entities: dict[str, Any]) -> dict[str, str]:
     """
     Extract standardized identity fields from raw entities by document type.
 
@@ -187,7 +189,7 @@ def resolve_identity(domain: str, entities: Dict[str, Any]) -> Dict[str, str]:
     normalized = normalize_entity_keys(entities)
 
     fields = DOMAIN_IDENTITY.get(domain, DOMAIN_IDENTITY.get("*", []))
-    identity: Dict[str, str] = {"document_type": domain}
+    identity: dict[str, str] = {"document_type": domain}
 
     for field_def in fields:
         display_name = field_def[0]
@@ -202,5 +204,5 @@ def resolve_identity(domain: str, entities: Dict[str, Any]) -> Dict[str, str]:
             # No candidate had a value — set to empty string
             identity[display_name] = ""
 
-    logger.info(f"[Config] Resolved identity for domain '{domain}': extracted {len(identity)-1}/{len(fields)} fields")
+    logger.info(f"[Config] Resolved identity for domain '{domain}': extracted {len(identity) - 1}/{len(fields)} fields")
     return identity

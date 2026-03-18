@@ -38,7 +38,8 @@ import importlib
 import logging
 import pkgutil
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional, Sequence, Tuple
+from collections.abc import Sequence
+from typing import Any, Dict, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +74,7 @@ class DomainPlugin(ABC):
         return ()
 
     @property
-    def identity_fields(self) -> Sequence[Tuple[str, Sequence[str]]]:
+    def identity_fields(self) -> Sequence[tuple[str, Sequence[str]]]:
         """
         Identity field definitions: (display_name, candidate_keys...).
         Used by domain_registry for entity extraction.
@@ -81,13 +82,11 @@ class DomainPlugin(ABC):
         """
         return ()
 
-
-
     def build_domain_data(
         self,
-        metadata: Dict[str, Any],
-        entities: Dict[str, Any],
-    ) -> Optional[Any]:
+        metadata: dict[str, Any],
+        entities: dict[str, Any],
+    ) -> Any | None:
         """
         Build domain-specific data model from extracted metadata and entities.
 
@@ -98,7 +97,7 @@ class DomainPlugin(ABC):
         """
         return None
 
-    def get_middleware_config(self) -> Dict[str, Any]:
+    def get_middleware_config(self) -> dict[str, Any]:
         """
         Return plugin-specific middleware configuration overrides.
 
@@ -118,50 +117,39 @@ class PluginRegistry:
     """
 
     def __init__(self):
-        self._plugins: Dict[str, DomainPlugin] = {}
+        self._plugins: dict[str, DomainPlugin] = {}
         self._discovered = False
 
-    def register(
-        self, plugin: DomainPlugin, *, override: bool = False
-    ) -> None:
+    def register(self, plugin: DomainPlugin, *, override: bool = False) -> None:
         """Register a domain plugin."""
         name = plugin.domain_name
         if name in self._plugins and not override:
-            logger.warning(
-                f"[PluginRegistry] Plugin '{name}' already registered; "
-                "use override=True to replace"
-            )
+            logger.warning(f"[PluginRegistry] Plugin '{name}' already registered; use override=True to replace")
             return
         self._plugins[name] = plugin
-        logger.debug(
-            f"[PluginRegistry] Registered domain plugin: {name} ({plugin.display_name})"
-        )
+        logger.debug(f"[PluginRegistry] Registered domain plugin: {name} ({plugin.display_name})")
 
-    def get(self, domain_name: str) -> Optional[DomainPlugin]:
+    def get(self, domain_name: str) -> DomainPlugin | None:
         """Get a registered plugin by domain name."""
         self._ensure_discovered()
         return self._plugins.get(domain_name)
 
-    def list_plugins(self) -> Dict[str, str]:
+    def list_plugins(self) -> dict[str, str]:
         """Return {domain_name: display_name} for all registered plugins."""
         self._ensure_discovered()
         return {name: p.display_name for name, p in self._plugins.items()}
 
-    def get_all_scene_keywords(self) -> Dict[str, Sequence[str]]:
+    def get_all_scene_keywords(self) -> dict[str, Sequence[str]]:
         """Return {domain_name: keywords} for plugins with scene keywords."""
         self._ensure_discovered()
-        return {
-            name: p.scene_keywords
-            for name, p in self._plugins.items()
-            if p.scene_keywords
-        }
+        return {name: p.scene_keywords for name, p in self._plugins.items() if p.scene_keywords}
 
     def build_domain_data(
         self,
         domain_name: str,
-        metadata: Dict[str, Any],
-        entities: Dict[str, Any],
-    ) -> Optional[Any]:
+        metadata: dict[str, Any],
+        entities: dict[str, Any],
+    ) -> Any | None:
         """Build domain data using the appropriate plugin."""
         plugin = self.get(domain_name)
         if plugin is None:
@@ -179,23 +167,19 @@ class PluginRegistry:
         """Discover and load plugins from docmirror.plugins subpackage."""
         try:
             import docmirror.plugins as plugins_pkg
+
             for _, modname, _ in pkgutil.iter_modules(plugins_pkg.__path__):
                 if modname.startswith("_"):
                     continue
                 try:
-                    mod = importlib.import_module(
-                        f"docmirror.plugins.{modname}"
-                    )
+                    mod = importlib.import_module(f"docmirror.plugins.{modname}")
                     # Convention: each plugin module has a `plugin` attribute
                     if hasattr(mod, "plugin"):
                         self.register(mod.plugin)
                     elif hasattr(mod, "Plugin"):
                         self.register(mod.Plugin())
                 except Exception as e:
-                    logger.warning(
-                        f"[PluginRegistry] Failed to load plugin "
-                        f"docmirror.plugins.{modname}: {e}"
-                    )
+                    logger.warning(f"[PluginRegistry] Failed to load plugin docmirror.plugins.{modname}: {e}")
         except ImportError:
             logger.debug("[PluginRegistry] No docmirror.plugins package found")
 

@@ -20,6 +20,7 @@ Environment variables:
     DOCMIRROR_AISTUDIO_OCR_API_URL   — API endpoint (default from integration spec)
     DOCMIRROR_AISTUDIO_OCR_TOKEN    — Bearer token for Authorization
 """
+
 from __future__ import annotations
 
 import base64
@@ -33,10 +34,11 @@ logger = logging.getLogger(__name__)
 DEFAULT_API_URL = "https://j0g4k9d1a8x3mfx1.aistudio-app.com/layout-parsing"
 
 
-def _encode_image_bgr_to_base64(image_bgr) -> Optional[str]:
+def _encode_image_bgr_to_base64(image_bgr) -> str | None:
     """Encode BGR numpy array to PNG base64. Requires OpenCV."""
     try:
         import cv2
+
         _, buf = cv2.imencode(".png", image_bgr)
         return base64.b64encode(buf.tobytes()).decode("ascii")
     except ImportError:
@@ -58,7 +60,7 @@ def call_aistudio_layout_ocr(
     use_doc_unwarping: bool = False,
     use_chart_recognition: bool = False,
     **kwargs: Any,
-) -> Optional[Dict[str, Any]]:
+) -> dict[str, Any] | None:
     """Call AI Studio layout-parsing API and return result in DocMirror OCR format.
 
     Args:
@@ -110,9 +112,7 @@ def call_aistudio_layout_ocr(
         return None
 
     if response.status_code != 200:
-        logger.warning(
-            f"[aistudio] API returned {response.status_code} on page {page_idx}"
-        )
+        logger.warning(f"[aistudio] API returned {response.status_code} on page {page_idx}")
         return None
 
     try:

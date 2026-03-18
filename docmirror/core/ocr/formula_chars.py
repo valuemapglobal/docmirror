@@ -19,8 +19,8 @@ Principle:
 
     Priority: character-stream extraction > OCR image recognition > empty string
 """
-from __future__ import annotations
 
+from __future__ import annotations
 
 import logging
 import re
@@ -53,59 +53,150 @@ def is_math_font(fontname: str) -> bool:
 
 _UNICODE_TO_LATEX = {
     # Greek lowercase
-    "α": r"\alpha", "β": r"\beta", "γ": r"\gamma", "δ": r"\delta",
-    "ε": r"\varepsilon", "ζ": r"\zeta", "η": r"\eta", "θ": r"\theta",
-    "ι": r"\iota", "κ": r"\kappa", "λ": r"\lambda", "μ": r"\mu",
-    "ν": r"\nu", "ξ": r"\xi", "π": r"\pi", "ρ": r"\rho",
-    "σ": r"\sigma", "τ": r"\tau", "υ": r"\upsilon", "φ": r"\varphi",
-    "χ": r"\chi", "ψ": r"\psi", "ω": r"\omega", "ϵ": r"\epsilon",
-    "ϕ": r"\phi", "ϑ": r"\vartheta", "ϱ": r"\varrho", "ς": r"\varsigma",
+    "α": r"\alpha",
+    "β": r"\beta",
+    "γ": r"\gamma",
+    "δ": r"\delta",
+    "ε": r"\varepsilon",
+    "ζ": r"\zeta",
+    "η": r"\eta",
+    "θ": r"\theta",
+    "ι": r"\iota",
+    "κ": r"\kappa",
+    "λ": r"\lambda",
+    "μ": r"\mu",
+    "ν": r"\nu",
+    "ξ": r"\xi",
+    "π": r"\pi",
+    "ρ": r"\rho",
+    "σ": r"\sigma",
+    "τ": r"\tau",
+    "υ": r"\upsilon",
+    "φ": r"\varphi",
+    "χ": r"\chi",
+    "ψ": r"\psi",
+    "ω": r"\omega",
+    "ϵ": r"\epsilon",
+    "ϕ": r"\phi",
+    "ϑ": r"\vartheta",
+    "ϱ": r"\varrho",
+    "ς": r"\varsigma",
     "ϖ": r"\varpi",
     # Greek uppercase
-    "Γ": r"\Gamma", "Δ": r"\Delta", "Θ": r"\Theta", "Λ": r"\Lambda",
-    "Ξ": r"\Xi", "Π": r"\Pi", "Σ": r"\Sigma", "Υ": r"\Upsilon",
-    "Φ": r"\Phi", "Ψ": r"\Psi", "Ω": r"\Omega",
+    "Γ": r"\Gamma",
+    "Δ": r"\Delta",
+    "Θ": r"\Theta",
+    "Λ": r"\Lambda",
+    "Ξ": r"\Xi",
+    "Π": r"\Pi",
+    "Σ": r"\Sigma",
+    "Υ": r"\Upsilon",
+    "Φ": r"\Phi",
+    "Ψ": r"\Psi",
+    "Ω": r"\Omega",
     # Operators
-    "±": r"\pm", "∓": r"\mp", "×": r"\times", "÷": r"\div",
-    "·": r"\cdot", "∗": r"*", "⊕": r"\oplus", "⊗": r"\otimes",
+    "±": r"\pm",
+    "∓": r"\mp",
+    "×": r"\times",
+    "÷": r"\div",
+    "·": r"\cdot",
+    "∗": r"*",
+    "⊕": r"\oplus",
+    "⊗": r"\otimes",
     "∘": r"\circ",
     # Relations
-    "≤": r"\leq", "≥": r"\geq", "≠": r"\neq", "≈": r"\approx",
-    "≡": r"\equiv", "∼": r"\sim", "≃": r"\simeq", "≅": r"\cong",
-    "∝": r"\propto", "≪": r"\ll", "≫": r"\gg", "⊂": r"\subset",
-    "⊃": r"\supset", "⊆": r"\subseteq", "⊇": r"\supseteq",
-    "∈": r"\in", "∉": r"\notin", "∋": r"\ni", "≺": r"\prec",
-    "≻": r"\succ", "⊥": r"\perp", "∥": r"\parallel",
+    "≤": r"\leq",
+    "≥": r"\geq",
+    "≠": r"\neq",
+    "≈": r"\approx",
+    "≡": r"\equiv",
+    "∼": r"\sim",
+    "≃": r"\simeq",
+    "≅": r"\cong",
+    "∝": r"\propto",
+    "≪": r"\ll",
+    "≫": r"\gg",
+    "⊂": r"\subset",
+    "⊃": r"\supset",
+    "⊆": r"\subseteq",
+    "⊇": r"\supseteq",
+    "∈": r"\in",
+    "∉": r"\notin",
+    "∋": r"\ni",
+    "≺": r"\prec",
+    "≻": r"\succ",
+    "⊥": r"\perp",
+    "∥": r"\parallel",
     # Large operators
-    "∑": r"\sum", "∏": r"\prod", "∫": r"\int", "∮": r"\oint",
-    "∬": r"\iint", "∭": r"\iiint", "⋃": r"\bigcup", "⋂": r"\bigcap",
+    "∑": r"\sum",
+    "∏": r"\prod",
+    "∫": r"\int",
+    "∮": r"\oint",
+    "∬": r"\iint",
+    "∭": r"\iiint",
+    "⋃": r"\bigcup",
+    "⋂": r"\bigcap",
     "⊔": r"\bigsqcup",
     # Arrows
-    "→": r"\to", "←": r"\leftarrow", "↔": r"\leftrightarrow",
-    "⇒": r"\Rightarrow", "⇐": r"\Leftarrow", "⇔": r"\Leftrightarrow",
-    "↦": r"\mapsto", "↑": r"\uparrow", "↓": r"\downarrow",
-    "↗": r"\nearrow", "↘": r"\searrow",
+    "→": r"\to",
+    "←": r"\leftarrow",
+    "↔": r"\leftrightarrow",
+    "⇒": r"\Rightarrow",
+    "⇐": r"\Leftarrow",
+    "⇔": r"\Leftrightarrow",
+    "↦": r"\mapsto",
+    "↑": r"\uparrow",
+    "↓": r"\downarrow",
+    "↗": r"\nearrow",
+    "↘": r"\searrow",
     # Miscellaneous
-    "∞": r"\infty", "∂": r"\partial", "∇": r"\nabla", "∅": r"\emptyset",
-    "∀": r"\forall", "∃": r"\exists", "¬": r"\neg", "√": r"\sqrt",
-    "∠": r"\angle", "△": r"\triangle", "□": r"\square", "◇": r"\diamond",
-    "♯": r"\sharp", "♭": r"\flat", "♮": r"\natural",
-    "∧": r"\wedge", "∨": r"\vee", "⊤": r"\top", "⊥": r"\bot",
+    "∞": r"\infty",
+    "∂": r"\partial",
+    "∇": r"\nabla",
+    "∅": r"\emptyset",
+    "∀": r"\forall",
+    "∃": r"\exists",
+    "¬": r"\neg",
+    "√": r"\sqrt",
+    "∠": r"\angle",
+    "△": r"\triangle",
+    "□": r"\square",
+    "◇": r"\diamond",
+    "♯": r"\sharp",
+    "♭": r"\flat",
+    "♮": r"\natural",
+    "∧": r"\wedge",
+    "∨": r"\vee",
+    "⊤": r"\top",
     # Brackets
-    "⟨": r"\langle", "⟩": r"\rangle", "⌈": r"\lceil", "⌉": r"\rceil",
-    "⌊": r"\lfloor", "⌋": r"\rfloor", "‖": r"\|",
+    "⟨": r"\langle",
+    "⟩": r"\rangle",
+    "⌈": r"\lceil",
+    "⌉": r"\rceil",
+    "⌊": r"\lfloor",
+    "⌋": r"\rfloor",
+    "‖": r"\|",
     # Dots
-    "…": r"\ldots", "⋯": r"\cdots", "⋮": r"\vdots", "⋱": r"\ddots",
+    "…": r"\ldots",
+    "⋯": r"\cdots",
+    "⋮": r"\vdots",
+    "⋱": r"\ddots",
     # Accents / special symbols
-    "ℓ": r"\ell", "℘": r"\wp", "ℜ": r"\Re", "ℑ": r"\Im",
-    "ℵ": r"\aleph", "ℏ": r"\hbar", "†": r"\dagger", "‡": r"\ddagger",
+    "ℓ": r"\ell",
+    "℘": r"\wp",
+    "ℜ": r"\Re",
+    "ℑ": r"\Im",
+    "ℵ": r"\aleph",
+    "ℏ": r"\hbar",
+    "†": r"\dagger",
+    "‡": r"\ddagger",
 }
 
 
 def extract_formula_from_chars(
     chars: list,
-    bbox: Tuple[float, float, float, float],
-) -> Optional[str]:
+    bbox: tuple[float, float, float, float],
+) -> str | None:
     """Extract LaTeX from PDF character streams within a bounding box.
 
     Args:
@@ -172,13 +263,13 @@ def extract_formula_from_chars(
     return result
 
 
-def _group_by_rows(chars: list) -> List[List[dict]]:
+def _group_by_rows(chars: list) -> list[list[dict]]:
     """Group characters into rows by y-coordinate proximity."""
     if not chars:
         return []
 
-    rows: List[List[dict]] = []
-    current_row: List[dict] = [chars[0]]
+    rows: list[list[dict]] = []
+    current_row: list[dict] = [chars[0]]
 
     for c in chars[1:]:
         prev_mid = (current_row[-1].get("top", 0) + current_row[-1].get("bottom", 0)) / 2
@@ -220,9 +311,9 @@ def _row_to_latex(row_chars: list) -> str:
 
         if baseline > 0 and char_height > 0:
             if char_mid < baseline - char_height * 0.3:
-                latex = f"^{{{latex}}}"      # Superscript
+                latex = f"^{{{latex}}}"  # Superscript
             elif char_mid > baseline + char_height * 0.3:
-                latex = f"_{{{latex}}}"      # Subscript
+                latex = f"_{{{latex}}}"  # Subscript
 
         parts.append(latex)
 

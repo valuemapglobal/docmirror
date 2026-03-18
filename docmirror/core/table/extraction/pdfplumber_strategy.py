@@ -12,8 +12,8 @@ Split from ``table_extraction.py``.
 When pdfplumber's ``lines`` / ``text`` strategies discard the table
 header row, this module recovers it from the zone's character data.
 """
-from __future__ import annotations
 
+from __future__ import annotations
 
 import logging
 from collections import defaultdict
@@ -27,12 +27,13 @@ logger = logging.getLogger(__name__)
 # Forward import for TABLE_SETTINGS
 from .classifier import TABLE_SETTINGS
 
+
 def _recover_header_from_zone(
-    tables: List[List[List[str]]],
+    tables: list[list[list[str]]],
     work_page,
-    table_zone_bbox: Optional[Tuple[float, float, float, float]],
+    table_zone_bbox: tuple[float, float, float, float] | None,
     original_page,
-) -> List[List[List[str]]]:
+) -> list[list[list[str]]]:
     """Recover a table header row when pdfplumber's lines/text strategy
     discards it.
 
@@ -73,7 +74,7 @@ def _recover_header_from_zone(
 
     # Group words into rows by y-coordinate
     # defaultdict already imported at module level
-    y_rows: Dict[int, list] = defaultdict(list)
+    y_rows: dict[int, list] = defaultdict(list)
     for w in words:
         yk = round(w["top"] / 3) * 3
         y_rows[yk].append(w)
@@ -110,15 +111,15 @@ def _recover_header_from_zone(
     col_midpoints = None
     try:
         tf = work_page.debug_tablefinder(table_settings=TABLE_SETTINGS)
-        v_edges = sorted(set(
-            round(e['x0'], 1) for e in tf.edges
-            if abs(e['x0'] - e['x1']) < 1  # Vertical lines
-        ))
+        v_edges = sorted(
+            set(
+                round(e["x0"], 1)
+                for e in tf.edges
+                if abs(e["x0"] - e["x1"]) < 1  # Vertical lines
+            )
+        )
         if len(v_edges) >= 2:
-            col_midpoints = [
-                (v_edges[i] + v_edges[i + 1]) / 2
-                for i in range(len(v_edges) - 1)
-            ]
+            col_midpoints = [(v_edges[i] + v_edges[i + 1]) / 2 for i in range(len(v_edges) - 1)]
     except Exception as exc:
         logger.debug(f"operation: suppressed {exc}")
 
@@ -130,23 +131,16 @@ def _recover_header_from_zone(
             if not text:
                 continue
             hx_mid = (hw["x0"] + hw["x1"]) / 2
-            best_col = min(range(len(col_midpoints)),
-                           key=lambda ci: abs(col_midpoints[ci] - hx_mid))
+            best_col = min(range(len(col_midpoints)), key=lambda ci: abs(col_midpoints[ci] - hx_mid))
             if header_row[best_col]:
                 header_row[best_col] += text
             else:
                 header_row[best_col] = text
 
-        logger.info(
-            f"header recovery (x-aligned): vocab_score={best_score}, "
-            f"header={header_row[:4]}..."
-        )
+        logger.info(f"header recovery (x-aligned): vocab_score={best_score}, header={header_row[:4]}...")
         # Remove duplicate header rows from main_table (vocab_score >= 3),
         # keep preamble key-value rows
-        clean_body = [
-            row for row in main_table
-            if _score_header_by_vocabulary(row) < 3
-        ]
+        clean_body = [row for row in main_table if _score_header_by_vocabulary(row) < 3]
         new_table = [header_row] + clean_body
         return [new_table] + tables[1:]
 
@@ -157,14 +151,8 @@ def _recover_header_from_zone(
     elif len(header_row) < n_cols:
         header_row = header_row + [""] * (n_cols - len(header_row))
 
-    logger.info(
-        f"header recovery (fallback): vocab_score={best_score}, "
-        f"header={header_row[:4]}..."
-    )
+    logger.info(f"header recovery (fallback): vocab_score={best_score}, header={header_row[:4]}...")
     # Remove duplicate header rows, keep preamble key-value rows
-    clean_body = [
-        row for row in main_table
-        if _score_header_by_vocabulary(row) < 3
-    ]
+    clean_body = [row for row in main_table if _score_header_by_vocabulary(row) < 3]
     new_table = [header_row] + clean_body
     return [new_table] + tables[1:]

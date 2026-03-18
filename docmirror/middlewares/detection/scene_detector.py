@@ -17,14 +17,14 @@ Supported Scenes:
     bank_statement, invoice, tax_report, financial_report,
     credit_report, contract, generic (fallback).
 """
-from __future__ import annotations
 
+from __future__ import annotations
 
 import logging
 from typing import Dict, List, Set, Tuple
 
-from ..base import BaseMiddleware
 from ...models.entities.parse_result import ParseResult
+from ..base import BaseMiddleware
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 # Scenario Keyword Dictionary
 # ═══════════════════════════════════════════════════════════════════════════════
 
-SCENE_KEYWORDS: Dict[str, List[List[str]]] = {
+SCENE_KEYWORDS: dict[str, list[list[str]]] = {
     "bank_statement": [
         ["交易明细"],
         ["银行", "流水"],
@@ -70,7 +70,7 @@ SCENE_KEYWORDS: Dict[str, List[List[str]]] = {
     ],
 }
 
-HEADER_FEATURES: Dict[str, List[Set[str]]] = {
+HEADER_FEATURES: dict[str, list[set[str]]] = {
     "bank_statement": [
         {"Transaction date", "Amount"},
         {"交易日", "Balance"},
@@ -111,7 +111,7 @@ class SceneDetector(BaseMiddleware):
                 old_value="unknown",
                 new_value=scene,
                 confidence=confidence,
-                reason=f"Tier1 keyword match",
+                reason="Tier1 keyword match",
             )
             logger.info(f"[SceneDetector] Tier1 → {scene} (conf={confidence:.2f})")
             return result
@@ -141,7 +141,7 @@ class SceneDetector(BaseMiddleware):
                 old_value="unknown",
                 new_value=scene,
                 confidence=confidence,
-                reason=f"Tier2 feature+visual match",
+                reason="Tier2 feature+visual match",
             )
             logger.info(f"[SceneDetector] Tier2 → {scene} (conf={confidence:.2f})")
             return result
@@ -162,7 +162,7 @@ class SceneDetector(BaseMiddleware):
 
     # ─── Tier 1 ───
 
-    def _tier1_keyword(self, text: str) -> Tuple[str, float]:
+    def _tier1_keyword(self, text: str) -> tuple[str, float]:
         if not text:
             return "generic", 0.0
         best_scene = "generic"
@@ -178,7 +178,7 @@ class SceneDetector(BaseMiddleware):
 
     # ─── Tier 2 ───
 
-    def _tier2_header_features(self, table_blocks) -> Tuple[str, float]:
+    def _tier2_header_features(self, table_blocks) -> tuple[str, float]:
         """Tier 2: infer scene from table header column names."""
         if not table_blocks:
             return "generic", 0.0
@@ -203,7 +203,7 @@ class SceneDetector(BaseMiddleware):
 
     # ─── Visual Feature Boost ───
 
-    def _visual_feature_boost(self, result: ParseResult) -> Tuple[str, float]:
+    def _visual_feature_boost(self, result: ParseResult) -> tuple[str, float]:
         """Elevate confidence from prominent text (large/bold headings)."""
         boost_scene = "generic"
         boost_conf = 0.0
@@ -235,22 +235,26 @@ class SceneDetector(BaseMiddleware):
 
     # ─── Entity Corroboration ───
 
-    def _detect_from_entities(self, entities: Dict[str, str]) -> Tuple[str, float]:
+    def _detect_from_entities(self, entities: dict[str, str]) -> tuple[str, float]:
         if not entities:
             return "generic", 0.0
         keys = set(entities.keys())
 
         bank_keys = {
-            "Account name", "Account number", "Card number", "Bank name",
-            "Query period", "Account name称", "Customer name", "打印Period"
+            "Account name",
+            "Account number",
+            "Card number",
+            "Bank name",
+            "Query period",
+            "Account name称",
+            "Customer name",
+            "打印Period",
         }
         matched = len(keys & bank_keys)
         if matched >= 2:
             return "bank_statement", min(0.85, 0.5 + 0.15 * matched)
 
-        invoice_keys = {
-            "Invoice代码", "Invoice number", "Buyer", "Seller", "Tax amount"
-        }
+        invoice_keys = {"Invoice代码", "Invoice number", "Buyer", "Seller", "Tax amount"}
         matched = len(keys & invoice_keys)
         if matched >= 2:
             return "invoice", min(0.85, 0.5 + 0.15 * matched)

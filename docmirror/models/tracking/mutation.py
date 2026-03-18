@@ -22,9 +22,8 @@ Usage::
         confidence=0.95,
     )
 """
+
 from __future__ import annotations
-
-
 
 import dataclasses
 from datetime import datetime, timezone
@@ -46,15 +45,14 @@ class Mutation:
         timestamp:       The time the transformation occurred.
         reason:          The reason for the transformation (for debugging).
     """
+
     middleware_name: str
     target_block_id: str
     field_changed: str
     old_value: Any
     new_value: Any
     confidence: float = 1.0
-    timestamp: datetime = dataclasses.field(
-        default_factory=lambda: datetime.now(timezone.utc)
-    )
+    timestamp: datetime = dataclasses.field(default_factory=lambda: datetime.now(timezone.utc))
     reason: str = ""
 
     @classmethod

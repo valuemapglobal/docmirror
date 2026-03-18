@@ -21,12 +21,12 @@ Processing logic:
 Metadata includes:
     - parser_name: "EmailAdapter"
 """
+
 from __future__ import annotations
 
-
 import email as email_lib
-from email import policy
 import logging
+from email import policy
 from pathlib import Path
 from typing import Dict, List
 
@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 class EmailAdapter(BaseParser):
     """Email (.eml) format adapter — extracts headers, body text, and attachment metadata."""
 
-    async def to_parse_result(self, file_path: Path, **kwargs) -> "ParseResult":
+    async def to_parse_result(self, file_path: Path, **kwargs) -> ParseResult:
         """
         Parse an .eml file into a ParseResult.
 
@@ -47,8 +47,12 @@ class EmailAdapter(BaseParser):
         key_value pairs but their contents are not extracted.
         """
         from docmirror.models.entities.parse_result import (
-            ParseResult, PageContent, TextBlock, TextLevel,
-            KeyValuePair, ParserInfo,
+            KeyValuePair,
+            PageContent,
+            ParseResult,
+            ParserInfo,
+            TextBlock,
+            TextLevel,
         )
 
         logger.info(f"[EmailAdapter] Starting extraction for email: {file_path}")
@@ -56,7 +60,7 @@ class EmailAdapter(BaseParser):
             msg = email_lib.message_from_binary_file(f, policy=policy.default)
 
         # Extract standard email header fields
-        key_values: List[KeyValuePair] = [
+        key_values: list[KeyValuePair] = [
             KeyValuePair(key="subject", value=msg["subject"] or ""),
             KeyValuePair(key="from", value=msg["from"] or ""),
             KeyValuePair(key="to", value=msg["to"] or ""),
@@ -64,8 +68,8 @@ class EmailAdapter(BaseParser):
             KeyValuePair(key="message_id", value=msg.get("message-id", "")),
         ]
 
-        text_parts: List[str] = []
-        attachments: List[str] = []
+        text_parts: list[str] = []
+        attachments: list[str] = []
 
         if msg.is_multipart():
             for part in msg.walk():
@@ -88,7 +92,7 @@ class EmailAdapter(BaseParser):
         if attachments:
             key_values.append(KeyValuePair(key="attachments", value=", ".join(attachments)))
 
-        texts: List[TextBlock] = []
+        texts: list[TextBlock] = []
         for part_text in text_parts:
             if part_text.strip():
                 texts.append(TextBlock(content=part_text, level=TextLevel.BODY))

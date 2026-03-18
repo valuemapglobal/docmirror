@@ -26,13 +26,13 @@ Supported formats:
     - JSON/CSV → StructuredAdapter
 """
 
-from .pdf.pdf import PDFAdapter
-from .image.image import ImageAdapter
-from .web.email import EmailAdapter
-from .office.excel import ExcelAdapter
-from .office.word import WordAdapter
-from .office.ppt import PPTAdapter
 from .data.structured import StructuredAdapter
+from .image.image import ImageAdapter
+from .office.excel import ExcelAdapter
+from .office.ppt import PPTAdapter
+from .office.word import WordAdapter
+from .pdf.pdf import PDFAdapter
+from .web.email import EmailAdapter
 from .web.web import WebAdapter
 
 __all__ = [

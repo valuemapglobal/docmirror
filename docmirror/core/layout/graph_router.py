@@ -24,27 +24,29 @@ The router also supports an optional **model branch**: when a
 ``reading_order_model`` path is provided (or ``"auto"``), LayoutLMv3
 (``hantian/layoutreader``) is used to predict token-level reading order.
 """
+
 from __future__ import annotations
 
-from typing import List, Tuple, Dict, Set, Any, Optional
-from collections import defaultdict
 import logging
+from collections import defaultdict
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 logger = logging.getLogger(__name__)
 
 
-
 class SyntacticBridger:
-    """Evaluates semantic text continuity (N-gram/character-level syntax) 
+    """Evaluates semantic text continuity (N-gram/character-level syntax)
     between two text blocks to improve reading-order flow."""
-    
+
     @staticmethod
     def _extract_text(zone: Any) -> str:
         """Safely extract text from a layout Zone object."""
         if hasattr(zone, "text") and zone.text:
             return zone.text
         if hasattr(zone, "chars") and zone.chars:
-            return "".join(c.get("text", "") for c in sorted(zone.chars, key=lambda c: (c.get("top", 0), c.get("x0", 0))))
+            return "".join(
+                c.get("text", "") for c in sorted(zone.chars, key=lambda c: (c.get("top", 0), c.get("x0", 0)))
+            )
         return ""
 
     @staticmethod
@@ -56,16 +58,16 @@ class SyntacticBridger:
         """
         text_a = SyntacticBridger._extract_text(zone_a).strip()
         text_b = SyntacticBridger._extract_text(zone_b).strip()
-        
+
         if not text_a or not text_b:
             return 0.0
-            
+
         # Get last few characters of A and first few of B
         tail_a = text_a[-5:]
         head_b = text_b[:5]
-        
+
         score = 0.0
-        
+
         # 1. Punctuation continuity
         if tail_a[-1] in ".。!?！？":
             # Sentence ended
@@ -76,7 +78,7 @@ class SyntacticBridger:
         else:
             # Ends with alphanumeric/hanzi, might be broken word or no-punctuation boundary
             score += 0.5
-            
+
         # 2. Case continuity (applicable to English)
         if tail_a[-1].islower() and head_b[0].islower():
             score += 1.0
@@ -89,13 +91,13 @@ class SyntacticBridger:
             if tail_a[-1] in ":：":
                 score += 2.0
             else:
-                score -= 0.5 
-                
+                score -= 0.5
+
         return score
+
 
 # To avoid circular imports, we reference the Zone structure from layout_analysis.
 # Only used for type hints; duck typing with bbox and type also works.
-
 
 
 class GraphRouter:
@@ -103,22 +105,22 @@ class GraphRouter:
         self.page_width = page_width
         self.page_height = page_height
 
-    def _get_center(self, bbox: Tuple[float, float, float, float]) -> Tuple[float, float]:
+    def _get_center(self, bbox: tuple[float, float, float, float]) -> tuple[float, float]:
         x0, y0, x1, y1 = bbox
         return (x0 + x1) / 2, (y0 + y1) / 2
 
-    def _is_sidebar(self, bbox: Tuple[float, float, float, float]) -> bool:
+    def _is_sidebar(self, bbox: tuple[float, float, float, float]) -> bool:
         """Heuristically determine if a block is a sidebar or extreme header/footer."""
         x0, y0, x1, y1 = bbox
         w = x1 - x0
         cx, cy = self._get_center(bbox)
-        
+
         # Narrow vertical elements hugging the page edges
         if w < self.page_width * 0.15 and (cx < self.page_width * 0.15 or cx > self.page_width * 0.85):
             return True
         return False
 
-    def _detect_columns(self, zones: List[Any]) -> List[int]:
+    def _detect_columns(self, zones: list[Any]) -> list[int]:
         """Detect column structure (single / double / triple column).
 
         Determines the number of columns by clustering zone center
@@ -150,10 +152,10 @@ class GraphRouter:
         sorted_cx = sorted(valid_cx)
         gaps = []
         for i in range(1, len(sorted_cx)):
-            gap = sorted_cx[i] - sorted_cx[i-1]
+            gap = sorted_cx[i] - sorted_cx[i - 1]
             # A gap exceeding 15 % of page width is treated as a column separator
             if gap > self.page_width * 0.15:
-                gaps.append((sorted_cx[i-1] + sorted_cx[i]) / 2)
+                gaps.append((sorted_cx[i - 1] + sorted_cx[i]) / 2)
 
         if not gaps:
             return [0] * len(zones)
@@ -180,8 +182,7 @@ class GraphRouter:
 
         return columns
 
-    def build_flow(self, zones: List[Any], reading_order_model=None,
-                   enable_column_detection: bool = True) -> List[Any]:
+    def build_flow(self, zones: list[Any], reading_order_model=None, enable_column_detection: bool = True) -> list[Any]:
         """Produce a reading-order sorted list of zones using graph-based
         topological sort with semantic priorities and spatial relations.
 
@@ -197,7 +198,7 @@ class GraphRouter:
         """
         if not zones:
             return []
-            
+
         n = len(zones)
         if n == 1:
             return zones
@@ -212,24 +213,20 @@ class GraphRouter:
         try:
             from .spatial_graph import (
                 build_delaunay_adjacency,
-                detect_columns_geometric,
                 compute_reading_order,
+                detect_columns_geometric,
             )
 
             adj = build_delaunay_adjacency(zones, self.page_width, self.page_height)
-            columns = (
-                detect_columns_geometric(zones, self.page_width)
-                if enable_column_detection
-                else [0] * n
-            )
+            columns = detect_columns_geometric(zones, self.page_width) if enable_column_detection else [0] * n
             sorted_indices = compute_reading_order(
-                zones, self.page_width, self.page_height,
-                adj=adj, columns=columns,
+                zones,
+                self.page_width,
+                self.page_height,
+                adj=adj,
+                columns=columns,
             )
-            logger.debug(
-                f"Graph Router applied via Delaunay spatial graph. "
-                f"Visual Causal Flow established."
-            )
+            logger.debug("Graph Router applied via Delaunay spatial graph. Visual Causal Flow established.")
             return [zones[i] for i in sorted_indices]
 
         except Exception as exc:
@@ -238,28 +235,28 @@ class GraphRouter:
         # -------------------------------------------------------------------
         # Fallback: O(n²) brute-force adjacency (original logic)
         # -------------------------------------------------------------------
-        adj: Dict[int, Set[int]] = defaultdict(set)
-        in_degree: Dict[int, int] = defaultdict(int)
-        
+        adj: dict[int, set[int]] = defaultdict(set)
+        in_degree: dict[int, int] = defaultdict(int)
+
         # Pre-compute attributes
         is_sidebar = [self._is_sidebar(z.bbox) for z in zones]
 
         # Column detection (all zones get column 0 for single-column docs)
         columns = self._detect_columns(zones) if enable_column_detection else [0] * n
-        
+
         for i in range(n):
             for j in range(n):
                 if i == j:
                     continue
-                
+
                 z_i = zones[i]
                 z_j = zones[j]
                 x0_i, y0_i, x1_i, y1_i = z_i.bbox
                 x0_j, y0_j, x1_j, y1_j = z_j.bbox
-                
+
                 cy_i = (y0_i + y1_i) / 2
                 cy_j = (y0_j + y1_j) / 2
-                
+
                 # ── Causal constraints (directed edge construction) ──
 
                 # Rule 0: Cross-column titles precede column content
@@ -267,10 +264,10 @@ class GraphRouter:
                     if y1_i < y0_j + 15:
                         adj[i].add(j)
                         continue
-                
+
                 # Evaluate semantic continuity
                 semantic_score = SyntacticBridger.bridging_score(z_i, z_j)
-                
+
                 # Rule A: Main content precedes sidebar at same vertical band
                 if is_sidebar[j] and not is_sidebar[i]:
                     if abs(cy_i - cy_j) < self.page_height * 0.2:
@@ -278,12 +275,12 @@ class GraphRouter:
                         if semantic_score >= -1.0:
                             adj[i].add(j)
                         continue
-                
+
                 # Rule B: Block clearly above another takes precedence
                 if y1_i < y0_j + 15:  # bottom of i is still above top of j
                     adj[i].add(j)
                     continue
-                    
+
                 # Rule C: Horizontal case — left precedes right when heights significantly overlap
                 y_overlap = max(0, min(y1_i, y1_j) - max(y0_i, y0_j))
                 h_i, h_j = y1_i - y0_i, y1_j - y0_j
@@ -293,7 +290,7 @@ class GraphRouter:
                             adj[i].add(j)
                         elif x1_i < x0_j - 50:
                             adj[i].add(j)
-                        
+
         # Compute in-degree for each node
         for i in range(n):
             in_degree[i] = 0
@@ -305,45 +302,38 @@ class GraphRouter:
         # Topological sort (Kahn's algorithm) with a priority heap
         # -------------------------------------------------------------------
         import heapq
-        
-        _ZONE_ORDER = {
-            "title": 0, 
-            "summary": 1, 
-            "data_table": 2,
-            "formula": 2,
-            "unknown": 3, 
-            "footer": 4
-        }
-        
+
+        _ZONE_ORDER = {"title": 0, "summary": 1, "data_table": 2, "formula": 2, "unknown": 3, "footer": 4}
+
         queue = []
         for i in range(n):
             if in_degree[i] == 0:
                 col = max(0, columns[i])
                 qw = _ZONE_ORDER.get(zones[i].type, 3)
                 heapq.heappush(queue, (col, qw, zones[i].bbox[1], i))
-                
+
         sorted_indices = []
-        
+
         while queue:
             _, _, _, u = heapq.heappop(queue)
             sorted_indices.append(u)
-            
+
             for v in adj[u]:
                 in_degree[v] -= 1
                 if in_degree[v] == 0:
                     col = max(0, columns[v])
                     qw = _ZONE_ORDER.get(zones[v].type, 3)
                     heapq.heappush(queue, (col, qw, zones[v].bbox[1], v))
-        
+
         # Safety net: if cycles exist, fall back to static y + semantic sort
         if len(sorted_indices) != n:
             logger.debug("Graph Router detected cycle, falling back to static sort.")
             return sorted(zones, key=lambda z: (_ZONE_ORDER.get(z.type, 3), z.bbox[1]))
-            
+
         logger.info(f"[GraphRouter] Topological sort applied successfully: {n} zones. Visual Causal Flow established.")
         return [zones[i] for i in sorted_indices]
 
-    def _model_reading_order(self, zones: List[Any], model_path: str) -> Optional[List[Any]]:
+    def _model_reading_order(self, zones: list[Any], model_path: str) -> list[Any] | None:
         """Use a LayoutLMv3-based model to predict reading order.
 
         Args:
@@ -356,8 +346,8 @@ class GraphRouter:
             to the graph-based method).
         """
         try:
-            from transformers import LayoutLMv3ForTokenClassification, LayoutLMv3Tokenizer
             import torch
+            from transformers import LayoutLMv3ForTokenClassification, LayoutLMv3Tokenizer
         except ImportError:
             logger.debug("[GraphRouter] transformers/torch not available, using graph fallback")
             return None
@@ -365,7 +355,7 @@ class GraphRouter:
         try:
             repo_id = "hantian/layoutreader" if model_path == "auto" else model_path
 
-            if not hasattr(self, '_layoutreader_model'):
+            if not hasattr(self, "_layoutreader_model"):
                 self._layoutreader_model = LayoutLMv3ForTokenClassification.from_pretrained(repo_id)
                 self._layoutreader_tokenizer = LayoutLMv3Tokenizer.from_pretrained(repo_id)
                 self._layoutreader_model.eval()
@@ -406,7 +396,7 @@ class GraphRouter:
 
             # Strip [CLS] and [SEP] token predictions;
             # actual zone tokens correspond to predictions[1 : len(zones)+1]
-            zone_orders = predictions[1:len(zones)+1]
+            zone_orders = predictions[1 : len(zones) + 1]
 
             # Sort zones by their predicted reading order
             indexed_zones = list(enumerate(zones))

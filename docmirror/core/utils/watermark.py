@@ -20,14 +20,15 @@ Contents:
     - ``_dedup_overlapping_chars`` — removes pseudo-bold duplicate
       characters (same text at nearly the same position).
 """
-from __future__ import annotations
 
+from __future__ import annotations
 
 import logging
 from pathlib import Path
 from typing import Dict
 
 logger = logging.getLogger(__name__)
+
 
 def preprocess_document(file_path: Path) -> Path:
     """Layer-0 physical clean-up: use pikepdf to strip annotation layers.
@@ -38,11 +39,12 @@ def preprocess_document(file_path: Path) -> Path:
     """
     try:
         import pikepdf
+
         pdf = pikepdf.open(str(file_path))
         modified = False
         for page in pdf.pages:
-            if '/Annots' in page:
-                del page['/Annots']
+            if "/Annots" in page:
+                del page["/Annots"]
                 modified = True
         if modified:
             temp_path = file_path.parent / f"{file_path.stem}_cleaned.pdf"
@@ -54,7 +56,7 @@ def preprocess_document(file_path: Path) -> Path:
     return file_path
 
 
-def is_watermark_char(obj: Dict) -> bool:
+def is_watermark_char(obj: dict) -> bool:
     """Determine whether a pdfplumber character object is a watermark.
 
     Uses a triple-check heuristic:
@@ -77,10 +79,7 @@ def is_watermark_char(obj: Dict) -> bool:
 
 def filter_watermark_page(page):
     """Return a filtered pdfplumber page with watermark characters removed."""
-    return page.filter(
-        lambda obj: obj.get("object_type") != "char"
-        or not is_watermark_char(obj)
-    )
+    return page.filter(lambda obj: obj.get("object_type") != "char" or not is_watermark_char(obj))
 
 
 def separate_watermark_layer(page) -> object:
@@ -114,7 +113,7 @@ def separate_watermark_layer(page) -> object:
     import math
 
     # ── Step 1: Cluster by rotation angle ──
-    rotation_buckets: Dict[int, list] = {}
+    rotation_buckets: dict[int, list] = {}
     for i, c in enumerate(chars):
         m = c.get("matrix")
         if m and len(m) >= 4:
@@ -156,12 +155,8 @@ def separate_watermark_layer(page) -> object:
         f"chars ({pct:.1f}%) across {len(rotation_buckets)} rotation clusters"
     )
 
-    keep_set = {
-        id(chars[i]) for i in range(len(chars)) if i not in watermark_indices
-    }
-    return page.filter(
-        lambda obj: obj.get("object_type") != "char" or id(obj) in keep_set
-    )
+    keep_set = {id(chars[i]) for i in range(len(chars)) if i not in watermark_indices}
+    return page.filter(lambda obj: obj.get("object_type") != "char" or id(obj) in keep_set)
 
 
 def _dedup_overlapping_chars(page):
@@ -188,9 +183,7 @@ def _dedup_overlapping_chars(page):
         return page
 
     keep_chars = {id(page.chars[i]) for i in range(len(page.chars)) if i not in dedup_ids}
-    return page.filter(
-        lambda obj: obj.get("object_type") != "char" or id(obj) in keep_chars
-    )
+    return page.filter(lambda obj: obj.get("object_type") != "char" or id(obj) in keep_chars)
 
 
 def fused_filter_and_dedup(page) -> tuple:
@@ -232,7 +225,5 @@ def fused_filter_and_dedup(page) -> tuple:
         return page, False
 
     keep = {id(page.chars[i]) for i in range(len(page.chars)) if i not in remove_ids}
-    filtered = page.filter(
-        lambda obj: obj.get("object_type") != "char" or id(obj) in keep
-    )
+    filtered = page.filter(lambda obj: obj.get("object_type") != "char" or id(obj) in keep)
     return filtered, watermark_found

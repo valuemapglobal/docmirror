@@ -6,8 +6,8 @@
 
 """Detection middlewares \u2013 scene, language, institution."""
 
-from .scene_detector import SceneDetector
-from .language_detector import LanguageDetector
 from .institution_detector import InstitutionDetector
+from .language_detector import LanguageDetector
+from .scene_detector import SceneDetector
 
 __all__ = ["SceneDetector", "LanguageDetector", "InstitutionDetector"]

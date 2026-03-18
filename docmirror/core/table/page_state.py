@@ -18,6 +18,7 @@ Used by ``extract_tables_layered()`` (via ``layer_hint``) and
 ``post_process_table()`` (via ``confirmed_header``) to skip
 redundant exploration on subsequent pages.
 """
+
 from __future__ import annotations
 
 import dataclasses
@@ -34,8 +35,9 @@ class PageState:
     Created once per document, updated after each page's successful
     table extraction, and passed forward to the next page.
     """
-    confirmed_header: Optional[List[str]] = None
-    winning_layer: Optional[str] = None
+
+    confirmed_header: list[str] | None = None
+    winning_layer: str | None = None
     col_count: int = 0
     page_count: int = 0
     confidence: float = 0.0
@@ -49,16 +51,12 @@ class PageState:
           - A winning layer has been identified.
           - Confidence is above a minimum threshold (0.3).
         """
-        return (
-            self.page_count > 0
-            and self.winning_layer is not None
-            and self.confidence >= 0.3
-        )
+        return self.page_count > 0 and self.winning_layer is not None and self.confidence >= 0.3
 
     def update(
         self,
-        header: Optional[List[str]],
-        layer: Optional[str],
+        header: list[str] | None,
+        layer: str | None,
         confidence: float,
     ) -> None:
         """Update state after a successful page extraction.

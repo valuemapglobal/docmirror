@@ -11,8 +11,8 @@ Converts PDF files into structured output.
   shared ``Orchestrator`` middleware pipeline (SceneDetector,
   EntityExtractor, Validator, etc.) then produces ``ParseResult``.
 """
-from __future__ import annotations
 
+from __future__ import annotations
 
 import logging
 from pathlib import Path
@@ -38,7 +38,7 @@ class PDFAdapter(BaseParser):
     def __init__(self, enhance_mode: str = "standard", **kwargs):
         self._enhance_mode = enhance_mode
 
-    async def to_parse_result(self, file_path: Path, **kwargs) -> "ParseResult":
+    async def to_parse_result(self, file_path: Path, **kwargs) -> ParseResult:
         """
         Extract a PDF into a ParseResult.
 
@@ -61,7 +61,7 @@ class PDFAdapter(BaseParser):
 
         return pr
 
-    async def perceive(self, file_path: Path, **context) -> "ParseResult":
+    async def perceive(self, file_path: Path, **context) -> ParseResult:
         """
         Full pipeline: PDF → middleware → ParseResult.
 
